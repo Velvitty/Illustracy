@@ -2545,7 +2545,7 @@ function sendToBackground(points) {
   // 획이 닿은 파츠 + 그와 거의 같은 색의 파츠만 허용
   const allowed = new Uint8Array(flats.length);
   const isClick = points.every(([x, y]) => Math.abs(x - points[0][0]) + Math.abs(y - points[0][1]) <= 4);
-  const inner = new Uint8Array(points.length), tipOk = new Uint8Array(points.length);
+  const inner = new Uint8Array(points.length);         // 획 끝(시작·끝 12px)이 아닌 점
   {
     const along = [0];                                 // 획을 따라간 거리
     for (let i = 1; i < points.length; i++) along.push(along[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
@@ -2561,13 +2561,7 @@ function sendToBackground(points) {
       const p = cy * W + cx;
       if (!bgA[p] && la[p] < T && pid[p] >= 0) seeds.add(pid[p]);
     }
-    // 획 끝(시작·끝 12px)에서만 닿은 파츠는 무시한다: 획이 물건 가장자리를 살짝 넘어 옆 파츠(치마 등)에 닿는 일이 흔하다
-    for (let i = 0; i < points.length; i++) {
-      const [cx, cy] = points[i];
-      if (inner[i] || cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
-      const p = cy * W + cx;
-      if (!bgA[p] && la[p] < T && pid[p] >= 0 && seeds.has(pid[p])) tipOk[i] = 1;
-    }
+
     for (let k = 0; k < flats.length; k++) for (const sd of seeds) {
       const a = flatLab[k], b = flatLab[sd];
       // 밝기 차이(명암)는 넉넉히, 색상 차이는 좁게: 같은 나무의 밝은 면·어두운 면은 받고,
@@ -2593,11 +2587,13 @@ function sendToBackground(points) {
   }
   const near = q => dist[q] <= reach;
   // 1) 획의 점마다: 같은 파츠 안에서 선을 넘지 않고 색이 이어지는 영역(합집합)
-  const R = new Uint8Array(N);
+  // 획 끝은 채우기를 시작하지 않는다: 가장자리를 살짝 넘겨 옆 물건(치마, 스타킹 …)에 닿는 일이 흔하고,
+  // 그 물건이 가구와 같은 파츠로 묶여 있으면 따로 채워져 버린다. 끝의 픽셀은 가운데에서 시작한 채우기가 닿을 때만 옮겨진다
+  const R = new Uint8Array(N), rid = new Int32Array(N).fill(-1), rArea = [];
   let n = 0, hitBg = 0, lineAmbiguous = false;
   for (let i = 0; i < points.length; i++) {
     const [cx, cy] = points[i];
-    if (byPart && !inner[i] && !tipOk[i]) continue;    // 획 끝에서 옆 파츠에 잘못 닿은 점
+    if (!inner[i]) continue;
     if (cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
     let p0 = cy * W + cx;
     if (bgA[p0]) { hitBg++; continue; }
@@ -2620,8 +2616,9 @@ function sendToBackground(points) {
       p0 = best;
     }
     if (byPart && pid[p0] >= 0) allowed[pid[p0]] = 1;
-    const stack = [p0];
-    R[p0] = 1; n++;
+    const stack = [p0], k = rArea.length;
+    R[p0] = 1; rid[p0] = k; n++;
+    let area = 1;
     while (stack.length) {
       const p = stack.pop(), x = p % W;
       for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
@@ -2629,9 +2626,22 @@ function sendToBackground(points) {
         if (byPart && !(pid[q] >= 0 && allowed[pid[q]])) continue;
         const i = p * 4, j = q * 4;
         if (Math.max(Math.abs(orig[i] - orig[j]), Math.abs(orig[i + 1] - orig[j + 1]), Math.abs(orig[i + 2] - orig[j + 2])) > tol) continue;
-        R[q] = 1; n++; stack.push(q);
+        R[q] = 1; rid[q] = k; n++; area++; stack.push(q);
       }
     }
+    rArea.push(area);
+  }
+  // 획 가운데가 10px 이상 지나간 채우기만 남긴다: 획이 옆 물건(스타킹 등)의 가장자리를 스치기만 한 경우는 버린다.
+  // (점 개수가 아니라 길이로 센다: 마우스를 천천히 움직이면 같은 자리에 점이 여러 개 찍힌다)
+  if (!isClick && rArea.length) {
+    const support = new Float64Array(rArea.length);
+    for (let i = 1; i < points.length; i++) {           // 획 끝 구간은 세지 않는다
+      const [cx, cy] = points[i], [px, py] = points[i - 1];
+      if (!inner[i] || !inner[i - 1] || cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
+      const k = rid[cy * W + cx]; if (k >= 0) support[k] += Math.hypot(cx - px, cy - py);
+    }
+    const drop = rArea.map((_, k) => support[k] < 10);
+    if (drop.some(Boolean)) for (let p = 0; p < N; p++) if (R[p] && drop[rid[p]]) { R[p] = 0; n--; }
   }
   if (n < 16) {
     toast(lineAmbiguous ? '선 위를 누르셨어요. 선 양쪽이 서로 다른 부분이라, 옮길 물건의 안쪽을 눌러 주세요.'
@@ -2674,6 +2684,27 @@ function sendToBackground(points) {
       }
     }
     front = next;
+  }
+  // 캐릭터와 맞닿은 윤곽선(스타킹 | 의자 다리, 치마 | 탁자)은 캐릭터 쪽에 남긴다:
+  // 남은 캐릭터 픽셀에서 4px 안에 닿는 선 픽셀과, 캐릭터 색이 매끄럽게 이어지는 가장자리 픽셀은 옮기지 않는다
+  {
+    const keep = new Uint8Array(N);
+    front = [];
+    for (let p = 0; p < N; p++) if (!M[p] && !bgA[p] && la[p] < 20 && pid[p] >= 0) front.push(p);
+    for (let d = 0; d < 4 && front.length; d++) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q < 0 || keep[q] || !M[q]) continue;
+          const i = p * 4, j = q * 4;
+          const smooth = Math.max(Math.abs(orig[i] - orig[j]), Math.abs(orig[i + 1] - orig[j + 1]), Math.abs(orig[i + 2] - orig[j + 2])) < 16;
+          if (la[q] >= 20 || smooth) { keep[q] = 1; next.push(q); }
+        }
+      }
+      front = next;
+    }
+    for (let p = 0; p < N; p++) if (keep[p]) M[p] = 0;
   }
   let count = 0;
   for (let p = 0; p < N; p++) if (M[p]) { count++; const x = p % W, y = (p / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
