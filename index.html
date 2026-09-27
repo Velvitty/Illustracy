@@ -564,7 +564,7 @@ function shadeRelated(c1, c2, hueTol, simTol) {
   const dE = Math.hypot(c1.L - c2.L, c1.a - c2.a, c1.b - c2.b);
   if (dE < simTol) return true;
   const n1 = c1.C < 12, n2 = c2.C < 12;
-  if (n1 && n2) return true;                        // 무채색끼리의 명암
+  if (n1 && n2) return Math.abs(c1.L - c2.L) < simTol * 3; // 무채색끼리의 명암(밝기 차이가 너무 크면 다른 재질)
   if (!n1 && !n2) {
     const ratio = c1.C / c2.C;
     return hueDiff(c1.h, c2.h) < hueTol && ratio > 0.3 && ratio < 3.3;
@@ -633,6 +633,74 @@ function detectBackground(U, known, W, H) {
   for (let p = 0; p < N; p++) area += bg[p];
   if (area < N * 0.03 || area > N * 0.97) return null;
   return bg;
+}
+
+/* 장면 배경: 캐릭터·소품은 선으로 그려지고 배경은 선 없이 칠해지는 경우가 많다.
+ * 선이 드문 곳 중 이미지 테두리와 이어진 영역을 배경으로 본다(좁은 틈으로는 새지 않게 침식 후 복원). */
+function detectSceneBg(U, known, lineMask, W, H, scale) {
+  const N = W * H, lm = new Float32Array(N);
+  let nl = 0;
+  for (let p = 0; p < N; p++) if (lineMask[p]) { lm[p] = 1; nl++; }
+  if (nl < N * 0.002) return null;
+  const D = blur(lm, W, H, Math.max(W, H) * 0.02);
+  const hist = new Int32Array(1001);                  // 선이 있는 곳의 전형적인 선 밀도(중앙값)
+  for (let p = 0; p < N; p++) if (lineMask[p]) hist[Math.min(1000, Math.round(D[p] * 1000))]++;
+  let acc = 0, med = 0;
+  for (let i = 0; i <= 1000; i++) { acc += hist[i]; if (acc * 2 >= nl) { med = i / 1000; break; } }
+  const tau = med * 0.25, cand = new Float32Array(N);
+  for (let p = 0; p < N; p++) cand[p] = known[p] && D[p] < tau ? 1 : 0;
+  const r = Math.max(2, Math.round(3 * scale));
+  const core = erode(cand, W, H, r), bg = new Uint8Array(N), dist = new Int32Array(N).fill(-1);
+  let front = [];
+  const border = [];
+  for (let x = 0; x < W; x++) border.push(x, (H - 1) * W + x);
+  for (let y = 1; y < H - 1; y++) border.push(y * W, y * W + W - 1);
+  for (const p of border) if (core[p] > 0.5 && dist[p] < 0) { dist[p] = 0; front.push(p); }
+  while (front.length) {                               // 침식된 후보 안에서 테두리부터 채우기
+    const next = [];
+    for (const p of front) {
+      bg[p] = 1;
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && dist[q] < 0 && core[q] > 0.5) { dist[q] = 0; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  front = [];                                          // 침식한 만큼(+1) 원래 후보 안에서 되살리기
+  for (let p = 0; p < N; p++) if (bg[p]) front.push(p);
+  for (let d = 0; d <= r && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !bg[q] && cand[q] > 0.5) { bg[q] = 1; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  // 캐릭터 둘레 여백: 선을 넘지 않고, 배경과 색이 매끄럽게 이어지는 곳까지 넓힌다
+  // (여백 폭 정도까지만: 배경과 같은 색의 가는 소품을 따라 멀리 새지 않게)
+  const rf = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+  front = [];
+  for (let p = 0; p < N; p++) if (bg[p]) { for (let c = 0; c < 3; c++) rf[c][p] = U[c][p]; front.push(p); }
+  const maxGrow = Math.round(Math.max(W, H) * 0.05);
+  for (let d = 0; d < maxGrow && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q < 0 || bg[q] || !known[q]) continue;
+        let st = 0, dr = 0;
+        for (let c = 0; c < 3; c++) { st = Math.max(st, Math.abs(U[c][q] - U[c][p])); dr = Math.max(dr, Math.abs(U[c][q] - rf[c][p])); }
+        if (st < 0.03 && dr < 0.1) { bg[q] = 1; for (let c = 0; c < 3; c++) rf[c][q] = rf[c][p]; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  let area = 0;
+  for (let p = 0; p < N; p++) area += bg[p];
+  return area >= N * 0.05 && area <= N * 0.9 ? bg : null;
 }
 
 function kmeans(Lp, Ap, Bp, idx, K, rnd, maxSamples = 50000) {
@@ -816,13 +884,33 @@ function process(img, opts, progress) {
       traceMask = new Uint8Array(N);
       let tw = 0, aw = 0;
       const col = [0, 0, 0];
+      // 이 알파 이상이면 선 색을 역산해도 0~1 범위 안에 들어온다(= 정확히 재현 가능한 최소 알파)
+      const aMin = p => {
+        let a = 0;
+        for (let c = 0; c < 3; c++) {
+          const u = U[c][p], o = O[c][p];
+          if (u > 0.004) a = Math.max(a, 1 - o / u);
+          if (o > u && u < 0.996) a = Math.max(a, (o - u) / (1 - u));
+        }
+        return clamp01(a);
+      };
       for (let p = 0; p < N; p++) {
         if (!inMask[p] || A[p] <= 0.02) continue;
         const cl = labOf(Cs[0][p], Cs[1][p], Cs[2][p]);
-        const tr = Math.hypot(cl[0] - k0[0], cl[1] - k0[1], cl[2] - k0[2]) > 6;
-        for (let c = 0; c < 3; c++) col[c] = tr ? Cs[c][p] : lineK0[c];
-        let a = solve(p, col);
-        if (a <= 0.02) { a = 0; U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p]; }
+        let tr = Math.hypot(cl[0] - k0[0], cl[1] - k0[1], cl[2] - k0[2]) > 6;
+        let a;
+        if (!tr) {                                     // 기본 선 색으로 맞춰 보고, 많이 어긋나면 색트레스로
+          a = solve(p, lineK0);
+          let r = 0;
+          for (let c = 0; c < 3; c++) r = Math.max(r, Math.abs(O[c][p] - (a * lineK0[c] + (1 - a) * U[c][p])));
+          if (r <= 8 / 255) for (let c = 0; c < 3; c++) col[c] = lineK0[c];
+          else tr = true;
+        }
+        if (tr) {                                      // 색트레스: 부드러운 선 색에서 출발해 정확히 재현되는 색으로
+          a = Math.max(solve(p, [Cs[0][p], Cs[1][p], Cs[2][p]]), aMin(p));
+          if (a > 0.02) for (let c = 0; c < 3; c++) col[c] = clamp01((O[c][p] - (1 - a) * U[c][p]) / a);
+        }
+        if (a <= 0.02) { a = 0; tr = false; U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p]; }
         lineA[p] = a;
         for (let c = 0; c < 3; c++) lineC[c][p] = col[c];
         if (tr && a > 0) { traceMask[p] = 1; tw += a; }
@@ -839,7 +927,11 @@ function process(img, opts, progress) {
 
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
-  const bgMask = opts.bg && !hasAlpha ? detectBackground(U, known, W, H) : null;
+  let bgMask = opts.bg && !hasAlpha ? detectBackground(U, known, W, H) : null;
+  if (opts.bg && !hasAlpha) {                          // 선 없이 칠한 장면 배경도 배경으로
+    const scene = detectSceneBg(U, known, lineMask, W, H, scale);
+    if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
+  }
   // 배경 위에 떠 있는 작은 조각(입자, 빛줄기 조각)은 캐릭터 파츠가 아니라 "배경 + 효과"로 본다
   let bgFx = null, bgBase = null;
   if (bgMask) {
@@ -872,10 +964,30 @@ function process(img, opts, progress) {
         if (bgMask[q]) { nbBg[r]++; for (let c = 0; c < 3; c++) bs[r * 3 + c] += U[c][q]; }
       }
     }
+    // 캐릭터(배경이 아닌 칠한 곳)까지의 거리: 캐릭터에서 멀리 떨어진 선은 배경 그림의 선
+    const near = Math.max(10, Math.round(20 * scale)), dch = new Int32Array(N).fill(-1);
+    let fr = [];
+    for (let p = 0; p < N; p++) if (known[p] && !bgMask[p]) { dch[p] = 0; fr.push(p); }
+    for (let d = 1; d <= near && fr.length; d++) {
+      const nx = [];
+      for (const p of fr) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q >= 0 && dch[q] < 0) { dch[q] = d; nx.push(q); }
+        }
+      }
+      fr = nx;
+    }
+    const nearChar = new Uint8Array(n);
+    for (let p = 0; p < N; p++) if (lc.rid[p] >= 0 && dch[p] >= 0) nearChar[lc.rid[p]] = 1;
     const drop = new Uint8Array(n);
-    let anyDrop = false;
+    let anyDrop = false, totalLine = 0;
+    for (let r = 0; r < n; r++) totalLine += cn[r];
     for (let r = 0; r < n; r++) {
       if (!nbAll[r] || nbBg[r] < nbAll[r] * 0.85) continue;
+      if (!nearChar[r]) { drop[r] = 1; anyDrop = true; continue; }
+      // 배경 안에 떠 있는 작은 선 조각(배경 그림의 선: 창틀, 구름, 크레이터 …)은 배경 그림에 남긴다
+      if (cn[r] < totalLine * 0.005) { drop[r] = 1; anyDrop = true; continue; }
       const l1 = labOf(cs[r * 3] / cn[r], cs[r * 3 + 1] / cn[r], cs[r * 3 + 2] / cn[r]);
       const l2 = labOf(bs[r * 3] / nbBg[r], bs[r * 3 + 1] / nbBg[r], bs[r * 3 + 2] / nbBg[r]);
       if (Math.hypot(l1[0] - l2[0], l1[1] - l2[1], l1[2] - l2[2]) < 15) { drop[r] = 1; anyDrop = true; }
@@ -1184,7 +1296,7 @@ function process(img, opts, progress) {
       const r = gLum[dark] / Math.max(gLum[lit], 1e-3);
       if (r < 0.45 || r > 0.93) return false;
       const a = gCol[lit], b = gCol[dark];
-      if (a.C < 22 && b.C < 22) return true;
+      if (a.C < 25 && b.C < 25) return Math.abs(a.C - b.C) < 18 && r >= 0.55; // 흰 머리카락 ↔ 연보라 그림자처럼 채도가 비슷한 경우만
       return a.C >= 12 && b.C >= 12 && hueDiff(a.h, b.h) < 30 && b.C / a.C > 0.5 && b.C / a.C < 2;
     };
     const minPart = Math.max(64, N * 0.0015);
@@ -1203,9 +1315,17 @@ function process(img, opts, progress) {
       if (ra > rb) { const t = ra; ra = rb; rb = t; }
       const k = ra * nGroups + rb; rootEdges.set(k, (rootEdges.get(k) || 0) + n);
     }
+    const rootPerim = new Map();                     // 파츠별 다른 파츠와 맞닿은 경계 총길이
+    for (const [k, n] of rootEdges) {
+      const a = Math.floor(k / nGroups), b = k % nGroups;
+      rootPerim.set(a, (rootPerim.get(a) || 0) + n); rootPerim.set(b, (rootPerim.get(b) || 0) + n);
+    }
     for (const [k, n] of [...rootEdges.entries()].sort((x, y) => y[1] - x[1])) {
       const a = Math.floor(k / nGroups), b = k % nGroups;
       if (n < 8) continue;
+      // 그림자 면은 밝은 면에 대부분 둘러싸여 있다(머리카락 가닥처럼). 여러 재질과 맞닿은 면(옷 등)은 따로 둔다
+      const darkRoot = gLum[rRep[uf.find(a)]] < gLum[rRep[uf.find(b)]] ? a : b;
+      if (n < 0.4 * (rootPerim.get(darkRoot) || 1)) continue;
       const ra = uf.find(a), rb = uf.find(b); if (ra === rb) continue;
       const ga = rRep[ra], gb = rRep[rb];
       const lit = gLum[ga] >= gLum[gb] ? ga : gb, dark = lit === ga ? gb : ga;
@@ -1263,13 +1383,17 @@ function process(img, opts, progress) {
       continue;
     }
     const ll = lumOf(cl[0], cl[1], cl[2]);
-    if (lf < 0.995 && 1 - (1 - ll) / (1 - lf) > 0.12) toneHi[t] = 1;
+    if (lf < 0.995 && 1 - (1 - ll) / (1 - lf) > 0.12) {
+      toneHi[t] = 1;
+      // 반짝임 후보: 거의 흰색이고 밑색보다 훨씬 밝은 톤(눈 하이라이트, 별). 나머지 작은 하이라이트는 하이라이트 레이어에
+      if (Math.max(tMean[t * 3], tMean[t * 3 + 1], tMean[t * 3 + 2]) >= 0.85 && 1 - (1 - ll) / (1 - lf) > 0.35) toneHi[t] = 2;
+    }
   }
   // 작은 하이라이트 조각은 반짝임으로
   const sparkPix = new Uint8Array(N);
   {
     const vis = new Uint8Array(N);
-    for (let p = 0; p < N; p++) vis[p] = A[p] > 0.02 && tone[p] >= 0 && tone[p] < nT && toneHi[tone[p]] ? 1 : 0;
+    for (let p = 0; p < N; p++) vis[p] = A[p] > 0.02 && tone[p] >= 0 && tone[p] < nT && toneHi[tone[p]] === 2 ? 1 : 0;
     const hc = components(tone, vis, W, H), hArea = new Int32Array(hc.count);
     for (let p = 0; p < N; p++) if (hc.rid[p] >= 0) hArea[hc.rid[p]]++;
     for (let p = 0; p < N; p++) if (hc.rid[p] >= 0 && hArea[hc.rid[p]] <= sparkArea) sparkPix[p] = 1;
@@ -1476,14 +1600,27 @@ function buildLayers(ctx) {
   /* 밝아짐 → 반짝임(작은 점) / 림라이트(실루엣 가장자리에 몰린 빛) / 반사광(그림자 속 밝아짐) / 빛(나머지).
    * 스크린은 1-(1-a)(1-b)로 합쳐지므로 차례로 떼어 내도 합성 결과가 같다 */
   progress(0.76, '반짝임 · 림라이트 · 반사광 · 빛 분리');
-  const open = blur(dilate(erode(sMax, W, H, sparkR), W, H, sparkR), W, H, sparkR * 0.5);
+  // 반짝임 판정용: 선을 지운 그림 자체의 밝기에서 반짝임 크기보다 가는 밝은 구조만(화이트 탑햇)
+  const lumU = new Float32Array(N);
+  for (let p = 0; p < N; p++) lumU[p] = lumOf(U[0][p], U[1][p], U[2][p]);
+  const openU = dilate(erode(lumU, W, H, sparkR), W, H, sparkR);
   const smallS = new Uint8Array(N);
   {
     const on = new Uint8Array(N);
     for (let p = 0; p < N; p++) on[p] = sMax[p] > 3 / 255 ? 1 : 0;
-    const sc = components(new Int32Array(N), on, W, H), sa = new Int32Array(sc.count), smx = new Float32Array(sc.count);
-    for (let p = 0; p < N; p++) { const r = sc.rid[p]; if (r >= 0) { sa[r]++; if (sMax[p] > smx[r]) smx[r] = sMax[p]; } }
-    for (let p = 0; p < N; p++) { const r = sc.rid[p]; if (r >= 0 && sa[r] <= sparkArea && smx[r] > 0.15) smallS[p] = 1; }
+    const sc = components(new Int32Array(N), on, W, H), n = sc.count;
+    const sa = new Int32Array(n), smx = new Float32Array(n), sw = new Float32Array(n), th = new Float32Array(n);
+    for (let p = 0; p < N; p++) {
+      const r = sc.rid[p]; if (r < 0) continue;
+      sa[r]++; if (sMax[p] > smx[r]) smx[r] = sMax[p];
+      sw[r] += Math.min(U[0][p], U[1][p], U[2][p]);
+      const d = lumU[p] - openU[p]; if (d > th[r]) th[r] = d;
+    }
+    // 떨어져 있는 작은 밝은 조각 중 확실히 밝고(0.25+), 옅은 색이며, 그림에서도 주변보다 튀는(0.12+) 것만 반짝임
+    for (let p = 0; p < N; p++) {
+      const r = sc.rid[p];
+      if (r >= 0 && sa[r] <= sparkArea && smx[r] > 0.25 && sw[r] / sa[r] > 0.65 && th[r] > 0.12) smallS[p] = 1;
+    }
   }
   // 실루엣(배경·투명과 맞닿은 캐릭터 가장자리)에서의 거리
   const rimR = Math.max(4, Math.round(12 * scale));
@@ -1523,7 +1660,8 @@ function buildLayers(ctx) {
     const sm = sMax[p];
     const small = sparkPix[p] || smallS[p] ? 1 : 0;
     const wr = use.rim && edgeDist && edgeDist[p] >= 0 ? smoothstep(rimR, rimR * 0.4, edgeDist[p]) * clamp01((sm - openRim[p]) / sm) : 0;
-    const wt = clamp01((sm - open[p]) / sm) * smoothstep(0.45, 0.8, Math.max(U[0][p], U[1][p], U[2][p]));
+    // 가는 반짝임: 그림에서 주변보다 확 튀는(0.08~0.2) 옅은 색의 점 · 가는 광택만. 넓게 밝은 면은 빛으로
+    const wt = smoothstep(0.08, 0.2, lumU[p] - openU[p]) * smoothstep(0.55, 0.8, Math.min(U[0][p], U[1][p], U[2][p]));
     const wb = use.refl && inShadow[p] ? 1 : 0;
     for (let c = 0; c < 3; c++) {
       const [a1, r1] = take(S[c][p], small);
