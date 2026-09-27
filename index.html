@@ -88,6 +88,8 @@ aside.right { border-left: 1px solid var(--line); display: flex; flex-direction:
 .toolbar .zoom { color: var(--muted); min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
 .stage { flex: 1; position: relative; overflow: hidden; cursor: grab; background: #101114; touch-action: none; }
 .stage.dragging { cursor: grabbing; }
+.stage.picking { cursor: crosshair; }
+button.tool.on { background: var(--sel); border-color: var(--accent); color: #fff; }
 .canvas-wrap {
   position: absolute; left: 0; top: 0; transform-origin: 0 0;
   background-color: #fff;
@@ -276,6 +278,8 @@ aside.right { border-left: 1px solid var(--line); display: flex; flex-direction:
         <button data-view="diff">차이 ×8</button>
       </div>
       <div class="spacer"></div>
+      <button id="bgToolBtn" class="tool" disabled title="캐릭터 쪽에 남은 탁자·의자 같은 배경 물건을 클릭하거나 문질러 칠하면 배경 레이어로 옮겨집니다(같은 파츠 안에서 선을 넘지 않음)">배경으로 보내기</button>
+      <button id="undoBtn" disabled title="되돌리기 (Ctrl+Z)">↶</button>
       <button id="fitBtn" title="화면에 맞춤">맞춤</button>
       <button id="oneBtn" title="100%">1:1</button>
       <span class="zoom" id="zoomLbl"></span>
@@ -2257,6 +2261,8 @@ function installResult(res) {
   walk(res.layers);
   state.result = res;
   state.selected = null;
+  state.undo = [];
+  $('bgToolBtn').disabled = false; updateUndoBtn();
   renderLayerList();
   render();
   $('psdBtn').disabled = $('pngBtn').disabled = false;
@@ -2383,9 +2389,46 @@ stage.addEventListener('wheel', e => {
   zoomAt(state.zoom * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
 }, { passive: false });
 let drag = null;
-stage.addEventListener('pointerdown', e => { if (wrap.hidden) return; drag = { x: e.clientX, y: e.clientY, tx: state.tx, ty: state.ty }; stage.setPointerCapture(e.pointerId); stage.classList.add('dragging'); });
-stage.addEventListener('pointermove', e => { if (!drag) return; state.tx = drag.tx + e.clientX - drag.x; state.ty = drag.ty + e.clientY - drag.y; applyTransform(); });
-stage.addEventListener('pointerup', () => { drag = null; stage.classList.remove('dragging'); });
+const toCanvas = e => { const r = wrap.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / state.zoom), Math.floor((e.clientY - r.top) / state.zoom)]; };
+stage.addEventListener('pointerdown', e => {
+  if (wrap.hidden) return;
+  stage.setPointerCapture(e.pointerId);
+  // 배경으로 보내기 모드: 왼쪽 버튼 드래그 = 칠하기(획), 가운데/오른쪽 버튼 드래그 = 화면 이동
+  if (state.bgTool && state.result && e.button === 0) { drag = { stroke: [toCanvas(e)] }; strokeOverlay(drag.stroke); return; }
+  drag = { x: e.clientX, y: e.clientY, tx: state.tx, ty: state.ty };
+  stage.classList.add('dragging');
+});
+stage.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (drag.stroke) {
+    const [x, y] = toCanvas(e), [px, py] = drag.stroke[drag.stroke.length - 1];
+    const n = Math.max(1, Math.ceil(Math.hypot(x - px, y - py) / 3));   // 3px 간격으로 촘촘히
+    for (let k = 1; k <= n; k++) drag.stroke.push([Math.round(px + (x - px) * k / n), Math.round(py + (y - py) * k / n)]);
+    strokeOverlay(drag.stroke);
+    return;
+  }
+  state.tx = drag.tx + e.clientX - drag.x; state.ty = drag.ty + e.clientY - drag.y; applyTransform();
+});
+stage.addEventListener('pointerup', () => {
+  const d = drag; drag = null; stage.classList.remove('dragging');
+  if (d && d.stroke) { strokeOverlay(null); sendToBackground(d.stroke); }
+});
+stage.addEventListener('contextmenu', e => { if (state.bgTool) e.preventDefault(); });
+const brushReach = () => state.result ? Math.max(24, Math.round(Math.max(state.result.width, state.result.height) * 0.05)) : 40;
+function strokeOverlay(pts) {                         // 칠하는 중인 획과 붓 폭 표시
+  let c = $('strokeCanvas');
+  if (!pts) { if (c) c.hidden = true; return; }
+  const v = $('view');
+  if (!c) { c = document.createElement('canvas'); c.id = 'strokeCanvas'; c.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none'; wrap.appendChild(c); }
+  if (c.width !== v.width || c.height !== v.height) { c.width = v.width; c.height = v.height; }
+  c.style.width = v.width + 'px'; c.style.height = v.height + 'px'; c.hidden = false;
+  const x = c.getContext('2d');
+  x.clearRect(0, 0, c.width, c.height);
+  x.lineCap = x.lineJoin = 'round';
+  const path = () => { x.beginPath(); pts.forEach(([px, py], i) => i ? x.lineTo(px + 0.5, py + 0.5) : x.moveTo(px + 0.5, py + 0.5)); if (pts.length === 1) x.lineTo(pts[0][0] + 0.6, pts[0][1] + 0.5); };
+  x.strokeStyle = 'rgba(255, 60, 160, 0.18)'; x.lineWidth = brushReach() * 2; path(); x.stroke();   // 가져갈 수 있는 범위
+  x.strokeStyle = 'rgba(255, 60, 160, 0.9)'; x.lineWidth = Math.max(2, 3 / state.zoom); path(); x.stroke();
+}
 window.addEventListener('resize', () => { if (!wrap.hidden) fit(); });
 
 /* ---------- 레이어 패널 ---------- */
@@ -2460,6 +2503,170 @@ function layerRow(L, depth) {
   });
   return row;
 }
+
+/* ---------- 배경으로 보내기 (수동 보정) ----------
+ * 자동 판정으로 캐릭터 쪽에 남은 배경 물건(탁자, 의자 …)을 클릭하면, 클릭한 곳과 같은 파츠(밑색)이면서
+ * 선을 넘지 않고 색이 이어지는 영역을 페인트 통처럼 골라 배경 레이어로 옮긴다.
+ * 파츠로 제한하므로 선 없이 맞닿은 어두운 옷과 어두운 탁자 모서리도 섞이지 않는다. 옮긴 픽셀은 배경에 원본 색으로 들어가고 캐릭터 쪽 레이어에서는 지워지므로
+ * 합성 결과는 그대로 원본과 같다. */
+const leafLayers = (ls, out = []) => { for (const L of ls) { if (L.group) leafLayers(L.children, out); else out.push(L); } return out; };
+function fullAlpha(L, W, H) {                         // 레이어 알파를 캔버스 크기로
+  const a = new Uint8Array(W * H);
+  if (!L || !L.w) return a;
+  for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) a[(y + L.y) * W + x + L.x] = L.data[(y * L.w + x) * 4 + 3];
+  return a;
+}
+function refreshCanvas(L) {
+  L._opaque = null;
+  if (!L.w || !L.h) { L._canvas = null; return; }
+  if (!L._canvas || L._canvas.width !== L.w || L._canvas.height !== L.h) { L._canvas = document.createElement('canvas'); L._canvas.width = L.w; L._canvas.height = L.h; }
+  L._canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(L.data.buffer, L.data.byteOffset, L.w * L.h * 4), L.w, L.h), 0, 0);
+}
+function updateUndoBtn() { $('undoBtn').disabled = !(state.undo && state.undo.length); }
+
+function sendToBackground(points) {
+  const res = state.result, W = res.width, H = res.height, N = W * H;
+  const leaves = leafLayers(res.layers), bgL = leaves.find(L => L.kind === 'bg');
+  if (!bgL) { toast('배경 레이어가 없는 그림입니다(투명 배경 등).'); return; }
+  const orig = state.src.data.data, bgA = fullAlpha(bgL, W, H), la = fullAlpha(leaves.find(L => L.kind === 'line'), W, H);
+  const flats = leaves.filter(L => L.kind === 'flat'), pid = new Int32Array(N).fill(-1);
+  flats.forEach((L, k) => { const a = fullAlpha(L, W, H); for (let p = 0; p < N; p++) if (a[p]) pid[p] = k; });
+  const byPart = flats.length > 1;
+  const T = 110, tol = byPart ? 40 : 26;               // 선 경계(알파 0.43), 이웃 색 차이 허용치
+  // 붓 폭: 획에서 이 거리 안쪽만 가져간다(삐져나간 한 점이 캐릭터 파츠 전체를 끌어오지 않게)
+  const reach = brushReach(), near = new Uint8Array(N);
+  {
+    let front = [];
+    for (const [cx, cy] of points) if (cx >= 0 && cy >= 0 && cx < W && cy < H && !near[cy * W + cx]) { near[cy * W + cx] = 1; front.push(cy * W + cx); }
+    for (let d = 0; d < reach && front.length; d++) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q >= 0 && !near[q]) { near[q] = 1; next.push(q); }
+        }
+      }
+      front = next;
+    }
+  }
+  // 1) 획의 점마다: 같은 파츠 안에서 선을 넘지 않고 색이 이어지는 영역(합집합)
+  const R = new Uint8Array(N);
+  let n = 0, hitBg = 0;
+  for (const [cx, cy] of points) {
+    if (cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
+    let p0 = cy * W + cx;
+    if (bgA[p0]) { hitBg++; continue; }
+    if (R[p0]) continue;
+    if (la[p0] >= T) {                                 // 선 위를 눌렀으면 가까운 칠한 곳에서 시작
+      let best = -1, bd = 1e9;
+      for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+        const x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const q = y * W + x; if (la[q] < T && !bgA[q] && dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = q; }
+      }
+      if (best < 0 || R[best]) continue;
+      p0 = best;
+    }
+    const P = pid[p0], stack = [p0];
+    R[p0] = 1; n++;
+    while (stack.length) {
+      const p = stack.pop(), x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q < 0 || R[q] || !near[q] || bgA[q] || la[q] >= T || (byPart && pid[q] !== P)) continue;
+        const i = p * 4, j = q * 4;
+        if (Math.max(Math.abs(orig[i] - orig[j]), Math.abs(orig[i + 1] - orig[j + 1]), Math.abs(orig[i + 2] - orig[j + 2])) > tol) continue;
+        R[q] = 1; n++; stack.push(q);
+      }
+    }
+  }
+  if (n < 16) { toast(hitBg ? '이미 배경입니다.' : '선택된 영역이 너무 작습니다. 조금 더 넓은 곳을 칠해 보세요.'); return; }
+  // 2) 둘레의 선: 가장 가까운 칠한 영역 쪽으로 나눔(이 물건 또는 배경 쪽이면 함께 옮긴다)
+  const lab = new Uint8Array(N);                      // 1 = 이 물건, 2 = 배경, 3 = 나머지 캐릭터
+  let front = [];
+  for (let p = 0; p < N; p++) {
+    if (la[p] >= 20) continue;
+    lab[p] = R[p] ? 1 : bgA[p] ? 2 : 3;
+    front.push(p);
+  }
+  for (let d = 0; d < 10 && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !lab[q]) { lab[q] = lab[p]; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  const M = new Uint8Array(N);
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let p = 0; p < N; p++) {
+    if (bgA[p]) continue;
+    if (R[p] || (la[p] >= 20 && lab[p] === 1 && near[p])) M[p] = 1;
+  }
+  // 물건과 배경 사이의 윤곽선(배경 쪽 절반)도 물건 쪽 선에 이어져 있으면 함께
+  front = [];
+  for (let p = 0; p < N; p++) if (M[p] && la[p] >= 20) front.push(p);
+  for (let d = 0; d < 8 && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !M[q] && near[q] && !bgA[q] && la[q] >= 20 && lab[q] === 2) { M[q] = 1; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  let count = 0;
+  for (let p = 0; p < N; p++) if (M[p]) { count++; const x = p % W, y = (p / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  // 3) 적용 (되돌리기용으로 바뀌는 사각형만 저장)
+  const undo = [];
+  for (const L of leaves) {
+    if (L === bgL || L.kind === 'bgfx' || L.kind === 'rough' || !L.w) continue;
+    const ax = Math.max(x0, L.x), ay = Math.max(y0, L.y), bx = Math.min(x1, L.x + L.w - 1), by = Math.min(y1, L.y + L.h - 1);
+    if (ax > bx || ay > by) continue;
+    const saved = { L, ax, ay, bx, by, rows: [] };
+    let touched = false;
+    for (let y = ay; y <= by; y++) {
+      const off = ((y - L.y) * L.w + (ax - L.x)) * 4;
+      saved.rows.push(L.data.slice(off, off + (bx - ax + 1) * 4));
+      for (let x = ax; x <= bx; x++) if (M[y * W + x]) { const i = ((y - L.y) * L.w + (x - L.x)) * 4 + 3; if (L.data[i]) { L.data[i] = 0; touched = true; } }
+    }
+    if (touched) { undo.push(saved); refreshCanvas(L); }
+  }
+  undo.push({ L: bgL, whole: { data: bgL.data, x: bgL.x, y: bgL.y, w: bgL.w, h: bgL.h } });
+  const full = new Uint8ClampedArray(N * 4);            // 배경 레이어를 캔버스 크기로 펼친 뒤 옮긴 픽셀을 원본 색으로
+  for (let y = 0; y < bgL.h; y++) full.set(bgL.data.subarray(y * bgL.w * 4, (y + 1) * bgL.w * 4), ((y + bgL.y) * W + bgL.x) * 4);
+  for (let p = 0; p < N; p++) if (M[p]) { const i = p * 4; full[i] = orig[i]; full[i + 1] = orig[i + 1]; full[i + 2] = orig[i + 2]; full[i + 3] = 255; }
+  Object.assign(bgL, { data: full, x: 0, y: 0, w: W, h: H });
+  refreshCanvas(bgL);
+  state.undo.push(undo);
+  updateUndoBtn();
+  renderLayerList(); render();
+  toast(`배경으로 옮겼습니다 (${count.toLocaleString()} px). 되돌리기: Ctrl+Z`);
+}
+function undoBackground() {
+  const undo = state.undo && state.undo.pop();
+  if (!undo) return;
+  for (const u of undo) {
+    if (u.whole) { Object.assign(u.L, u.whole); refreshCanvas(u.L); continue; }
+    const { L, ax, ay, bx, rows } = u;
+    rows.forEach((row, k) => L.data.set(row, ((ay + k - L.y) * L.w + (ax - L.x)) * 4));
+    refreshCanvas(L);
+  }
+  updateUndoBtn();
+  renderLayerList(); render();
+  toast('되돌렸습니다.');
+}
+$('bgToolBtn').addEventListener('click', () => {
+  state.bgTool = !state.bgTool;
+  $('bgToolBtn').classList.toggle('on', state.bgTool);
+  stage.classList.toggle('picking', state.bgTool);
+  if (state.bgTool) toast('배경으로 보낼 물건(탁자, 의자 …)을 클릭하거나 문질러 칠하세요. 옅은 분홍 띠 안의 같은 물건만 옮겨집니다. 화면 이동은 오른쪽 버튼 드래그.', 6000);
+});
+$('undoBtn').addEventListener('click', undoBackground);
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.target.isContentEditable) { e.preventDefault(); undoBackground(); }
+});
 
 /* ---------- 저장 ---------- */
 function download(blob, name) {
