@@ -1,0 +1,3010 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Illustracy 레이어 분리기</title>
+<style>
+:root {
+  --bg: #16171b;
+  --panel: #1f2126;
+  --panel-2: #272a31;
+  --line: #34373f;
+  --text: #e7e8ec;
+  --muted: #9a9ea8;
+  --accent: #6c8cff;
+  --accent-2: #4b6ae0;
+  --ok: #4cc38a;
+  --warn: #e0a84b;
+  --danger: #e06363;
+  --sel: #2e3650;
+  --radius: 8px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, select, input { font: inherit; color: inherit; }
+button {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 10px; cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: #4a4e59; background: #2e3139; }
+button:disabled { opacity: .45; cursor: default; }
+button.link { background: none; border: 0; padding: 8px 0 0; color: var(--muted); font-size: 12px; text-decoration: underline; }
+button.link:hover:not(:disabled) { background: none; color: var(--text); }
+button.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=checkbox] { accent-color: var(--accent); }
+input[type=color] { width: 36px; height: 24px; border: 1px solid var(--line); border-radius: 4px; background: none; padding: 0; }
+
+header {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  border-bottom: 1px solid var(--line); background: var(--panel); flex: none;
+}
+header h1 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: .2px; }
+header h1 span { color: var(--muted); font-weight: 500; margin-left: 6px; font-size: 12px; }
+header .spacer { flex: 1; }
+header .stat { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+main { flex: 1; display: grid; grid-template-columns: 270px 1fr 310px; min-height: 0; }
+aside { background: var(--panel); overflow-y: auto; min-height: 0; }
+aside.left { border-right: 1px solid var(--line); }
+aside.right { border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+.section { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.section h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 10px; font-weight: 700; }
+.field { margin-bottom: 11px; }
+.field:last-child { margin-bottom: 0; }
+.field label.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 3px; }
+.field .val { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.field .hint { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+.drop {
+  border: 1.5px dashed #4a4e59; border-radius: var(--radius); padding: 16px 10px; text-align: center;
+  color: var(--muted); cursor: pointer; transition: border-color .15s, background .15s;
+}
+.drop:hover, .drop.over { border-color: var(--accent); background: #232839; color: var(--text); }
+.drop strong { color: var(--text); display: block; margin-bottom: 2px; }
+.btn-row { display: flex; gap: 6px; margin-top: 8px; }
+.btn-row > * { flex: 1; }
+
+.viewer { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.toolbar {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line);
+  background: var(--panel); flex-wrap: wrap;
+}
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; padding: 4px 10px; }
+.seg button.on { background: var(--sel); color: #fff; }
+.toolbar .spacer { flex: 1; }
+.toolbar .zoom { color: var(--muted); min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.stage { flex: 1; position: relative; overflow: hidden; cursor: grab; background: #101114; touch-action: none; }
+.stage.dragging { cursor: grabbing; }
+.stage.picking { cursor: crosshair; }
+button.tool.on { background: var(--sel); border-color: var(--accent); color: #fff; }
+.canvas-wrap {
+  position: absolute; left: 0; top: 0; transform-origin: 0 0;
+  background-color: #fff;
+  background-image: linear-gradient(45deg, #d9d9d9 25%, transparent 25%), linear-gradient(-45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d9d9d9 75%), linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
+  background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  box-shadow: 0 2px 20px rgba(0,0,0,.5);
+}
+.canvas-wrap canvas { display: block; }
+.empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+  color: var(--muted); gap: 10px; text-align: center; padding: 20px; pointer-events: none;
+}
+.empty .big { font-size: 18px; color: var(--text); font-weight: 600; }
+.empty button { pointer-events: auto; }
+
+.progress {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, 80%);
+  background: rgba(31,33,38,.96); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: none;
+  box-shadow: 0 10px 40px rgba(0,0,0,.5);
+}
+.progress.on { display: block; }
+.progress .label { margin-bottom: 8px; }
+.bar { height: 6px; border-radius: 3px; background: #33363e; overflow: hidden; }
+.bar > div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+
+.layers { flex: 1; overflow-y: auto; min-height: 0; }
+.layer {
+  display: grid; grid-template-columns: 22px 46px 1fr; gap: 8px; align-items: center;
+  padding: 6px 10px; border-bottom: 1px solid #2a2d33; cursor: pointer;
+}
+.layer:hover { background: #24272d; }
+.layer.sel { background: var(--sel); }
+.layer.group { background: #22252b; }
+.layer .eye { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; background: transparent; padding: 0; }
+.layer .eye.on::after { content: "●"; color: var(--text); }
+.layer .thumb {
+  width: 46px; height: 46px; border-radius: 4px; border: 1px solid var(--line); overflow: hidden;
+  background-color: #fff;
+  background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.layer .thumb canvas { max-width: 100%; max-height: 100%; display: block; }
+.layer .thumb.folder { background: #2c3038; font-size: 20px; color: var(--muted); }
+.layer .meta { min-width: 0; }
+.layer .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; outline: none; border-radius: 3px; }
+.layer .name[contenteditable=true] { background: #111; padding: 0 3px; }
+.layer .sub { color: var(--muted); font-size: 11px; display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.layer .sub .clip { color: var(--warn); }
+.layer .ctrl { display: none; grid-column: 1 / -1; gap: 6px; align-items: center; padding-top: 4px; }
+.layer.sel .ctrl { display: flex; }
+.layer .ctrl select { flex: 1; min-width: 0; }
+.layer .ctrl input[type=range] { width: 90px; flex: none; }
+.layer .ctrl .op { width: 34px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.layer .ctrl button { padding: 3px 7px; font-size: 12px; }
+.layers-foot { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; flex: none; }
+.layers-foot .info { color: var(--muted); font-size: 11px; }
+.note { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.note b { color: var(--text); font-weight: 600; }
+.toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #2b2f38; border: 1px solid var(--line);
+  padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10;
+}
+.toast.on { opacity: 1; }
+
+@media (max-width: 900px) {
+  body { overflow: auto; height: auto; }
+  main { grid-template-columns: 1fr; }
+  aside.left, aside.right { border: 0; border-bottom: 1px solid var(--line); }
+  .viewer { height: 70vh; }
+  .layers { max-height: none; }
+  header .stat { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Illustracy<span>일러스트 → 레이어 분리 PSD</span></h1>
+  <div class="spacer"></div>
+  <div class="stat" id="stat"></div>
+</header>
+<main>
+  <aside class="left">
+    <div class="section">
+      <h2>입력</h2>
+      <div class="drop" id="drop">
+        <strong>이미지를 끌어다 놓거나 클릭</strong>
+        PNG · JPG · WebP (Ctrl+V 붙여넣기 가능)
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="btn-row">
+        <button id="sampleBtn">예제 그림</button>
+        <button id="runBtn" class="primary" disabled>레이어 분리</button>
+      </div>
+      <button id="saveAppBtn" class="link" title="이 HTML 파일 하나만 있으면 인터넷 없이 실행됩니다">⬇ 프로그램 저장 (오프라인 실행용)</button>
+    </div>
+
+    <div class="section">
+      <h2>처리</h2>
+      <div class="field">
+        <label class="row">처리 해상도 (긴 변)</label>
+        <select id="o_maxSize" style="width:100%">
+          <option value="1024">1024 px</option>
+          <option value="1536">1536 px</option>
+          <option value="2048" selected>2048 px</option>
+          <option value="3072">3072 px</option>
+          <option value="4096">4096 px</option>
+          <option value="0">원본 크기</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>선화</h2>
+      <div class="field">
+        <label class="row">선 감도 <span class="val" id="v_lineSens"></span></label>
+        <input type="range" id="o_lineSens" min="0" max="100" value="50">
+      </div>
+      <div class="field">
+        <label class="row">최대 선 굵기 <span class="val" id="v_lineWidth"></span></label>
+        <input type="range" id="o_lineWidth" min="0" max="16" value="0">
+        <div class="hint">0 = 해상도에 맞춰 자동</div>
+      </div>
+      <div class="field">
+        <label class="row">선 색상</label>
+        <select id="o_lineColor" style="width:100%">
+          <option value="trace" selected>선화 + 색트레스 (작가식)</option>
+          <option value="original">원본 선 색 그대로 (한 장)</option>
+          <option value="black">검정 단색</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>채색 · 명암</h2>
+      <div class="field">
+        <label class="row">색상 군집 수 <span class="val" id="v_colors"></span></label>
+        <input type="range" id="o_colors" min="6" max="40" value="18">
+      </div>
+      <div class="field">
+        <label class="row">밑색 병합 강도 <span class="val" id="v_merge"></span></label>
+        <input type="range" id="o_merge" min="0" max="100" value="50">
+        <div class="hint">높을수록 음영 톤을 같은 밑색으로 묶음</div>
+      </div>
+      <div class="field">
+        <label class="row">그림자 판정 기준 <span class="val" id="v_shadow"></span></label>
+        <input type="range" id="o_shadow" min="0" max="100" value="50">
+        <div class="hint">높을수록 옅은 음영도 그림자 레이어로</div>
+      </div>
+      <div class="field">
+        <label class="row">반짝임 최대 크기 <span class="val" id="v_sparkle"></span></label>
+        <input type="range" id="o_sparkle" min="0" max="30" value="0">
+        <div class="hint">0 = 자동</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>레이어 구성</h2>
+      <div class="field"><label class="check"><input type="checkbox" id="o_splitColors" checked> 채색을 파츠별 폴더로 나누기</label></div>
+      <div class="field"><label class="check"><input type="checkbox" id="o_clip" checked> 그림자·하이라이트를 밑색에 클리핑</label></div>
+      <div class="field"><label class="check"><input type="checkbox" id="o_bg" checked> 단색 배경 자동 분리</label></div>
+      <div class="field"><label class="check"><input type="checkbox" id="o_rough" checked> 러프 스케치 생성</label></div>
+      <div class="field">
+        <label class="row">러프 색상 <input type="color" id="o_roughColor" value="#2f6fe0"></label>
+      </div>
+    </div>
+
+    <div class="section note">
+      <b>오프라인 동작</b> — 이 파일 하나만 있으면 인터넷 없이 실행됩니다. 외부 라이브러리·서버·유료 API를 쓰지 않고,
+      이미지는 어디에도 업로드되지 않습니다.<br><br>
+      <b>레이어 구성</b> — 작업 파일처럼 [캐릭터] · [배경] 폴더로 나누고, 파츠마다 <b>밑색 → 1차·2차 그림자(곱하기) → 하이라이트</b>를
+      클리핑으로 쌓습니다. 그 위에 그라데이션 · 명암 · 반사광 · 림라이트, [효과](빛, 반짝임), [선화](선화 + 색트레스)를 두고,
+      배경 위 입자는 배경 효과로 나눕니다. 내용이 거의 없는 레이어는 만들지 않으며, 다시 합치면 원본이 재현되도록 계산합니다.
+      러프는 완성본에서 역으로 만든 <b>추정 스케치</b>이며 기본적으로 숨김 상태입니다.
+    </div>
+  </aside>
+
+  <section class="viewer">
+    <div class="toolbar">
+      <div class="seg" id="viewSeg">
+        <button data-view="comp" class="on">합성</button>
+        <button data-view="orig">원본</button>
+        <button data-view="solo">선택 레이어</button>
+        <button data-view="diff">차이 ×8</button>
+      </div>
+      <div class="spacer"></div>
+      <button id="bgToolBtn" class="tool" disabled title="캐릭터 쪽에 남은 탁자·의자 같은 배경 물건을 클릭하거나 문질러 칠하면 배경 레이어로 옮겨집니다(같은 파츠 안에서 선을 넘지 않음)">배경으로 보내기</button>
+      <button id="charToolBtn" class="tool" disabled title="배경에 잘못 들어간 캐릭터 부분(모자, 소매, 다리 …)을 클릭하거나 문질러 칠하면 캐릭터로 되돌린 뒤 다시 분리합니다">캐릭터로 되돌리기</button>
+      <button id="undoBtn" disabled title="되돌리기 (Ctrl+Z)">↶</button>
+      <button id="fitBtn" title="화면에 맞춤">맞춤</button>
+      <button id="oneBtn" title="100%">1:1</button>
+      <span class="zoom" id="zoomLbl"></span>
+    </div>
+    <div class="stage" id="stage">
+      <div class="canvas-wrap" id="wrap" hidden><canvas id="view"></canvas></div>
+      <div class="empty" id="empty">
+        <div class="big">일러스트를 넣어 주세요</div>
+        <div>선화 · 색트레스 · 채색(파츠별 밑색) · 그림자 · 하이라이트 · 그라데이션 · 명암 · 반사광 · 림라이트 · 빛 · 반짝임 · 배경 효과 · 러프로 분리해 PSD로 저장합니다.</div>
+      </div>
+      <div class="progress" id="progress">
+        <div class="label" id="progLabel">준비 중…</div>
+        <div class="bar"><div id="progBar"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="section" style="padding-bottom:8px"><h2 style="margin:0">레이어</h2></div>
+    <div class="layers" id="layers"></div>
+    <div class="layers-foot">
+      <div class="info" id="layerInfo">레이어를 클릭하면 혼합 모드·불투명도를 바꿀 수 있습니다. 이름은 더블클릭으로 수정.</div>
+      <button id="psdBtn" class="primary" disabled>PSD 다운로드</button>
+      <button id="pngBtn" disabled>합성 결과 PNG 저장</button>
+    </div>
+  </aside>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+ * Illustracy core — 이미지 분해 알고리즘.
+ * 이 함수는 Web Worker 안에서(toString()으로 직렬화) 또는
+ * 워커를 쓸 수 없는 환경에서는 메인 스레드에서 그대로 실행된다.
+ * ============================================================ */
+function IllustracyCore() {
+'use strict';
+/* ---------------- 공용 유틸 ---------------- */
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const smoothstep = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+const lumOf = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// 1차원 슬라이딩 최대/최소 (단조 덱, O(n))
+function slide1D(inp, out, n, r, isMax, dq) {
+  let head = 0, tail = 0, j = 0;
+  for (let i = 0; i < n; i++) {
+    const hi = i + r < n ? i + r : n - 1;
+    while (j <= hi) {
+      const v = inp[j];
+      if (isMax) { while (tail > head && inp[dq[tail - 1]] <= v) tail--; }
+      else { while (tail > head && inp[dq[tail - 1]] >= v) tail--; }
+      dq[tail++] = j++;
+    }
+    while (dq[head] < i - r) head++;
+    out[i] = inp[dq[head]];
+  }
+}
+
+// 정사각형 구조 요소 팽창(max) / 침식(min)
+function morph(src, W, H, r, isMax) {
+  const N = W * H, tmp = new Float32Array(N), out = new Float32Array(N);
+  if (r <= 0) { out.set(src); return out; }
+  const n = Math.max(W, H), line = new Float32Array(n), res = new Float32Array(n), dq = new Int32Array(n);
+  for (let y = 0; y < H; y++) {
+    const o = y * W;
+    for (let x = 0; x < W; x++) line[x] = src[o + x];
+    slide1D(line, res, W, r, isMax, dq);
+    for (let x = 0; x < W; x++) tmp[o + x] = res[x];
+  }
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) line[y] = tmp[y * W + x];
+    slide1D(line, res, H, r, isMax, dq);
+    for (let y = 0; y < H; y++) out[y * W + x] = res[y];
+  }
+  return out;
+}
+const dilate = (s, W, H, r) => morph(s, W, H, r, true);
+const erode = (s, W, H, r) => morph(s, W, H, r, false);
+
+function box1D(inp, out, n, r) {
+  const w = 2 * r + 1, last = n - 1;
+  let s = 0;
+  for (let k = -r; k <= r; k++) s += inp[k < 0 ? 0 : k > last ? last : k];
+  for (let i = 0; i < n; i++) {
+    out[i] = s / w;
+    const a = i + r + 1, b = i - r;
+    s += inp[a > last ? last : a] - inp[b < 0 ? 0 : b];
+  }
+}
+
+// 가우시안 근사 (박스 블러 3회)
+function blur(src, W, H, sigma) {
+  const N = W * H, out = new Float32Array(src);
+  if (sigma < 0.3) return out;
+  const r = Math.max(1, Math.round((Math.sqrt(4 * sigma * sigma + 1) - 1) / 2));
+  const n = Math.max(W, H), a = new Float32Array(n), b = new Float32Array(n);
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < H; y++) {
+      const o = y * W;
+      for (let x = 0; x < W; x++) a[x] = out[o + x];
+      box1D(a, b, W, r);
+      for (let x = 0; x < W; x++) out[o + x] = b[x];
+    }
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < H; y++) a[y] = out[y * W + x];
+      box1D(a, b, H, r);
+      for (let y = 0; y < H; y++) out[y * W + x] = b[y];
+    }
+  }
+  return out;
+}
+
+/* sRGB → CIELAB */
+const LIN = new Float32Array(256);
+for (let i = 0; i < 256; i++) { const c = i / 255; LIN[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+const labF = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+function labOf(r, g, b) {
+  const R = LIN[Math.round(clamp01(r) * 255)], G = LIN[Math.round(clamp01(g) * 255)], B = LIN[Math.round(clamp01(b) * 255)];
+  const fx = labF((0.4124564 * R + 0.3575761 * G + 0.1804375 * B) / 0.95047);
+  const fy = labF(0.2126729 * R + 0.7151522 * G + 0.0721750 * B);
+  const fz = labF((0.0193339 * R + 0.1191920 * G + 0.9503041 * B) / 1.08883);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function toLab(Rp, Gp, Bp, N) {
+  const L = new Float32Array(N), A = new Float32Array(N), Bb = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const v = labOf(Rp[i], Gp[i], Bp[i]);
+    L[i] = v[0]; A[i] = v[1]; Bb[i] = v[2];
+  }
+  return [L, A, Bb];
+}
+
+const NB8X = [-1, 0, 1, -1, 1, -1, 0, 1], NB8Y = [-1, -1, -1, 0, 0, 1, 1, 1];
+
+/* 모르는 픽셀(known=0)을 바깥쪽부터 한 겹씩 이웃 평균으로 채움. skip=1 픽셀은 건드리지 않음 */
+function inpaint(planes, known, W, H, skip) {
+  const N = W * H, dist = new Int32Array(N).fill(-1);
+  let front = new Int32Array(N), next = new Int32Array(N), nf = 0;
+  for (let p = 0; p < N; p++) if (skip && skip[p]) dist[p] = -2; else if (known[p]) dist[p] = 0;
+  for (let p = 0; p < N; p++) {
+    if (dist[p] !== -1) continue;
+    const x = p % W, y = (p / W) | 0;
+    for (let k = 0; k < 8; k++) {
+      const xx = x + NB8X[k], yy = y + NB8Y[k];
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      if (dist[yy * W + xx] === 0) { dist[p] = 1; front[nf++] = p; break; }
+    }
+  }
+  const np = planes.length, acc = new Float64Array(np);
+  let level = 1;
+  while (nf > 0) {
+    for (let i = 0; i < nf; i++) {
+      const p = front[i], x = p % W, y = (p / W) | 0;
+      acc.fill(0); let c = 0;
+      for (let k = 0; k < 8; k++) {
+        const xx = x + NB8X[k], yy = y + NB8Y[k];
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const q = yy * W + xx, d = dist[q];
+        if (d >= 0 && d < level) { for (let j = 0; j < np; j++) acc[j] += planes[j][q]; c++; }
+      }
+      if (c) for (let j = 0; j < np; j++) planes[j][p] = acc[j] / c;
+    }
+    let nn = 0;
+    for (let i = 0; i < nf; i++) {
+      const p = front[i], x = p % W, y = (p / W) | 0;
+      for (let k = 0; k < 8; k++) {
+        const xx = x + NB8X[k], yy = y + NB8Y[k];
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const q = yy * W + xx;
+        if (dist[q] === -1) { dist[q] = level + 1; next[nn++] = q; }
+      }
+    }
+    const t = front; front = next; next = t; nf = nn; level++;
+  }
+}
+
+/* 라벨(-1 = 미정)을 가장 가까운 확정 라벨의 다수결로 채움 */
+function fillLabels(lab, W, H) {
+  const N = W * H, dist = new Int32Array(N).fill(-1);
+  let front = new Int32Array(N), next = new Int32Array(N), nf = 0;
+  for (let p = 0; p < N; p++) if (lab[p] >= 0) dist[p] = 0;
+  for (let p = 0; p < N; p++) {
+    if (dist[p] !== -1) continue;
+    const x = p % W, y = (p / W) | 0;
+    for (let k = 0; k < 8; k++) {
+      const xx = x + NB8X[k], yy = y + NB8Y[k];
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      if (dist[yy * W + xx] === 0) { dist[p] = 1; front[nf++] = p; break; }
+    }
+  }
+  const cand = new Int32Array(8), cnt = new Int32Array(8);
+  let level = 1;
+  while (nf > 0) {
+    for (let i = 0; i < nf; i++) {
+      const p = front[i], x = p % W, y = (p / W) | 0;
+      let m = 0;
+      for (let k = 0; k < 8; k++) {
+        const xx = x + NB8X[k], yy = y + NB8Y[k];
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const q = yy * W + xx, d = dist[q];
+        if (d >= 0 && d < level) {
+          const l = lab[q]; let j = 0;
+          while (j < m && cand[j] !== l) j++;
+          if (j === m) { cand[m] = l; cnt[m] = 0; m++; }
+          cnt[j] += (k === 1 || k === 3 || k === 4 || k === 6) ? 2 : 1; // 4-이웃 가중
+        }
+      }
+      let best = -1, bc = -1;
+      for (let j = 0; j < m; j++) if (cnt[j] > bc) { bc = cnt[j]; best = cand[j]; }
+      lab[p] = best;
+    }
+    let nn = 0;
+    for (let i = 0; i < nf; i++) {
+      const p = front[i], x = p % W, y = (p / W) | 0;
+      for (let k = 0; k < 8; k++) {
+        const xx = x + NB8X[k], yy = y + NB8Y[k];
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const q = yy * W + xx;
+        if (dist[q] === -1) { dist[q] = level + 1; next[nn++] = q; }
+      }
+    }
+    const t = front; front = next; next = t; nf = nn; level++;
+  }
+}
+
+/* 같은 라벨끼리 4-연결 성분 분할. valid=0 픽셀은 제외(-1) */
+function components(lab, valid, W, H) {
+  const N = W * H, rid = new Int32Array(N).fill(-1), stack = new Int32Array(N);
+  let count = 0;
+  for (let s = 0; s < N; s++) {
+    if (rid[s] !== -1 || !valid[s]) continue;
+    const l = lab[s]; let sp = 0;
+    stack[sp++] = s; rid[s] = count;
+    while (sp) {
+      const p = stack[--sp], x = p % W;
+      if (x > 0) { const q = p - 1; if (rid[q] === -1 && valid[q] && lab[q] === l) { rid[q] = count; stack[sp++] = q; } }
+      if (x < W - 1) { const q = p + 1; if (rid[q] === -1 && valid[q] && lab[q] === l) { rid[q] = count; stack[sp++] = q; } }
+      if (p >= W) { const q = p - W; if (rid[q] === -1 && valid[q] && lab[q] === l) { rid[q] = count; stack[sp++] = q; } }
+      if (p < N - W) { const q = p + W; if (rid[q] === -1 && valid[q] && lab[q] === l) { rid[q] = count; stack[sp++] = q; } }
+    }
+    count++;
+  }
+  return { rid, count };
+}
+
+function makeUF(n) {
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = a => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  return { parent, find };
+}
+
+/* 부드러운 값 노이즈 필드 (러프 스케치 흔들림용) */
+function noiseField(W, H, cell, rnd) {
+  const gw = Math.ceil(W / cell) + 2, gh = Math.ceil(H / cell) + 2, g = new Float32Array(gw * gh);
+  for (let i = 0; i < g.length; i++) g[i] = rnd() * 2 - 1;
+  const out = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const fy = y / cell, iy = fy | 0, ty = fy - iy, sy = ty * ty * (3 - 2 * ty);
+    for (let x = 0; x < W; x++) {
+      const fx = x / cell, ix = fx | 0, tx = fx - ix, sx = tx * tx * (3 - 2 * tx);
+      const a = g[iy * gw + ix], b = g[iy * gw + ix + 1], c = g[(iy + 1) * gw + ix], d = g[(iy + 1) * gw + ix + 1];
+      out[y * W + x] = (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
+    }
+  }
+  return out;
+}
+/* ---------------- 분석 파이프라인 ---------------- */
+function lch(rgb) {
+  const l = labOf(rgb[0], rgb[1], rgb[2]);
+  return { L: l[0], a: l[1], b: l[2], C: Math.hypot(l[1], l[2]), h: Math.atan2(l[2], l[1]) * 180 / Math.PI };
+}
+function hueDiff(h1, h2) { let d = Math.abs(h1 - h2) % 360; return d > 180 ? 360 - d : d; }
+
+// 두 색이 "같은 재질의 명암 변화"로 볼 수 있는 관계인지
+function shadeRelated(c1, c2, hueTol, simTol) {
+  const dE = Math.hypot(c1.L - c2.L, c1.a - c2.a, c1.b - c2.b);
+  if (dE < simTol) return true;
+  const n1 = c1.C < 12, n2 = c2.C < 12;
+  if (n1 && n2) return Math.abs(c1.L - c2.L) < simTol * 3; // 무채색끼리의 명암(밝기 차이가 너무 크면 다른 재질)
+  if (!n1 && !n2) {
+    const ratio = c1.C / c2.C;
+    return hueDiff(c1.h, c2.h) < hueTol && ratio > 0.3 && ratio < 3.3;
+  }
+  const nu = n1 ? c1 : c2, ch = n1 ? c2 : c1;       // 한쪽만 무채색: 밝은 하이라이트만 허용
+  return nu.L > ch.L + 8 && nu.L > 70;
+}
+
+function detectBackground(U, known, W, H) {
+  const N = W * H, hist = new Int32Array(4096), path = [];
+  // 테두리를 한 바퀴 도는 순서(위 → 오른쪽 → 아래 → 왼쪽)
+  for (let x = 0; x < W; x++) path.push(x);
+  for (let y = 1; y < H; y++) path.push(y * W + W - 1);
+  for (let x = W - 2; x >= 0; x--) path.push((H - 1) * W + x);
+  for (let y = H - 2; y > 0; y--) path.push(y * W);
+  const q4 = p => ((U[0][p] * 15.99) | 0) << 8 | ((U[1][p] * 15.99) | 0) << 4 | ((U[2][p] * 15.99) | 0);
+  let nb = 0;
+  for (const p of path) if (known[p]) { hist[q4(p)]++; nb++; }
+  if (nb < 16) return null;
+  let mode = 0;
+  for (let i = 1; i < 4096; i++) if (hist[i] > hist[mode]) mode = i;
+  const ref = [0, 0, 0]; let rc = 0;
+  for (const p of path) if (known[p] && q4(p) === mode) { ref[0] += U[0][p]; ref[1] += U[1][p]; ref[2] += U[2][p]; rc++; }
+  ref[0] /= rc; ref[1] /= rc; ref[2] /= rc;
+  const diff = (p, r0, r1, r2) => Math.max(Math.abs(U[0][p] - r0), Math.abs(U[1][p] - r1), Math.abs(U[2][p] - r2));
+  const step = (p, q) => Math.max(Math.abs(U[0][q] - U[0][p]), Math.abs(U[1][q] - U[1][p]), Math.abs(U[2][q] - U[2][p]));
+  let match = 0;
+  for (const p of path) if (known[p] && diff(p, ref[0], ref[1], ref[2]) < 0.1) match++;
+  if (match < nb * 0.45) return null;
+  // 픽셀마다 기준색을 들고 퍼진다(그라데이션 배경은 씨앗마다 기준색이 다름)
+  const bg = new Uint8Array(N), stack = new Int32Array(N), rf = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+  let sp = 0;
+  const seed = (p, r0, r1, r2) => { bg[p] = 1; rf[0][p] = r0; rf[1][p] = r1; rf[2][p] = r2; stack[sp++] = p; };
+  const flood = tol => {
+    while (sp) {
+      const p = stack[--sp], x = p % W;
+      const nb4 = [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1];
+      for (const q of nb4) {
+        if (q < 0 || bg[q] || !known[q]) continue;
+        if (step(p, q) < 0.035 && diff(q, rf[0][p], rf[1][p], rf[2][p]) < tol) seed(q, rf[0][p], rf[1][p], rf[2][p]);
+      }
+    }
+  };
+  for (const p of path) if (known[p] && !bg[p] && diff(p, ref[0], ref[1], ref[2]) < 0.12) seed(p, ref[0], ref[1], ref[2]);
+  flood(0.3);
+  // 테두리를 따라 색이 이어지는 곳은 같은 배경(아래로 밝아지는 그라데이션 등).
+  // 선 없이 테두리를 가로지르는 짧은 끊김(빛줄기 등, 64px 이하)은 건너뛴다
+  const L = path.length, last = [0, 0, 0];
+  for (let pass = 0; pass < 3; pass++) {
+    let added = false;
+    for (const dir of [1, -1]) {
+      let lastK = -1;
+      for (let k = 0; k < 2 * L; k++) {
+        const i = dir > 0 ? k % L : (2 * L - 1 - k) % L, p = path[i];
+        if (bg[p]) { lastK = k; last[0] = U[0][p]; last[1] = U[1][p]; last[2] = U[2][p]; continue; }
+        if (!known[p]) { lastK = -1; continue; }         // 선(윤곽)을 만나면 다른 물체의 경계이므로 끊는다
+        if (lastK < 0 || k - lastK > 64 || diff(p, last[0], last[1], last[2]) >= 0.05) continue;
+        seed(p, U[0][p], U[1][p], U[2][p]); added = true;
+        lastK = k; last[0] = U[0][p]; last[1] = U[1][p]; last[2] = U[2][p];
+      }
+    }
+    if (!added) break;
+    flood(0.12);                                       // 새 씨앗은 자기 색 주변만(옷 같은 어두운 면으로 새지 않게)
+  }
+  let area = 0;
+  for (let p = 0; p < N; p++) area += bg[p];
+  if (area < N * 0.03 || area > N * 0.97) return null;
+  return bg;
+}
+
+/* 장면 배경
+ * 1단계: 캐릭터·소품은 선으로 그리고 배경은 선 없이 칠하는 경우 — 선이 드문 곳 중 테두리와 이어진 영역.
+ *        선 밀도를 흐려서 쓰므로 모든 선 둘레에 두꺼운 띠가 생겨, 윤곽선의 작은 틈으로는 새지 않는다.
+ * 2단계: 배경을 흐리게(피사계 심도) 또는 잔 결로 그린 경우 — 1단계 배경(또는 위·왼쪽·오른쪽 테두리)에서 출발해,
+ *        "진하고 선명한 선"은 없고 흐린 자국만 빽빽한 곳(선반, 글씨, 무늬)으로만 넓힌다.
+ *        아래 테두리는 캐릭터가 잘려 있는 경우가 많아 씨앗으로 쓰지 않는다.
+ * 두 단계 모두 좁은 틈으로 새지 않게 후보를 침식한 뒤 채우고 다시 복원한다. */
+function floodCand(cand, seeds, W, H, r) {
+  const N = W * H, core = erode(cand, W, H, r), bg = new Uint8Array(N);
+  let front = [];
+  for (const p of seeds) if (core[p] > 0.5 && !bg[p]) { bg[p] = 1; front.push(p); }
+  while (front.length) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !bg[q] && core[q] > 0.5) { bg[q] = 1; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  front = [];                                          // 침식한 만큼(+1) 원래 후보 안에서 되살리기
+  for (let p = 0; p < N; p++) if (bg[p]) front.push(p);
+  for (let d = 0; d <= r && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !bg[q] && cand[q] > 0.5) { bg[q] = 1; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  return bg;
+}
+
+function detectSceneBg(U, known, lineMask, crisp, W, H, scale) {
+  const N = W * H, sig = Math.max(W, H) * 0.02;
+  const all = new Float32Array(N), cr = new Float32Array(N), soft = new Float32Array(N);
+  let nl = 0, nc = 0;
+  for (let p = 0; p < N; p++) {
+    if (!lineMask[p]) continue;
+    all[p] = 1; nl++;
+    if (crisp[p]) { cr[p] = 1; nc++; } else soft[p] = 1;
+  }
+  if (nl < N * 0.002) return null;
+  const Da = blur(all, W, H, sig), Dc = blur(cr, W, H, sig), Ds = blur(soft, W, H, sig);
+  const median = (D, mask, n) => {                     // 선이 있는 곳의 전형적인 밀도
+    const hist = new Int32Array(1001);
+    for (let p = 0; p < N; p++) if (mask[p]) hist[Math.min(1000, Math.round(D[p] * 1000))]++;
+    let acc = 0;
+    for (let i = 0; i <= 1000; i++) { acc += hist[i]; if (acc * 2 >= n) return i / 1000; }
+    return 0;
+  };
+  const tauA = median(Da, lineMask, nl) * 0.25, tauC = nc ? median(Dc, crisp, nc) * 0.25 : 0;
+  const r = Math.max(2, Math.round(3 * scale));
+  const upper = [];                                   // 위 · 왼쪽 · 오른쪽 테두리
+  for (let x = 0; x < W; x++) upper.push(x);
+  for (let y = 1; y < H - 1; y++) { upper.push(y * W, y * W + W - 1); }
+  // 1단계
+  const cand1 = new Float32Array(N);
+  for (let p = 0; p < N; p++) cand1[p] = known[p] && Da[p] < tauA ? 1 : 0;
+  // 아래 테두리는 씨앗으로 쓰지 않는다: 화면 아래에서 잘린 캐릭터(소매, 치마, 다리)를 배경으로 채우지 않게.
+  // 바닥처럼 아래 테두리에 닿은 배경은 옆 테두리나 위쪽 배경과 이어져 있으면 그쪽에서 채워진다
+  const bg = floodCand(cand1, upper, W, H, r);
+  // 2단계
+  if (nc) {
+    const cand2 = new Float32Array(N);
+    for (let p = 0; p < N; p++) {
+      if (cand1[p]) { cand2[p] = 1; continue; }
+      if (Dc[p] < tauC && Ds[p] >= 0.085 && (known[p] || (lineMask[p] && !crisp[p]))) cand2[p] = 1;
+    }
+    const seeds = [];
+    for (let p = 0; p < N; p++) if (bg[p]) seeds.push(p);
+    for (const p of upper) seeds.push(p);
+    const bg2 = floodCand(cand2, seeds, W, H, r);
+    for (let p = 0; p < N; p++) if (bg2[p]) bg[p] = 1;
+  }
+  // 캐릭터 둘레 여백: 선을 넘지 않고, 배경과 색이 매끄럽게 이어지는 곳까지 넓힌다
+  // (여백 폭 정도까지만: 배경과 같은 색의 가는 소품을 따라 멀리 새지 않게)
+  const rf = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+  let front = [];
+  for (let p = 0; p < N; p++) if (bg[p]) { for (let c = 0; c < 3; c++) rf[c][p] = U[c][p]; front.push(p); }
+  const maxGrow = Math.round(Math.max(W, H) * 0.05);
+  for (let d = 0; d < maxGrow && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q < 0 || bg[q] || !known[q]) continue;
+        let st = 0, dr = 0;
+        for (let c = 0; c < 3; c++) { st = Math.max(st, Math.abs(U[c][q] - U[c][p])); dr = Math.max(dr, Math.abs(U[c][q] - rf[c][p])); }
+        if (st < 0.03 && dr < 0.1) { bg[q] = 1; for (let c = 0; c < 3; c++) rf[c][q] = rf[c][p]; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  let area = 0;
+  for (let p = 0; p < N; p++) area += bg[p];
+  return area >= N * 0.05 && area <= N * 0.9 ? bg : null;
+}
+
+function kmeans(Lp, Ap, Bp, idx, K, rnd, maxSamples = 50000) {
+  const M = Math.min(idx.length, maxSamples), sL = new Float32Array(M), sA = new Float32Array(M), sB = new Float32Array(M);
+  for (let i = 0; i < M; i++) {
+    const p = idx.length > M ? idx[(rnd() * idx.length) | 0] : idx[i];
+    sL[i] = Lp[p]; sA[i] = Ap[p]; sB[i] = Bp[p];
+  }
+  const cL = new Float64Array(K), cA = new Float64Array(K), cB = new Float64Array(K), d2 = new Float64Array(M);
+  let f = (rnd() * M) | 0; cL[0] = sL[f]; cA[0] = sA[f]; cB[0] = sB[f];
+  d2.fill(Infinity);
+  for (let k = 1; k < K; k++) {                    // k-means++ 초기화
+    let sum = 0;
+    for (let i = 0; i < M; i++) {
+      const d = (sL[i] - cL[k - 1]) ** 2 + (sA[i] - cA[k - 1]) ** 2 + (sB[i] - cB[k - 1]) ** 2;
+      if (d < d2[i]) d2[i] = d;
+      sum += d2[i];
+    }
+    let t = rnd() * sum, i = 0;
+    while (i < M - 1 && (t -= d2[i]) > 0) i++;
+    cL[k] = sL[i]; cA[k] = sA[i]; cB[k] = sB[i];
+  }
+  const asg = new Int32Array(M), nL = new Float64Array(K), nA = new Float64Array(K), nB = new Float64Array(K), nc = new Int32Array(K);
+  for (let it = 0; it < 18; it++) {
+    nL.fill(0); nA.fill(0); nB.fill(0); nc.fill(0);
+    let moved = 0;
+    for (let i = 0; i < M; i++) {
+      let best = 0, bd = Infinity;
+      for (let k = 0; k < K; k++) {
+        const d = (sL[i] - cL[k]) ** 2 + (sA[i] - cA[k]) ** 2 + (sB[i] - cB[k]) ** 2;
+        if (d < bd) { bd = d; best = k; }
+      }
+      if (asg[i] !== best) moved++;
+      asg[i] = best; d2[i] = bd;
+      nL[best] += sL[i]; nA[best] += sA[i]; nB[best] += sB[i]; nc[best]++;
+    }
+    for (let k = 0; k < K; k++) {
+      if (nc[k]) { cL[k] = nL[k] / nc[k]; cA[k] = nA[k] / nc[k]; cB[k] = nB[k] / nc[k]; }
+      else {                                        // 빈 군집 → 가장 먼 표본으로 재배치
+        let far = 0; for (let i = 1; i < M; i++) if (d2[i] > d2[far]) far = i;
+        cL[k] = sL[far]; cA[k] = sA[far]; cB[k] = sB[far]; d2[far] = 0;
+      }
+    }
+    if (it > 2 && moved < M * 0.001) break;
+  }
+  return { cL, cA, cB };
+}
+
+function process(img, opts, progress) {
+  const t0 = Date.now();
+  const W = img.width, H = img.height, N = W * H, src = img.data;
+  const scale = Math.max(W, H) / 1000;
+  const rnd = mulberry32(12345);
+  progress(0.03, '픽셀 분석');
+  const R = new Float32Array(N), Gc = new Float32Array(N), B = new Float32Array(N), A = new Float32Array(N), Lw = new Float32Array(N);
+  let transparent = 0;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    const a = src[j + 3] / 255, r = src[j] / 255, g = src[j + 1] / 255, b = src[j + 2] / 255;
+    R[i] = r; Gc[i] = g; B[i] = b; A[i] = a;
+    if (a < 0.98) transparent++;
+    Lw[i] = lumOf(r * a + 1 - a, g * a + 1 - a, b * a + 1 - a);
+  }
+  const hasAlpha = transparent > N * 0.001;
+
+  /* 1) 선화 검출: 블랙 탑햇(closing - 원본)으로 얇고 어두운 구조만 추출 + 히스테리시스 */
+  progress(0.08, '선화 검출');
+  const lw = opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale));
+  const closeL = erode(dilate(Lw, W, H, lw), W, H, lw);
+  const strength = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const c = closeL[i], d = c - Lw[i];
+    strength[i] = c > 0.02 && d > 0 ? Math.min(d / c, d / 0.3) : 0;
+  }
+  const tHigh = 0.58 - 0.34 * opts.lineSens, tLow = tHigh * 0.45;
+  const lineMask = new Uint8Array(N);
+  {
+    const seen = new Uint8Array(N), stack = new Int32Array(N), comp = new Int32Array(N);
+    const minLine = Math.max(4, Math.round(6 * scale));
+    for (let s0 = 0; s0 < N; s0++) {
+      if (seen[s0] || strength[s0] < tHigh) continue;
+      let sp = 0, cn = 0; stack[sp++] = s0; seen[s0] = 1;
+      while (sp) {
+        const p = stack[--sp], x = p % W, y = (p / W) | 0; comp[cn++] = p;
+        for (let k = 0; k < 8; k++) {
+          const xx = x + NB8X[k], yy = y + NB8Y[k];
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const q = yy * W + xx;
+          if (!seen[q] && strength[q] >= tLow) { seen[q] = 1; stack[sp++] = q; }
+        }
+      }
+      if (cn >= minLine) for (let i = 0; i < cn; i++) lineMask[comp[i]] = 1;
+    }
+  }
+  // 선이 모이는 교차점처럼 closing 창보다 넓은 어두운 덩어리는 선에서 이어서 채움.
+  // 단, 선 굵기 범위를 넘어 계속 이어지는 어두운 면(검은 옷, 어두운 배경)은 채우지 않는다.
+  {
+    const lim = lw + 1, ref = new Float32Array(N), dist = new Int32Array(N).fill(-1);
+    let front = [];
+    for (let p = 0; p < N; p++) if (lineMask[p]) { dist[p] = 0; ref[p] = Lw[p]; front.push(p); }
+    for (let lvl = 0; front.length && lvl < lim; lvl++) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W, y = (p / W) | 0;
+        for (let k = 0; k < 8; k++) {
+          const xx = x + NB8X[k], yy = y + NB8Y[k];
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const q = yy * W + xx;
+          if (dist[q] >= 0 || Lw[q] > ref[p] + 0.05 || Lw[q] > 0.5) continue;
+          dist[q] = lvl + 1; ref[q] = ref[p]; next.push(q);
+        }
+      }
+      front = next;
+    }
+    const cand = new Uint8Array(N);
+    for (let p = 0; p < N; p++) cand[p] = dist[p] > 0 ? 1 : 0;
+    const cc = components(new Int32Array(N), cand, W, H), far = new Uint8Array(cc.count);
+    for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && dist[p] >= lim) far[cc.rid[p]] = 1;
+    for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && !far[cc.rid[p]]) lineMask[p] = 1;
+  }
+  // 선명한 선: 진하고(알파 0.45+) 얇고 또렷한(살짝 흐리면 깊이의 25% 이상이 사라지는) 선. 흐린 배경 자국과 구분
+  const crisp = new Uint8Array(N);
+  {
+    const bl = blur(Lw, W, H, 1.5);
+    for (let p = 0; p < N; p++) {
+      if (!lineMask[p]) continue;
+      const d = closeL[p] - Lw[p];
+      if (d > 0.02 && strength[p] >= 0.45 && (bl[p] - Lw[p]) / d >= 0.25) crisp[p] = 1;
+    }
+  }
+  const inMask = new Uint8Array(N);                  // 선 + 안티에일리어싱 가장자리 1px
+  for (let p = 0; p < N; p++) {
+    if (!lineMask[p]) continue;
+    const x = p % W, y = (p / W) | 0; inMask[p] = 1;
+    for (let k = 0; k < 8; k++) {
+      const xx = x + NB8X[k], yy = y + NB8Y[k];
+      if (xx >= 0 && yy >= 0 && xx < W && yy < H) inMask[yy * W + xx] = 1;
+    }
+  }
+  const known = new Uint8Array(N);
+  for (let p = 0; p < N; p++) known[p] = !inMask[p] && A[p] > 0.02 ? 1 : 0;
+
+  /* 2) 선 아래 색 복원(인페인팅) → U, 선 알파/색 역산 */
+  progress(0.16, '선 아래 색 복원');
+  const U = [Float32Array.from(R), Float32Array.from(Gc), Float32Array.from(B)];
+  inpaint(U, known, W, H);
+  const lineA = new Float32Array(N), lineC = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+  const O = [R, Gc, B], blackLine = opts.lineColor === 'black';
+  for (let p = 0; p < N; p++) {
+    if (!inMask[p] || A[p] <= 0.02) continue;
+    let a = 0;
+    if (blackLine) {
+      const lu = lumOf(U[0][p], U[1][p], U[2][p]), lo = lumOf(R[p], Gc[p], B[p]);
+      a = lu > 0.01 ? clamp01(1 - lo / lu) : 0;
+    } else {
+      for (let c = 0; c < 3; c++) { const u = U[c][p]; if (u > 0.004) a = Math.max(a, 1 - O[c][p] / u); }
+      a = clamp01(a);
+      if (a > 0.02) for (let c = 0; c < 3; c++) lineC[c][p] = clamp01((O[c][p] - (1 - a) * U[c][p]) / a);
+    }
+    if (a <= 0.02) { a = 0; U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p]; }
+    lineA[p] = a;
+  }
+
+  /* 2-1) 선화 + 색트레스: 작가처럼 한 가지 색의 선화를 그리고, 색이 다른 부분만 위에 클리핑한 색트레스로 */
+  let lineK0 = null, traceMask = null;
+  if (opts.lineColor === 'trace') {
+    const solve = (p, C) => {                          // 선 색 C가 정해졌을 때의 알파(최소제곱)
+      let num = 0, den = 0;
+      for (let c = 0; c < 3; c++) { const du = U[c][p] - C[c]; num += (U[c][p] - O[c][p]) * du; den += du * du; }
+      return den > 1e-5 ? clamp01(num / den) : 0;
+    };
+    // 기본 선 색 = 선이 완전히 덮은 픽셀(중심부) 원본 색의 중앙값
+    const hist = [new Int32Array(256), new Int32Array(256), new Int32Array(256)];
+    let nc = 0;
+    for (let p = 0; p < N; p++) if (lineMask[p] && lineA[p] >= 0.85) { nc++; for (let c = 0; c < 3; c++) hist[c][Math.round(O[c][p] * 255)]++; }
+    if (nc) {
+      const med = h => { let s = 0; for (let v = 0; v < 256; v++) { s += h[v]; if (s * 2 >= nc) return v / 255; } return 0; };
+      lineK0 = [med(hist[0]), med(hist[1]), med(hist[2])];
+      const k0 = labOf(lineK0[0], lineK0[1], lineK0[2]);
+      // 기본 선 색으로 봤을 때 완전히 덮인 픽셀의 원본 색 = 그 자리의 실제 선 색 → 선 전체로 퍼뜨림
+      const Cs = [new Float32Array(N).fill(lineK0[0]), new Float32Array(N).fill(lineK0[1]), new Float32Array(N).fill(lineK0[2])];
+      const core = new Uint8Array(N), skip = new Uint8Array(N);
+      for (let p = 0; p < N; p++) {
+        skip[p] = inMask[p] ? 0 : 1;
+        if (!inMask[p] || A[p] <= 0.02 || lineA[p] <= 0) continue;
+        const ak = solve(p, lineK0);
+        if (ak < 0.5) continue;                        // 절반 이상 덮인 픽셀은 아래색을 빼서 선 색을 추정
+        core[p] = 1;
+        for (let c = 0; c < 3; c++) Cs[c][p] = clamp01((O[c][p] - (1 - ak) * U[c][p]) / ak);
+      }
+      inpaint(Cs, core, W, H, skip);
+      traceMask = new Uint8Array(N);
+      let tw = 0, aw = 0;
+      const col = [0, 0, 0];
+      // 이 알파 이상이면 선 색을 역산해도 0~1 범위 안에 들어온다(= 정확히 재현 가능한 최소 알파)
+      const aMin = p => {
+        let a = 0;
+        for (let c = 0; c < 3; c++) {
+          const u = U[c][p], o = O[c][p];
+          if (u > 0.004) a = Math.max(a, 1 - o / u);
+          if (o > u && u < 0.996) a = Math.max(a, (o - u) / (1 - u));
+        }
+        return clamp01(a);
+      };
+      for (let p = 0; p < N; p++) {
+        if (!inMask[p] || A[p] <= 0.02) continue;
+        const cl = labOf(Cs[0][p], Cs[1][p], Cs[2][p]);
+        let tr = Math.hypot(cl[0] - k0[0], cl[1] - k0[1], cl[2] - k0[2]) > 6;
+        let a;
+        if (!tr) {                                     // 기본 선 색으로 맞춰 보고, 많이 어긋나면 색트레스로
+          a = solve(p, lineK0);
+          let r = 0;
+          for (let c = 0; c < 3; c++) r = Math.max(r, Math.abs(O[c][p] - (a * lineK0[c] + (1 - a) * U[c][p])));
+          if (r <= 8 / 255) for (let c = 0; c < 3; c++) col[c] = lineK0[c];
+          else tr = true;
+        }
+        if (tr) {                                      // 색트레스: 부드러운 선 색에서 출발해 정확히 재현되는 색으로
+          a = Math.max(solve(p, [Cs[0][p], Cs[1][p], Cs[2][p]]), aMin(p));
+          if (a > 0.02) for (let c = 0; c < 3; c++) col[c] = clamp01((O[c][p] - (1 - a) * U[c][p]) / a);
+        }
+        if (a <= 0.02) { a = 0; tr = false; U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p]; }
+        lineA[p] = a;
+        for (let c = 0; c < 3; c++) lineC[c][p] = col[c];
+        if (tr && a > 0) { traceMask[p] = 1; tw += a; }
+        aw += a;
+      }
+      if (tw < aw * 0.003) {                           // 색트레스가 거의 없으면 선화 한 장으로
+        for (let p = 0; p < N; p++) if (traceMask[p]) {
+          lineA[p] = solve(p, lineK0); for (let c = 0; c < 3; c++) lineC[c][p] = lineK0[c];
+        }
+        traceMask = null;
+      }
+    }
+  }
+
+  /* 3) 단색 배경 분리 */
+  progress(0.24, '배경 판별');
+  let bgMask = opts.bg && !hasAlpha ? detectBackground(U, known, W, H) : null;
+  if (opts.bg && !hasAlpha) {                          // 선 없이 칠한 장면 배경도 배경으로
+    const scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale);
+    if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
+  }
+  // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
+  const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
+  const forceChar = opts.forceChar && opts.forceChar.length === N ? opts.forceChar : null;
+  if (forceBg) {
+    if (!bgMask) bgMask = new Uint8Array(N);
+    for (let p = 0; p < N; p++) if (forceBg[p] && A[p] > 0.02) bgMask[p] = 1;
+  }
+  if (forceChar && bgMask) for (let p = 0; p < N; p++) if (forceChar[p]) bgMask[p] = 0;
+  // 배경 위에 떠 있는 작은 조각(입자, 빛줄기 조각)은 캐릭터 파츠가 아니라 "배경 + 효과"로 본다
+  let bgFx = null, bgBase = null;
+  if (bgMask) {
+    const notBg = new Uint8Array(N);
+    for (let p = 0; p < N; p++) notBg[p] = !bgMask[p] && A[p] > 0.02 ? 1 : 0;
+    // (사용자가 캐릭터로 되돌린 조각은 작아도 배경 효과로 보내지 않는다)
+    const cc = components(new Int32Array(N), notBg, W, H), area = new Int32Array(cc.count);
+    for (let p = 0; p < N; p++) if (cc.rid[p] >= 0) area[cc.rid[p]]++;
+    let any = false;
+    bgFx = new Uint8Array(N);
+    const keepChar = new Uint8Array(cc.count);
+    if (forceChar) for (let p = 0; p < N; p++) if (forceChar[p] && cc.rid[p] >= 0) keepChar[cc.rid[p]] = 1;
+    for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && !keepChar[cc.rid[p]] && area[cc.rid[p]] < N * 0.015) { bgFx[p] = 1; any = true; }
+    if (any) {
+      const Ubg = [Float32Array.from(U[0]), Float32Array.from(U[1]), Float32Array.from(U[2])], skip = new Uint8Array(N);
+      for (let p = 0; p < N; p++) skip[p] = notBg[p] && !bgFx[p] ? 1 : 0;
+      inpaint(Ubg, bgMask, W, H, skip);                // 조각 아래의 배경색을 주변에서 추정
+      bgBase = Ubg;
+      for (let p = 0; p < N; p++) if (bgFx[p]) { bgMask[p] = 1; for (let c = 0; c < 3; c++) bgBase[c][p] = Math.min(U[c][p], Ubg[c][p]); }
+    } else bgFx = null;
+  }
+  // 배경으로 거의 둘러싸여 있고 색도 주변 배경과 같은 "선"은 선이 아니라 배경이 드러난 틈(빛줄기 사이 등)
+  if (bgMask) {
+    const lc = components(new Int32Array(N), lineMask, W, H), n = lc.count;
+    const nbBg = new Int32Array(n), nbAll = new Int32Array(n), cs = new Float64Array(n * 3), cn = new Int32Array(n), bs = new Float64Array(n * 3);
+    const inBg = new Int32Array(n);
+    for (let p = 0; p < N; p++) {
+      const r = lc.rid[p]; if (r < 0) continue;
+      cn[r]++; for (let c = 0; c < 3; c++) cs[r * 3 + c] += O[c][p];
+      if (bgMask[p]) inBg[r]++;
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q < 0 || inMask[q]) continue;
+        nbAll[r]++;
+        if (bgMask[q]) { nbBg[r]++; for (let c = 0; c < 3; c++) bs[r * 3 + c] += U[c][q]; }
+      }
+    }
+    // 캐릭터(배경이 아닌 칠한 곳)까지의 거리: 캐릭터에서 멀리 떨어진 선은 배경 그림의 선
+    const near = Math.max(10, Math.round(20 * scale)), dch = new Int32Array(N).fill(-1);
+    let fr = [];
+    for (let p = 0; p < N; p++) if (known[p] && !bgMask[p]) { dch[p] = 0; fr.push(p); }
+    for (let d = 1; d <= near && fr.length; d++) {
+      const nx = [];
+      for (const p of fr) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q >= 0 && dch[q] < 0) { dch[q] = d; nx.push(q); }
+        }
+      }
+      fr = nx;
+    }
+    const nearChar = new Uint8Array(n);
+    for (let p = 0; p < N; p++) if (lc.rid[p] >= 0 && dch[p] >= 0) nearChar[lc.rid[p]] = 1;
+    const drop = new Uint8Array(n);
+    let anyDrop = false, totalLine = 0;
+    for (let r = 0; r < n; r++) totalLine += cn[r];
+    for (let r = 0; r < n; r++) {
+      if (inBg[r] >= cn[r] * 0.5) { drop[r] = 1; anyDrop = true; continue; } // 배경 판정에 흡수된 흐린 자국
+      if (!nbAll[r] || nbBg[r] < nbAll[r] * 0.85) continue;
+      if (!nearChar[r]) { drop[r] = 1; anyDrop = true; continue; }
+      // 배경 안에 떠 있는 작은 선 조각(배경 그림의 선: 창틀, 구름, 크레이터 …)은 배경 그림에 남긴다
+      if (cn[r] < totalLine * 0.005) { drop[r] = 1; anyDrop = true; continue; }
+      const l1 = labOf(cs[r * 3] / cn[r], cs[r * 3 + 1] / cn[r], cs[r * 3 + 2] / cn[r]);
+      const l2 = labOf(bs[r * 3] / nbBg[r], bs[r * 3 + 1] / nbBg[r], bs[r * 3 + 2] / nbBg[r]);
+      if (Math.hypot(l1[0] - l2[0], l1[1] - l2[1], l1[2] - l2[2]) < 15) { drop[r] = 1; anyDrop = true; }
+    }
+    // 배경 판정이 흡수한 흐린 자국은(선명한 선이 아니면) 조각 단위가 아니라 픽셀 단위로도 배경 그림에 돌려준다
+    for (let p = 0; p < N && !anyDrop; p++) if (lineMask[p] && ((bgMask[p] && !crisp[p]) || (forceBg && forceBg[p]))) anyDrop = true;
+    if (anyDrop) {
+      const clear = (p, asBg) => {
+        lineA[p] = 0; inMask[p] = 0; known[p] = A[p] > 0.02 ? 1 : 0;
+        if (traceMask) traceMask[p] = 0;
+        U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p];
+        if (asBg) { bgMask[p] = 1; if (bgFx) bgFx[p] = 0; }
+      };
+      for (let p = 0; p < N; p++) {
+        if (!lineMask[p]) continue;
+        if (forceChar && forceChar[p]) continue;
+        if ((lc.rid[p] >= 0 && drop[lc.rid[p]]) || (bgMask[p] && !crisp[p]) || (forceBg && forceBg[p])) { lineMask[p] = 0; clear(p, true); }
+      }
+      // 지운 선의 가장자리 픽셀: 남은 선과 닿아 있지 않으면 선 영역에서 빼고, 배경과 닿아 있으면 배경으로
+      for (let p = 0; p < N; p++) {
+        if (!inMask[p] || lineMask[p]) continue;
+        const x = p % W, y = (p / W) | 0;
+        let nearLine = false, nearBg = false;
+        for (let k = 0; k < 8; k++) {
+          const xx = x + NB8X[k], yy = y + NB8Y[k];
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const q = yy * W + xx;
+          if (lineMask[q]) nearLine = true;
+          if (bgMask[q]) nearBg = true;
+        }
+        if (!nearLine) clear(p, nearBg && !(forceChar && forceChar[p]));
+      }
+    }
+  }
+
+  /* 4) 색 군집화(Lab k-means) → 연결 성분 → 잔조각 제거 */
+  progress(0.3, '색 군집화');
+  const valid = new Uint8Array(N); let nValid = 0;
+  for (let p = 0; p < N; p++) if (known[p] && !(bgMask && bgMask[p])) { valid[p] = 1; nValid++; }
+  const vidx = new Int32Array(nValid);
+  for (let p = 0, i = 0; p < N; p++) if (valid[p]) vidx[i++] = p;
+  const [Lp, Ap, Bp] = toLab(U[0], U[1], U[2], N);
+  const K = Math.max(2, Math.min(opts.colors, nValid || 2));
+  const clus = new Int32Array(N).fill(-1);
+  if (nValid) {
+    const { cL, cA, cB } = kmeans(Lp, Ap, Bp, vidx, K, rnd);
+    for (const p of vidx) {
+      let best = 0, bd = Infinity;
+      for (let k = 0; k < K; k++) {
+        const d = (Lp[p] - cL[k]) ** 2 + (Ap[p] - cA[k]) ** 2 + (Bp[p] - cB[k]) ** 2;
+        if (d < bd) { bd = d; best = k; }
+      }
+      clus[p] = best;
+    }
+  }
+  progress(0.42, '영역 분할');
+  const cc = components(clus, valid, W, H);
+  const cArea = new Int32Array(cc.count), cPerim = new Int32Array(cc.count), cClus = new Int32Array(cc.count);
+  for (let p = 0; p < N; p++) {
+    const r = cc.rid[p]; if (r < 0) continue;
+    cArea[r]++; cClus[r] = clus[p];
+    const x = p % W;
+    if (x === 0 || cc.rid[p - 1] !== r) cPerim[r]++;
+    if (x === W - 1 || cc.rid[p + 1] !== r) cPerim[r]++;
+    if (p < W || cc.rid[p - W] !== r) cPerim[r]++;
+    if (p >= N - W || cc.rid[p + W] !== r) cPerim[r]++;
+  }
+  const minArea = Math.max(10, Math.round(12 * scale * scale));
+  const remap = new Int32Array(cc.count).fill(-1);
+  let nR = 0;
+  for (let r = 0; r < cc.count; r++) if (cArea[r] >= minArea && cArea[r] >= 0.75 * cPerim[r]) remap[r] = nR++;
+  const clusterOf = new Int32Array(Math.max(1, nR));
+  for (let r = 0; r < cc.count; r++) if (remap[r] >= 0) clusterOf[remap[r]] = cClus[r];
+  const bgId = bgMask ? nR : -1;
+  const reg = new Int32Array(N).fill(-1);
+  for (let p = 0; p < N; p++) {
+    if (bgMask && bgMask[p]) reg[p] = bgId;
+    else if (cc.rid[p] >= 0 && remap[cc.rid[p]] >= 0) reg[p] = remap[cc.rid[p]];
+  }
+  if (nR || bgMask) fillLabels(reg, W, H); else reg.fill(0);
+  if (!nR && !bgMask) nR = 1;
+
+  /* 5) 영역 통계: 평균 / 상위 평균(밝은 쪽) / 하위 평균(어두운 쪽) */
+  progress(0.5, '영역 통계');
+  const cnt = new Float64Array(nR), areaAll = new Int32Array(nR), sum = new Float64Array(nR * 3);
+  for (let p = 0; p < N; p++) {
+    const r = reg[p]; if (r < 0 || r >= nR) continue;
+    areaAll[r]++;
+    if (!valid[p]) continue;
+    cnt[r]++; sum[r * 3] += U[0][p]; sum[r * 3 + 1] += U[1][p]; sum[r * 3 + 2] += U[2][p];
+  }
+  const mean = new Float64Array(nR * 3), mLum = new Float64Array(nR);
+  for (let r = 0; r < nR; r++) {
+    const n = cnt[r] || 1;
+    for (let c = 0; c < 3; c++) mean[r * 3 + c] = cnt[r] ? sum[r * 3 + c] / n : 0.5;
+    mLum[r] = lumOf(mean[r * 3], mean[r * 3 + 1], mean[r * 3 + 2]);
+  }
+  const up = new Float64Array(nR * 3), upN = new Float64Array(nR), lo = new Float64Array(nR * 3), loN = new Float64Array(nR);
+  for (let p = 0; p < N; p++) {
+    const r = reg[p]; if (r < 0 || r >= nR || !valid[p]) continue;
+    const l = lumOf(U[0][p], U[1][p], U[2][p]);
+    if (l >= mLum[r]) { upN[r]++; for (let c = 0; c < 3; c++) up[r * 3 + c] += U[c][p]; }
+    if (l <= mLum[r]) { loN[r]++; for (let c = 0; c < 3; c++) lo[r * 3 + c] += U[c][p]; }
+  }
+  for (let r = 0; r < nR; r++) for (let c = 0; c < 3; c++) {
+    up[r * 3 + c] = upN[r] ? up[r * 3 + c] / upN[r] : mean[r * 3 + c];
+    lo[r * 3 + c] = loN[r] ? lo[r * 3 + c] / loN[r] : mean[r * 3 + c];
+  }
+  const regCol = [];
+  for (let r = 0; r < nR; r++) regCol.push(lch([mean[r * 3], mean[r * 3 + 1], mean[r * 3 + 2]]));
+
+  /* 6) 영역 인접 그래프: 경계가 선으로 막혔는지(lined) 열려 있는지(open) 집계 */
+  progress(0.56, '재질(밑색) 병합');
+  const edgeIdx = new Map(), eA = [], eB = [], eOpen = [], eLined = [];
+  const addEdge = (a, b, lined) => {
+    if (a > b) { const t = a; a = b; b = t; }
+    const key = a * nR + b;
+    let i = edgeIdx.get(key);
+    if (i === undefined) { i = eA.length; edgeIdx.set(key, i); eA.push(a); eB.push(b); eOpen.push(0); eLined.push(0); }
+    if (lined) eLined[i]++; else eOpen[i]++;
+  };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x, a = reg[p];
+    if (a < 0 || a >= nR || A[p] <= 0.02) continue;
+    if (x < W - 1) { const q = p + 1, b = reg[q]; if (b !== a && b >= 0 && b < nR && A[q] > 0.02) addEdge(a, b, inMask[p] || inMask[q]); }
+    if (y < H - 1) { const q = p + W, b = reg[q]; if (b !== a && b >= 0 && b < nR && A[q] > 0.02) addEdge(a, b, inMask[p] || inMask[q]); }
+  }
+  const m = opts.merge;
+  const hueTol = 14 + 40 * m, simTol = 5 + 12 * m, minOpenRatio = 0.8 - 0.45 * m;
+  const uf = makeUF(nR), rep = new Int32Array(nR), gArea = new Float64Array(nR);
+  for (let r = 0; r < nR; r++) { rep[r] = r; gArea[r] = cnt[r]; }
+  const order = eA.map((_, i) => i).sort((i, j) => eOpen[j] - eOpen[i]);
+  for (const i of order) {
+    const o = eOpen[i], l = eLined[i];
+    if (o < 3 || o / (o + l) < minOpenRatio) continue;
+    const a = eA[i], b = eB[i], ga = uf.find(a), gb = uf.find(b);
+    if (ga === gb) continue;
+    if (!shadeRelated(regCol[a], regCol[b], hueTol, simTol)) continue;
+    if (!shadeRelated(regCol[rep[ga]], regCol[rep[gb]], hueTol * 1.5, simTol * 1.5)) continue;
+    const big = gArea[ga] >= gArea[gb] ? ga : gb, small = big === ga ? gb : ga;
+    uf.parent[small] = big;
+    gArea[big] += gArea[small];
+    if (cnt[rep[small]] > cnt[rep[big]]) rep[big] = rep[small];
+  }
+  const gid = new Int32Array(nR).fill(-1); let nG = 0;
+  const grp = new Int32Array(nR);
+  for (let r = 0; r < nR; r++) { const g = uf.find(r); if (gid[g] < 0) gid[g] = nG++; grp[r] = gid[g]; }
+
+  /* 7) 재질별 톤 재군집: 재질(그룹) 안에서만 다시 k-means → 밑색/그림자/하이라이트 톤 */
+  progress(0.6, '톤 분석');
+  const gCount = new Int32Array(nG + 1), gOff = new Int32Array(nG + 1);
+  for (const p of vidx) gCount[grp[reg[p]]]++;
+  for (let g = 1; g <= nG; g++) gOff[g] = gOff[g - 1] + gCount[g - 1];
+  const gIdx = new Int32Array(nValid), gFill = gOff.slice();
+  for (const p of vidx) gIdx[gFill[grp[reg[p]]]++] = p;
+  const toneOf = new Int32Array(N).fill(-1), toneGroup = [], toneLab = [];
+  const gFirstReg = new Int32Array(nG).fill(-1);
+  for (let r = 0; r < nR; r++) if (gFirstReg[grp[r]] < 0) gFirstReg[grp[r]] = r;
+  for (let g = 0; g < nG; g++) {
+    const n = gCount[g], idx = gIdx.subarray(gOff[g], gOff[g] + n), first = toneGroup.length;
+    if (!n) { const c = regCol[gFirstReg[g]]; toneGroup.push(g); toneLab.push([c.L, c.a, c.b]); continue; }
+    const kl = Math.min(6, Math.max(1, Math.floor(n / 40)));
+    let cents;
+    if (kl === 1) {
+      let a = 0, b = 0, l = 0; for (const p of idx) { l += Lp[p]; a += Ap[p]; b += Bp[p]; }
+      cents = [[l / n, a / n, b / n]];
+    } else {
+      const km = kmeans(Lp, Ap, Bp, idx, kl, rnd, 6000);
+      cents = Array.from({ length: kl }, (_, k) => [km.cL[k], km.cA[k], km.cB[k]]);
+    }
+    for (const c of cents) {                          // 가까운 중심(ΔE<8)은 한 톤으로
+      let hit = -1;
+      for (let t = first; t < toneLab.length; t++) {
+        const d = toneLab[t]; if (Math.hypot(d[0] - c[0], d[1] - c[1], d[2] - c[2]) < 8) { hit = t; break; }
+      }
+      if (hit < 0) { toneGroup.push(g); toneLab.push(c.slice()); }
+    }
+    const last = toneLab.length;
+    for (const p of idx) {
+      let best = first, bd = Infinity;
+      for (let t = first; t < last; t++) {
+        const d = toneLab[t], e = (Lp[p] - d[0]) ** 2 + (Ap[p] - d[1]) ** 2 + (Bp[p] - d[2]) ** 2;
+        if (e < bd) { bd = e; best = t; }
+      }
+      toneOf[p] = best;
+    }
+  }
+  if (!toneGroup.length) { toneGroup.push(0); toneLab.push([100, 0, 0]); }
+  const nT = toneGroup.length, bgTone = bgMask ? nT : -1;
+  let nGroups = Math.max(1, nG);
+  // 잔조각 톤 제거 후 선/빈 곳 채우기
+  const tc = components(toneOf, valid, W, H);
+  const tArea = new Int32Array(tc.count), tPerim = new Int32Array(tc.count);
+  for (let p = 0; p < N; p++) {
+    const r = tc.rid[p]; if (r < 0) continue;
+    tArea[r]++;
+    const x = p % W;
+    if (x === 0 || tc.rid[p - 1] !== r) tPerim[r]++;
+    if (x === W - 1 || tc.rid[p + 1] !== r) tPerim[r]++;
+    if (p < W || tc.rid[p - W] !== r) tPerim[r]++;
+    if (p >= N - W || tc.rid[p + W] !== r) tPerim[r]++;
+  }
+  const tone = new Int32Array(N).fill(-1);
+  for (let p = 0; p < N; p++) {
+    if (bgMask && bgMask[p]) tone[p] = bgTone;
+    else { const r = tc.rid[p]; if (r >= 0 && tArea[r] >= minArea && tArea[r] >= 0.75 * tPerim[r]) tone[p] = toneOf[p]; }
+  }
+  let anyTone = false;
+  for (let p = 0; p < N && !anyTone; p++) if (tone[p] >= 0) anyTone = true;
+  if (anyTone) fillLabels(tone, W, H); else tone.fill(0);
+
+  /* 8) 톤 통계 → 재질별 밑색 선택 → 그림자/하이라이트 톤 분류 */
+  progress(0.64, '밑색 · 그림자 판정');
+  const tCnt = new Float64Array(nT), tSum = new Float64Array(nT * 3), tLum = new Float64Array(nT);
+  for (const p of vidx) { const t = tone[p]; if (t < 0 || t >= nT || toneOf[p] !== t) continue; tCnt[t]++; for (let c = 0; c < 3; c++) tSum[t * 3 + c] += U[c][p]; }
+  const tMean = new Float64Array(nT * 3);
+  for (let t = 0; t < nT; t++) {
+    if (tCnt[t]) for (let c = 0; c < 3; c++) tMean[t * 3 + c] = tSum[t * 3 + c] / tCnt[t];
+    else {                                            // 표본 없는 톤은 Lab 중심값에서
+      const d = toneLab[t], fy = (d[0] + 16) / 116, fx = fy + d[1] / 500, fz = fy - d[2] / 200;
+      const inv = v => v ** 3 > 0.008856 ? v ** 3 : (v - 16 / 116) / 7.787;
+      const X = inv(fx) * 0.95047, Y = inv(fy), Z = inv(fz) * 1.08883;
+      const lin = [3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z, -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z, 0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z];
+      for (let c = 0; c < 3; c++) { const v = clamp01(lin[c]); tMean[t * 3 + c] = v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055; }
+    }
+    tLum[t] = lumOf(tMean[t * 3], tMean[t * 3 + 1], tMean[t * 3 + 2]);
+  }
+  const tUp = new Float64Array(nT * 3), tUpN = new Float64Array(nT), tLo = new Float64Array(nT * 3), tLoN = new Float64Array(nT);
+  for (const p of vidx) {
+    const t = tone[p]; if (t < 0 || t >= nT || toneOf[p] !== t) continue;
+    const l = lumOf(U[0][p], U[1][p], U[2][p]);
+    if (l >= tLum[t] - 0.01) { tUpN[t]++; for (let c = 0; c < 3; c++) tUp[t * 3 + c] += U[c][p]; }
+    if (l <= tLum[t] + 0.01) { tLoN[t]++; for (let c = 0; c < 3; c++) tLo[t * 3 + c] += U[c][p]; }
+  }
+  for (let t = 0; t < nT; t++) for (let c = 0; c < 3; c++) {
+    tUp[t * 3 + c] = tUpN[t] ? tUp[t * 3 + c] / tUpN[t] : tMean[t * 3 + c];
+    tLo[t * 3 + c] = tLoN[t] ? tLo[t * 3 + c] / tLoN[t] : tMean[t * 3 + c];
+  }
+  // 밑색 = 가장 넓은 톤(거의 비슷한 넓이의 더 밝은 톤이 있으면 그쪽)의 상위 평균
+  const gMax = new Float64Array(nGroups), baseL = new Float64Array(nGroups).fill(-1);
+  let baseTone = new Int32Array(nGroups).fill(-1);
+  for (let t = 0; t < nT; t++) if (tCnt[t] > gMax[toneGroup[t]]) gMax[toneGroup[t]] = tCnt[t];
+  for (let t = 0; t < nT; t++) {
+    const g = toneGroup[t];
+    if (tCnt[t] < gMax[g] * 0.75) continue;
+    const L = labOf(tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2])[0];
+    if (L > baseL[g]) { baseL[g] = L; baseTone[g] = t; }
+  }
+  let base = new Float64Array(nGroups * 3).fill(0.5);
+  for (let t = 0; t < nT; t++) { const g = toneGroup[t]; if (baseTone[g] < 0) baseTone[g] = t; }
+  // 선으로 나뉜 같은 재질(예: 앞머리/뒷머리): 더 넓은 재질의 밑색과 같은 톤이 있으면 그 톤을 밑색으로
+  {
+    const gTot = new Float64Array(nGroups);
+    for (let t = 0; t < nT; t++) gTot[toneGroup[t]] += tCnt[t];
+    const labUp = t => labOf(tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2]);
+    const gs = Array.from({ length: nGroups }, (_, g) => g).sort((a, b) => gTot[b] - gTot[a]);
+    const done = [];
+    for (const g of gs) {
+      if (baseTone[g] < 0) continue;
+      if (done.length) {
+        let best = -1, bestD = 7;
+        for (let t = 0; t < nT; t++) {
+          if (toneGroup[t] !== g || t === baseTone[g] || tCnt[t] < gTot[g] * 0.1) continue;
+          const lt = labUp(t);
+          for (const ref of done) {
+            const d = Math.hypot(lt[0] - ref[0], lt[1] - ref[1], lt[2] - ref[2]);
+            if (d < bestD) { bestD = d; best = t; }
+          }
+        }
+        if (best >= 0) {
+          const lb = labUp(baseTone[g]);
+          if (!done.some(ref => Math.hypot(lb[0] - ref[0], lb[1] - ref[1], lb[2] - ref[2]) < bestD)) baseTone[g] = best;
+        }
+      }
+      done.push(labUp(baseTone[g]));
+    }
+  }
+  for (let g = 0; g < nGroups; g++) if (baseTone[g] >= 0) for (let c = 0; c < 3; c++) base[g * 3 + c] = tUp[baseTone[g] * 3 + c];
+
+  /* 7-2) 파츠 정리: 실제 작업 파일처럼 파츠 수를 줄인다
+   *  ② 거의 같은 밑색은 한 파츠 → ① 선으로 나뉜 그림자 면(흰 머리카락 옆 연보라 가닥)은 밝은 재질에 합침 → ② 한 번 더   ③ 작은 조각은 이웃 파츠로   ④ 파츠 수 상한 */
+  {
+    const gPix = new Float64Array(nGroups);
+    for (let p = 0; p < N; p++) { const t = tone[p]; if (t >= 0 && t < nT && A[p] > 0.02) gPix[toneGroup[t]]++; }
+    const gCol = [], gLum = new Float64Array(nGroups);
+    for (let g = 0; g < nGroups; g++) {
+      gCol.push(lch([base[g * 3], base[g * 3 + 1], base[g * 3 + 2]]));
+      gLum[g] = lumOf(base[g * 3], base[g * 3 + 1], base[g * 3 + 2]);
+    }
+    const adj = new Map();
+    const addAdj = (a, b) => {
+      if (a === b) return;
+      if (a > b) { const t = a; a = b; b = t; }
+      const k = a * nGroups + b; adj.set(k, (adj.get(k) || 0) + 1);
+    };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const p = y * W + x, t = tone[p]; if (t < 0 || t >= nT) continue;
+      const g = toneGroup[t];
+      if (x < W - 1) { const u = tone[p + 1]; if (u >= 0 && u < nT) addAdj(g, toneGroup[u]); }
+      if (y < H - 1) { const u = tone[p + W]; if (u >= 0 && u < nT) addAdj(g, toneGroup[u]); }
+    }
+    const edges = [...adj.entries()].map(([k, n]) => [Math.floor(k / nGroups), k % nGroups, n]).sort((a, b) => b[2] - a[2]);
+    const uf = makeUF(nGroups), rArea = Float64Array.from(gPix), rRep = Int32Array.from({ length: nGroups }, (_, g) => g);
+    const join = (a, b) => {
+      a = uf.find(a); b = uf.find(b); if (a === b) return;
+      const root = rArea[a] >= rArea[b] ? a : b, other = root === a ? b : a;
+      uf.parent[other] = root; rArea[root] += rArea[other];
+      if (gPix[rRep[other]] > gPix[rRep[root]]) rRep[root] = rRep[other];
+    };
+    const dE = (g1, g2) => { const a = gCol[g1], b = gCol[g2]; return Math.hypot(a.L - b.L, a.a - b.a, a.b - b.b); };
+    const shadowOf = (lit, dark) => {
+      const r = gLum[dark] / Math.max(gLum[lit], 1e-3);
+      if (r < 0.45 || r > 0.93) return false;
+      const a = gCol[lit], b = gCol[dark];
+      if (a.C < 25 && b.C < 25) return Math.abs(a.C - b.C) < 18 && r >= 0.55; // 흰 머리카락 ↔ 연보라 그림자처럼 채도가 비슷한 경우만
+      return a.C >= 12 && b.C >= 12 && hueDiff(a.h, b.h) < 30 && b.C / a.C > 0.5 && b.C / a.C < 2;
+    };
+    const minPart = Math.max(64, N * 0.0015);
+    const roots = () => { const r = new Set(); for (let g = 0; g < nGroups; g++) r.add(uf.find(g)); return [...r]; };
+    const mergeSame = () => {                          // ② 거의 같은 밑색
+      const rs = roots().filter(r => rArea[r] >= minPart).sort((x, y) => rArea[y] - rArea[x]);
+      for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+        const a = uf.find(rs[i]), b = uf.find(rs[j]);
+        if (a !== b && dE(rRep[a], rRep[b]) < 6) join(a, b);
+      }
+    };
+    mergeSame();
+    const rootEdges = new Map();                       // ① (합쳐진 파츠끼리의 경계 길이로)
+    for (const [a, b, n] of edges) {
+      let ra = uf.find(a), rb = uf.find(b); if (ra === rb) continue;
+      if (ra > rb) { const t = ra; ra = rb; rb = t; }
+      const k = ra * nGroups + rb; rootEdges.set(k, (rootEdges.get(k) || 0) + n);
+    }
+    const rootPerim = new Map();                     // 파츠별 다른 파츠와 맞닿은 경계 총길이
+    for (const [k, n] of rootEdges) {
+      const a = Math.floor(k / nGroups), b = k % nGroups;
+      rootPerim.set(a, (rootPerim.get(a) || 0) + n); rootPerim.set(b, (rootPerim.get(b) || 0) + n);
+    }
+    for (const [k, n] of [...rootEdges.entries()].sort((x, y) => y[1] - x[1])) {
+      const a = Math.floor(k / nGroups), b = k % nGroups;
+      if (n < 8) continue;
+      // 그림자 면은 밝은 면에 대부분 둘러싸여 있다(머리카락 가닥처럼). 여러 재질과 맞닿은 면(옷 등)은 따로 둔다
+      const darkRoot = gLum[rRep[uf.find(a)]] < gLum[rRep[uf.find(b)]] ? a : b;
+      if (n < 0.4 * (rootPerim.get(darkRoot) || 1)) continue;
+      const ra = uf.find(a), rb = uf.find(b); if (ra === rb) continue;
+      const ga = rRep[ra], gb = rRep[rb];
+      const lit = gLum[ga] >= gLum[gb] ? ga : gb, dark = lit === ga ? gb : ga;
+      if (rArea[uf.find(dark)] > rArea[uf.find(lit)] * 1.5) continue;
+      if (shadowOf(lit, dark)) join(lit, dark);
+    }
+    mergeSame();
+    {                                                  // ③
+      const nb = Array.from({ length: nGroups }, () => []);
+      for (const [a, b, n] of edges) { nb[a].push([b, n]); nb[b].push([a, n]); }
+      const order = Array.from({ length: nGroups }, (_, g) => g).sort((x, y) => gPix[x] - gPix[y]);
+      for (const g of order) {
+        const r = uf.find(g); if (rArea[r] >= minPart) continue;
+        const score = new Map();
+        for (const [h, n] of nb[g]) { const q = uf.find(h); if (q !== r) score.set(q, (score.get(q) || 0) + n); }
+        let best = -1, bs = -1, any = -1, as = -1;
+        for (const [q, n] of score) {
+          if (n > as) { as = n; any = q; }
+          if (dE(rRep[r], rRep[q]) < 30 && n > bs) { bs = n; best = q; }
+        }
+        if (best < 0) {                                // 이웃 중 비슷한 색이 없으면 색이 가장 비슷한 큰 파츠
+          let bd = 20;
+          for (const q of roots()) if (q !== r && rArea[q] >= minPart) { const d = dE(rRep[r], rRep[q]); if (d < bd) { bd = d; best = q; } }
+        }
+        if (best < 0) best = any;
+        if (best >= 0) join(best, r);
+      }
+    }
+    let rs = roots();                                  // ④
+    while (rs.length > 24) {
+      rs.sort((x, y) => rArea[x] - rArea[y]);
+      const sm = rs[0]; let best = -1, bd = Infinity;
+      for (const r of rs) if (r !== sm) { const d = dE(rRep[sm], rRep[r]); if (d < bd) { bd = d; best = r; } }
+      join(best, sm); rs = roots();
+    }
+    const pid = new Int32Array(nGroups).fill(-1), partRep = [];
+    for (let g = 0; g < nGroups; g++) { const r = uf.find(g); if (pid[r] < 0) { pid[r] = partRep.length; partRep.push(rRep[r]); } }
+    for (let t = 0; t < nT; t++) toneGroup[t] = pid[uf.find(toneGroup[t])];
+    const nb2 = new Float64Array(partRep.length * 3), bt2 = new Int32Array(partRep.length);
+    partRep.forEach((g, k) => { for (let c = 0; c < 3; c++) nb2[k * 3 + c] = base[g * 3 + c]; bt2[k] = baseTone[g]; });
+    base = nb2; baseTone = bt2; nGroups = partRep.length;
+  }
+
+  const shadowThr = 0.86 + 0.12 * opts.shadow;
+  const sparkR = opts.sparkle > 0 ? opts.sparkle : Math.max(4, Math.round(7 * scale));
+  const sparkArea = Math.PI * sparkR * sparkR * 3;
+  const toneG = new Float32Array(nT * 3).fill(1), toneHi = new Uint8Array(nT);
+  for (let t = 0; t < nT; t++) {
+    const g = toneGroup[t];
+    if (t === baseTone[g]) continue;
+    const F = [base[g * 3], base[g * 3 + 1], base[g * 3 + 2]], lf = lumOf(F[0], F[1], F[2]);
+    const cu = [tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2]], cl = [tLo[t * 3], tLo[t * 3 + 1], tLo[t * 3 + 2]];
+    if (lf > 0.01 && tLum[t] / lf < shadowThr) {
+      for (let c = 0; c < 3; c++) toneG[t * 3 + c] = F[c] > 0.004 ? Math.min(1, cu[c] / F[c]) : 1;
+      continue;
+    }
+    const ll = lumOf(cl[0], cl[1], cl[2]);
+    if (lf < 0.995 && 1 - (1 - ll) / (1 - lf) > 0.12) {
+      toneHi[t] = 1;
+      // 반짝임 후보: 거의 흰색이고 밑색보다 훨씬 밝은 톤(눈 하이라이트, 별). 나머지 작은 하이라이트는 하이라이트 레이어에
+      if (Math.max(tMean[t * 3], tMean[t * 3 + 1], tMean[t * 3 + 2]) >= 0.85 && 1 - (1 - ll) / (1 - lf) > 0.35) toneHi[t] = 2;
+    }
+  }
+  // 작은 하이라이트 조각은 반짝임으로
+  const sparkPix = new Uint8Array(N);
+  {
+    const vis = new Uint8Array(N);
+    for (let p = 0; p < N; p++) vis[p] = A[p] > 0.02 && tone[p] >= 0 && tone[p] < nT && toneHi[tone[p]] === 2 ? 1 : 0;
+    const hc = components(tone, vis, W, H), hArea = new Int32Array(hc.count);
+    for (let p = 0; p < N; p++) if (hc.rid[p] >= 0) hArea[hc.rid[p]]++;
+    for (let p = 0; p < N; p++) if (hc.rid[p] >= 0 && hArea[hc.rid[p]] <= sparkArea) sparkPix[p] = 1;
+  }
+
+  return buildLayers({
+    W, H, N, scale, rnd, opts, progress, t0, hasAlpha,
+    R, G: Gc, B, A, U, lineA, lineC, lineK0, traceMask, inMask, bgMask, bgFx, bgBase, tone, nT, bgTone, toneGroup, nG: nGroups, base,
+    toneG, toneHi, toneCol: tMean, tCnt, sparkPix, sparkR, sparkArea,
+    counts: { regions: nR, tones: nT }
+  });
+}
+/* ---------------- 레이어 분해 ---------------- */
+function cropLayer(full, W, H) {
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) {
+    const o = y * W * 4;
+    for (let x = 0; x < W; x++) if (full[o + x * 4 + 3]) {
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y;
+    }
+  }
+  if (x1 < 0) return { x: 0, y: 0, w: 0, h: 0, data: new Uint8ClampedArray(0) };
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) data.set(full.subarray(((y + y0) * W + x0) * 4, ((y + y0) * W + x0 + w) * 4), y * w * 4);
+  return { x: x0, y: y0, w, h, data };
+}
+function layer(name, kind, blend, full, W, H, extra) {
+  return Object.assign({ name, kind, blend, opacity: 255, visible: true, clipping: false }, cropLayer(full, W, H), extra || {});
+}
+function hex(rgb) { return '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase(); }
+
+// 곱하기/스크린 값 v(0..1, 채널별)를 "색 K + 알파 a" 최소 알파 형태로 기록
+function putMinAlpha(buf, i, v0, v1, v2, a0) {
+  const am = Math.max(v0, v1, v2);
+  if (am * 255 < 0.5) return;
+  const aq = Math.max(1, Math.round(am * 255)) / 255;
+  buf[i] = Math.round(clamp01(v0 / aq) * 255);
+  buf[i + 1] = Math.round(clamp01(v1 / aq) * 255);
+  buf[i + 2] = Math.round(clamp01(v2 / aq) * 255);
+  buf[i + 3] = Math.round(aq * a0 * 255);
+}
+
+// 파츠 이름: 밑색으로 대략적인 색 이름을 붙인다(피부색은 "피부")
+function colorName(rgb) {
+  const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  const v = mx, s = mx ? (mx - mn) / mx : 0;
+  let h = 0;
+  if (mx !== mn) h = 60 * (mx === r ? ((g - b) / (mx - mn) + 6) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4);
+  if (v < 0.18) return '검정';
+  if (s < 0.1) return v > 0.9 ? '흰색' : '회색';
+  if (h >= 5 && h <= 45 && s >= 0.08 && s <= 0.55 && v >= 0.7) return '피부';
+  if (h < 15 || h >= 345) return v < 0.45 ? '갈색' : s < 0.5 && v > 0.8 ? '분홍' : '빨강';
+  if (h < 40) return v < 0.6 ? '갈색' : '주황';
+  if (h < 65) return v < 0.5 ? '갈색' : '노랑';
+  if (h < 160) return '초록';
+  if (h < 200) return '청록';
+  if (h < 255) return '파랑';
+  if (h < 290) return '보라';
+  return '분홍';
+}
+
+/* 레이어 구성 — 실제 작가의 작업 파일처럼:
+ *   러프(숨김)
+ *   [캐릭터]
+ *     [선화]  색트레스(클리핑) / 선화(단색)
+ *     [효과]  반짝임 / 빛
+ *     [채색]  림라이트 / 반사광 / 명암 / 그라데이션
+ *             [파츠(피부, 머리카락 …)]  하이라이트 / 2차 그림자 / 1차 그림자(클리핑) / 밑색
+ *             실루엣(선택용, 숨김)
+ *   [배경]    배경 효과 / 배경
+ * 곱하기(색 K, 알파 a)는 x·(1-a+aK), 스크린은 1-(1-x)(1-aK)이므로 픽셀마다 역산해 원본을 재현한다. */
+function buildLayers(ctx) {
+  const { W, H, N, scale, rnd, opts, progress, t0, R, G, B, A, U, lineA, lineC, lineK0, traceMask, bgMask, bgFx, bgBase, tone, nT, bgTone,
+    toneGroup, nG, base, toneG, toneHi, toneCol, tCnt, sparkPix, sparkR, sparkArea } = ctx;
+  const O = [R, G, B];
+  const isBg = p => bgTone >= 0 && tone[p] === bgTone;
+  const q8 = v => Math.round(clamp01(v) * 255) / 255;
+
+  /* 파츠(팔레트): 거의 같은 밑색(ΔE<2.5)은 하나의 파츠로 */
+  progress(0.62, '파츠 구성');
+  const gArea = new Float64Array(nG);
+  for (let p = 0; p < N; p++) { const t = tone[p]; if (t >= 0 && t < nT && A[p] > 0.02) gArea[toneGroup[t]]++; }
+  const pal = [], palOf = new Int32Array(nG);
+  const gOrder = Array.from({ length: nG }, (_, i) => i).sort((a, b) => gArea[b] - gArea[a]);
+  for (const g of gOrder) {
+    const rgb = [0, 1, 2].map(c => Math.round(clamp01(base[g * 3 + c]) * 255));
+    const lab = labOf(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255);
+    let hit = pal.findIndex(e => Math.hypot(e.lab[0] - lab[0], e.lab[1] - lab[1], e.lab[2] - lab[2]) < 2.5);
+    if (hit < 0) { pal.push({ rgb, lab, area: 0 }); hit = pal.length - 1; }
+    palOf[g] = hit; pal[hit].area += gArea[g];
+  }
+  const nP = pal.length;
+
+  /* 파츠별 그림자 단계: 밝은 그림자 톤 → 1차, 확실히 더 어두운 톤 → 2차(1차 위에 한 번 더 곱하기) */
+  const toneLevel = new Uint8Array(nT), sh1 = new Float32Array(nP * 3).fill(1), sh2 = new Float32Array(nP * 3).fill(1);
+  {
+    const byPart = pal.map(() => []);
+    for (let t = 0; t < nT; t++) {
+      if (!(toneG[t * 3] < 0.998 || toneG[t * 3 + 1] < 0.998 || toneG[t * 3 + 2] < 0.998)) continue;
+      byPart[palOf[toneGroup[t]]].push({ t, l: lumOf(toneG[t * 3], toneG[t * 3 + 1], toneG[t * 3 + 2]), n: Math.max(1, tCnt[t]) });
+    }
+    const avg = (items, f) => {
+      const s = [0, 0, 0]; let n = 0;
+      for (const it of items) { const v = f(it.t); for (let c = 0; c < 3; c++) s[c] += v[c] * it.n; n += it.n; }
+      return s.map(v => q8(v / n));
+    };
+    byPart.forEach((list, k) => {
+      if (!list.length) return;
+      list.sort((a, b) => b.l - a.l);
+      let split = list.length;
+      if (list[0].l - list[list.length - 1].l >= 0.07) {
+        let gap = 0, at = -1;
+        for (let i = 1; i < list.length; i++) { const d = list[i - 1].l - list[i].l; if (d > gap) { gap = d; at = i; } }
+        if (gap >= 0.04) split = at;
+      }
+      const c1 = avg(list.slice(0, split), t => [toneG[t * 3], toneG[t * 3 + 1], toneG[t * 3 + 2]]);
+      for (let c = 0; c < 3; c++) sh1[k * 3 + c] = c1[c];
+      if (split < list.length) {
+        const c2 = avg(list.slice(split), t => [0, 1, 2].map(c => Math.min(1, toneG[t * 3 + c] / Math.max(c1[c], 1e-3))));
+        for (let c = 0; c < 3; c++) sh2[k * 3 + c] = c2[c];
+      }
+      list.forEach((it, i) => { toneLevel[it.t] = i < split ? 1 : 2; });
+    });
+  }
+
+  /* 1차: 밑색 → 그림자 → 하이라이트(표준)까지 칠한 뒤, 남는 어두워짐 D와 밝아짐 S를 구한다 */
+  progress(0.66, '그림자 · 하이라이트 분해');
+  const part = new Int32Array(N).fill(-1), inShadow = new Uint8Array(N);
+  const baseB = new Uint8ClampedArray(N * 4), sh1B = new Uint8ClampedArray(N * 4), sh2B = new Uint8ClampedArray(N * 4);
+  const hlB = new Uint8ClampedArray(N * 4);
+  const D = [new Float32Array(N), new Float32Array(N), new Float32Array(N)], dMax = new Float32Array(N);
+  const S = [new Float32Array(N), new Float32Array(N), new Float32Array(N)], sMax = new Float32Array(N);
+  for (let p = 0; p < N; p++) {
+    const a0 = A[p]; if (a0 <= 0.02) continue;
+    if (isBg(p)) {                                     // 배경 위 효과 조각: 추정한 배경색 위의 밝아짐만 배경 효과로
+      if (bgFx && bgFx[p]) {
+        let sm = 0;
+        for (let c = 0; c < 3; c++) {
+          const x = bgBase[c][p], u = U[c][p];
+          const s = u > x + 1.2 / 255 && x < 0.9999 ? clamp01(1 - (1 - u) / (1 - x)) : 0;
+          S[c][p] = s; if (s > sm) sm = s;
+        }
+        sMax[p] = sm;
+      }
+      continue;
+    }
+    const t = tone[p], k = palOf[toneGroup[t]], lv = toneLevel[t], hi = toneHi[t] && !sparkPix[p], i = p * 4, al = Math.round(a0 * 255);
+    part[p] = k;
+    if (lv >= 1 && !hi) inShadow[p] = 1;
+    let sm = 0, dm = 0;
+    for (let c = 0; c < 3; c++) {
+      let x = pal[k].rgb[c] / 255;
+      if (lv >= 1) x *= sh1[k * 3 + c];
+      if (lv === 2) x *= sh2[k * 3 + c];
+      if (hi) x = q8(toneCol[t * 3 + c]);
+      const u = U[c][p];
+      let M = 1, s = 0;
+      if (u <= x + 1.2 / 255) M = x > 0.002 ? clamp01(u / x) : 1;   // 1단계 이하 밝아짐은 노이즈로 무시
+      else s = x < 0.9999 ? clamp01(1 - (1 - u) / (1 - x)) : 0;
+      D[c][p] = 1 - M; S[c][p] = s;
+      if (s > sm) sm = s; if (1 - M > dm) dm = 1 - M;
+      baseB[i + c] = pal[k].rgb[c];
+      if (lv >= 1) sh1B[i + c] = Math.round(sh1[k * 3 + c] * 255);
+      if (lv === 2) sh2B[i + c] = Math.round(sh2[k * 3 + c] * 255);
+      if (hi) hlB[i + c] = Math.round(clamp01(toneCol[t * 3 + c]) * 255);
+    }
+    sMax[p] = sm; dMax[p] = dm;
+    baseB[i + 3] = al;
+    if (lv >= 1) sh1B[i + 3] = al;
+    if (lv === 2) sh2B[i + 3] = al;
+    if (hi) hlB[i + 3] = al;
+  }
+
+  /* 어두워짐 → 그라데이션(넓게 깔린 저주파 음영) × 명암(나머지). 둘 다 곱하기라 곱하면 원래 값 */
+  progress(0.72, '그라데이션 · 명암 분리');
+  let charPx = 0;
+  for (let p = 0; p < N; p++) if (part[p] >= 0) charPx++;
+  const minLayerPx = Math.max(24, Math.round(charPx * 0.003)); // 이보다 적게 칠해진 보조 레이어는 따로 만들지 않음
+  const gradB = new Uint8ClampedArray(N * 4), shadeB = new Uint8ClampedArray(N * 4);
+  {
+    const gradR = Math.max(8, Math.round(24 * scale)), src = new Float32Array(N);
+    for (let p = 0; p < N; p++) src[p] = part[p] >= 0 ? dMax[p] : 1;   // 캐릭터 밖이 침식을 끌어내리지 않게
+    const env = blur(erode(src, W, H, gradR), W, H, gradR * 0.5);
+    let nGrad = 0;
+    for (let p = 0; p < N; p++) if (part[p] >= 0 && Math.min(dMax[p], env[p]) > 12 / 255) nGrad++;
+    const useGrad = nGrad >= minLayerPx;               // 넓게 깔린 음영이 거의 없으면 명암 한 장으로
+    const v = [0, 0, 0], r = [0, 0, 0];
+    for (let p = 0; p < N; p++) {
+      if (part[p] < 0) continue;
+      const dm = dMax[p]; if (dm <= 0) continue;
+      const f = useGrad ? Math.min(dm, env[p]) / dm : 0; // 같은 색 방향으로 일부만 그라데이션에
+      for (let c = 0; c < 3; c++) {
+        const d = D[c][p], dl = d * f;
+        v[c] = dl; r[c] = dl < 0.9999 ? clamp01(1 - (1 - d) / (1 - dl)) : 0;
+      }
+      const i = p * 4, a0 = A[p];
+      putMinAlpha(gradB, i, v[0], v[1], v[2], a0);
+      if (gradB[i + 3]) for (let c = 0; c < 3; c++) gradB[i + c] = 255 - gradB[i + c];
+      putMinAlpha(shadeB, i, r[0], r[1], r[2], a0);
+      if (shadeB[i + 3]) for (let c = 0; c < 3; c++) shadeB[i + c] = 255 - shadeB[i + c];
+    }
+  }
+
+  /* 밝아짐 → 반짝임(작은 점) / 림라이트(실루엣 가장자리에 몰린 빛) / 반사광(그림자 속 밝아짐) / 빛(나머지).
+   * 스크린은 1-(1-a)(1-b)로 합쳐지므로 차례로 떼어 내도 합성 결과가 같다 */
+  progress(0.76, '반짝임 · 림라이트 · 반사광 · 빛 분리');
+  // 반짝임 판정용: 선을 지운 그림 자체의 밝기에서 반짝임 크기보다 가는 밝은 구조만(화이트 탑햇)
+  const lumU = new Float32Array(N);
+  for (let p = 0; p < N; p++) lumU[p] = lumOf(U[0][p], U[1][p], U[2][p]);
+  const openU = dilate(erode(lumU, W, H, sparkR), W, H, sparkR);
+  const smallS = new Uint8Array(N);
+  {
+    const on = new Uint8Array(N);
+    for (let p = 0; p < N; p++) on[p] = sMax[p] > 3 / 255 ? 1 : 0;
+    const sc = components(new Int32Array(N), on, W, H), n = sc.count;
+    const sa = new Int32Array(n), smx = new Float32Array(n), sw = new Float32Array(n), th = new Float32Array(n);
+    for (let p = 0; p < N; p++) {
+      const r = sc.rid[p]; if (r < 0) continue;
+      sa[r]++; if (sMax[p] > smx[r]) smx[r] = sMax[p];
+      sw[r] += Math.min(U[0][p], U[1][p], U[2][p]);
+      const d = lumU[p] - openU[p]; if (d > th[r]) th[r] = d;
+    }
+    // 떨어져 있는 작은 밝은 조각 중 확실히 밝고(0.25+), 옅은 색이며, 그림에서도 주변보다 튀는(0.12+) 것만 반짝임
+    for (let p = 0; p < N; p++) {
+      const r = sc.rid[p];
+      if (r >= 0 && sa[r] <= sparkArea && smx[r] > 0.25 && sw[r] / sa[r] > 0.65 && th[r] > 0.12) smallS[p] = 1;
+    }
+  }
+  // 실루엣(배경·투명과 맞닿은 캐릭터 가장자리)에서의 거리
+  const rimR = Math.max(4, Math.round(12 * scale));
+  let edgeDist = null, openRim = null;
+  if (bgMask || ctx.hasAlpha) {
+    edgeDist = new Int32Array(N).fill(-1);
+    let front = [];
+    for (let p = 0; p < N; p++) {
+      if (part[p] < 0) continue;
+      const x = p % W;
+      const out = q => q >= 0 && part[q] < 0;
+      if ((x > 0 && out(p - 1)) || (x < W - 1 && out(p + 1)) || (p >= W && out(p - W)) || (p < N - W && out(p + W))) { edgeDist[p] = 0; front.push(p); }
+    }
+    for (let d = 1; d <= rimR && front.length; d++) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q >= 0 && part[q] >= 0 && edgeDist[q] < 0) { edgeDist[q] = d; next.push(q); }
+        }
+      }
+      front = next;
+    }
+    // 가장자리보다 안쪽(rimR 너머)의 밝아짐 평균. 가장자리에서만 확 밝으면 림라이트, 안쪽도 비슷하면 넓은 빛
+    const m = new Float32Array(N), sm = new Float32Array(N);
+    for (let p = 0; p < N; p++) if (part[p] >= 0 && edgeDist[p] < 0) { m[p] = 1; sm[p] = sMax[p]; }
+    const bm = blur(m, W, H, rimR * 1.5), bs = blur(sm, W, H, rimR * 1.5);
+    openRim = new Float32Array(N);
+    for (let p = 0; p < N; p++) openRim[p] = bm[p] > 0.02 ? bs[p] / bm[p] : 0;
+  }
+  const sparkB = new Uint8ClampedArray(N * 4), fxB = new Uint8ClampedArray(N * 4), rimB = new Uint8ClampedArray(N * 4), reflB = new Uint8ClampedArray(N * 4);
+  const bgB = bgMask ? new Uint8ClampedArray(N * 4) : null, bgFxB = bgMask ? new Uint8ClampedArray(N * 4) : null;
+  const take = (s, w) => { const a = s * w; return [a, a < 0.9999 ? clamp01(1 - (1 - s) / (1 - a)) : 0]; };
+  // 순서: 작은 반짝임 조각 → 림라이트 → 가는 반짝임(탑햇) → 반사광 → 빛. out = [반짝임, 림, 반사, 빛] × RGB
+  const use = { rim: true, refl: true };
+  const splitS = (p, out) => {
+    const sm = sMax[p];
+    const small = sparkPix[p] || smallS[p] ? 1 : 0;
+    const wr = use.rim && edgeDist && edgeDist[p] >= 0 ? smoothstep(rimR, rimR * 0.4, edgeDist[p]) * clamp01((sm - openRim[p]) / sm) : 0;
+    // 가는 반짝임: 그림에서 주변보다 확 튀는(0.08~0.2) 옅은 색의 점 · 가는 광택만. 넓게 밝은 면은 빛으로
+    const wt = smoothstep(0.08, 0.2, lumU[p] - openU[p]) * smoothstep(0.55, 0.8, Math.min(U[0][p], U[1][p], U[2][p]));
+    const wb = use.refl && inShadow[p] ? 1 : 0;
+    for (let c = 0; c < 3; c++) {
+      const [a1, r1] = take(S[c][p], small);
+      const [a2, r2] = take(r1, wr);
+      const [a3, r3] = take(r2, wt);
+      const [a4, r4] = take(r3, wb);
+      out[c] = 1 - (1 - a1) * (1 - a3); out[3 + c] = a2; out[6 + c] = a4; out[9 + c] = r4;
+    }
+  };
+  const sv = new Float32Array(12);
+  {                                                    // 림라이트 · 반사광이 거의 없으면 빛에 남긴다
+    let nr = 0, nb = 0;
+    for (let p = 0; p < N; p++) {
+      if (part[p] < 0 || sMax[p] <= 1e-4) continue;
+      splitS(p, sv);
+      if (Math.max(sv[3], sv[4], sv[5]) > 12 / 255) nr++;
+      if (Math.max(sv[6], sv[7], sv[8]) > 12 / 255) nb++;
+    }
+    use.rim = nr >= minLayerPx; use.refl = nb >= minLayerPx;
+  }
+  for (let p = 0; p < N; p++) {
+    const a0 = A[p]; if (a0 <= 0.02) continue;
+    const i = p * 4;
+    if (isBg(p)) {
+      const fx = bgFx && bgFx[p];
+      for (let c = 0; c < 3; c++) bgB[i + c] = Math.round((fx ? bgBase[c][p] : U[c][p]) * 255);
+      bgB[i + 3] = 255;
+      if (fx && sMax[p] > 1e-4) putMinAlpha(bgFxB, i, S[0][p], S[1][p], S[2][p], a0);
+      continue;
+    }
+    if (sMax[p] <= 1e-4) continue;
+    splitS(p, sv);
+    putMinAlpha(sparkB, i, sv[0], sv[1], sv[2], a0);
+    putMinAlpha(rimB, i, sv[3], sv[4], sv[5], a0);
+    putMinAlpha(reflB, i, sv[6], sv[7], sv[8], a0);
+    putMinAlpha(fxB, i, sv[9], sv[10], sv[11], a0);
+  }
+  // 거의 비어 있는 보조 레이어는 만들지 않는다(실제 작업 파일처럼)
+  const meaningful = buf => { let n = 0; for (let i = 3; i < buf.length; i += 4) if (buf[i] > 8 && ++n >= 24) return true; return false; };
+  for (const b of [gradB, shadeB, sparkB, fxB, rimB, reflB, bgFxB]) if (b && !meaningful(b)) b.fill(0);
+
+  /* 선화 / 색트레스 */
+  const lineB = new Uint8ClampedArray(N * 4), traceB = traceMask ? new Uint8ClampedArray(N * 4) : null;
+  const black = opts.lineColor === 'black', K0 = lineK0 ? lineK0.map(v => Math.round(v * 255)) : null;
+  for (let p = 0; p < N; p++) {
+    const a = lineA[p]; if (a <= 0) continue;
+    const i = p * 4;
+    if (K0) { lineB[i] = K0[0]; lineB[i + 1] = K0[1]; lineB[i + 2] = K0[2]; }
+    else if (!black) for (let c = 0; c < 3; c++) lineB[i + c] = Math.round(lineC[c][p] * 255);
+    lineB[i + 3] = Math.round(a * A[p] * 255);
+    if (traceB && traceMask[p]) { for (let c = 0; c < 3; c++) traceB[i + c] = Math.round(lineC[c][p] * 255); traceB[i + 3] = 255; }
+  }
+
+  /* 저장될 8비트 값으로 다시 합성해 원본과 비교 */
+  progress(0.82, '재현 검증');
+  let err = 0, errN = 0;
+  const mul = [gradB, shadeB], scr = [reflB, rimB, sparkB, fxB];
+  for (let p = 0; p < N; p++) {
+    const a0 = A[p]; if (a0 <= 0.98) continue;
+    const i = p * 4;
+    for (let c = 0; c < 3; c++) {
+      let v;
+      if (bgB && isBg(p)) {
+        v = bgB[i + c] / 255;
+        if (bgFxB[i + 3]) v = 1 - (1 - v) * (1 - bgFxB[i + 3] / 255 * bgFxB[i + c] / 255);
+      } else {
+        v = baseB[i + c] / 255;
+        if (sh1B[i + 3]) v *= sh1B[i + c] / 255;
+        if (sh2B[i + 3]) v *= sh2B[i + c] / 255;
+        if (hlB[i + 3]) v = hlB[i + c] / 255;
+        for (const L of mul) if (L[i + 3]) { const sa = L[i + 3] / 255; v *= 1 - sa + sa * L[i + c] / 255; }
+        for (const L of scr) if (L[i + 3]) v = 1 - (1 - v) * (1 - L[i + 3] / 255 * L[i + c] / 255);
+      }
+      if (lineB[i + 3]) {
+        const la = lineB[i + 3] / 255, lc = traceB && traceB[i + 3] ? traceB[i + c] : lineB[i + c];
+        v = v * (1 - la) + la * lc / 255;
+      }
+      const d = (v - O[c][p]) * 255; err += d * d;
+    }
+    errN += 3;
+  }
+  const mse = errN ? err / errN : 0;
+  const psnr = mse > 1e-9 ? 10 * Math.log10(255 * 255 / mse) : 99;
+
+  /* 레이어 트리 조립 (작업 파일 구성)
+   *   러프
+   *   [캐릭터]
+   *     [선화]  색트레스(클리핑) / 선화
+   *     [효과]  반짝임 / 빛
+   *     [채색]  림라이트 / 반사광 / 명암 / 그라데이션 / [파츠…] / 실루엣(숨김)
+   *   [배경]    배경 효과 / 배경 */
+  progress(0.86, '레이어 정리');
+  const clip = opts.clip !== false;
+  const boxes = pal.map(() => [W, H, -1, -1]);
+  for (let p = 0; p < N; p++) {
+    const k = part[p]; if (k < 0) continue;
+    const b = boxes[k], x0 = p % W, y0 = (p / W) | 0;
+    if (x0 < b[0]) b[0] = x0; if (x0 > b[2]) b[2] = x0; if (y0 < b[1]) b[1] = y0; if (y0 > b[3]) b[3] = y0;
+  }
+  // 파츠 k에 속한 픽셀만 잘라낸 레이어 (비어 있으면 null)
+  const partLayer = (name, kind, blend, full, k, extra) => {
+    const [x0, y0, x1, y1] = boxes[k], w = x1 - x0 + 1, h = y1 - y0 + 1, data = new Uint8ClampedArray(w * h * 4);
+    let any = false;
+    for (let y = y0; y <= y1; y++) for (let xx = x0; xx <= x1; xx++) {
+      const p = y * W + xx, si = p * 4;
+      if (part[p] !== k || !full[si + 3]) continue;
+      const di = ((y - y0) * w + xx - x0) * 4;
+      data[di] = full[si]; data[di + 1] = full[si + 1]; data[di + 2] = full[si + 2]; data[di + 3] = full[si + 3]; any = true;
+    }
+    if (!any) return null;
+    const c = cropLayer(data, w, h); c.x += x0; c.y += y0;
+    return Object.assign({ name, kind, blend, opacity: 255, visible: true, clipping: false }, c, extra || {});
+  };
+  const fullLayer = (name, kind, blend, full, extra) => {
+    if (!full) return null;
+    const L = layer(name, kind, blend, full, W, H, extra);
+    return L.w ? L : null;
+  };
+  const group = (name, children, extra) => Object.assign({ name, kind: 'group', group: true, blend: 'pass', opacity: 255, visible: true, open: true, children }, extra || {});
+
+  // 채색: 실루엣(선택용, 숨김) → 파츠 → 그라데이션 → 명암 → 반사광 → 림라이트
+  const silB = new Uint8ClampedArray(N * 4);
+  for (let p = 0; p < N; p++) if (part[p] >= 0) { const i = p * 4; silB[i] = silB[i + 1] = silB[i + 2] = 160; silB[i + 3] = Math.round(A[p] * 255); }
+  const colorKids = [fullLayer('실루엣 (선택용)', 'silhouette', 'norm', silB, { visible: false })];
+  const parts = pal.map((_, k) => k).filter(k => boxes[k][2] >= 0).sort((a, b) => pal[b].area - pal[a].area);
+  if (opts.splitColors) {
+    const used = {};
+    for (const k of parts) {                         // 넓은 파츠가 아래(파츠끼리는 겹치지 않음)
+      let nm = colorName(pal[k].rgb);
+      used[nm] = (used[nm] || 0) + 1;
+      if (used[nm] > 1) nm += ' ' + used[nm];
+      const kids = [partLayer(`밑색 ${hex(pal[k].rgb)}`, 'flat', 'norm', baseB, k),
+        partLayer('1차 그림자', 'shadow', 'mul ', sh1B, k, { clipping: clip }),
+        partLayer('2차 그림자', 'shadow2', 'mul ', sh2B, k, { clipping: clip }),
+        partLayer('하이라이트', 'highlight', 'norm', hlB, k, { clipping: clip })].filter(Boolean);
+      colorKids.push(group(nm, kids, { kind: 'part', open: false, color: hex(pal[k].rgb) }));
+    }
+  } else {
+    colorKids.push(fullLayer('밑색', 'flat', 'norm', baseB),
+      fullLayer('1차 그림자', 'shadow', 'mul ', sh1B, { clipping: clip }),
+      fullLayer('2차 그림자', 'shadow2', 'mul ', sh2B, { clipping: clip }),
+      fullLayer('하이라이트', 'highlight', 'norm', hlB, { clipping: clip }));
+  }
+  colorKids.push(fullLayer('그라데이션', 'gradient', 'mul ', gradB), fullLayer('명암', 'shade', 'mul ', shadeB),
+    fullLayer('반사광', 'reflect', 'scrn', reflB), fullLayer('림라이트', 'rim', 'scrn', rimB));
+  const fxKids = [fullLayer('빛', 'effect', 'scrn', fxB), fullLayer('반짝임', 'sparkle', 'scrn', sparkB)].filter(Boolean);
+  const lineKids = [layer('선화', 'line', 'norm', lineB, W, H), fullLayer('색트레스', 'trace', 'norm', traceB, { clipping: true })].filter(Boolean);
+  const charKids = [group('채색', colorKids.filter(Boolean))];
+  if (fxKids.length) charKids.push(group('효과', fxKids));
+  charKids.push(group('선화', lineKids));
+
+  const out = [];
+  if (bgB) out.push(group('배경', [layer('배경', 'bg', 'norm', bgB, W, H), fullLayer('배경 효과', 'bgfx', 'scrn', bgFxB)].filter(Boolean)));
+  if (bgB || ctx.hasAlpha) out.push(group('캐릭터', charKids)); else out.push(...charKids);
+  if (opts.rough) { progress(0.9, '러프 스케치 생성'); out.push(makeRough(ctx)); }
+  progress(1, '완료');
+  return {
+    width: W, height: H, layers: out,
+    stats: {
+      ms: Date.now() - t0, psnr, regions: ctx.counts.regions, tones: ctx.counts.tones, parts: parts.length, hasAlpha: ctx.hasAlpha,
+      background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR
+    }
+  };
+}
+
+function makeRough(ctx) {
+  const { W, H, N, scale, rnd, opts, U, A, lineA } = ctx;
+  const lu = new Float32Array(N);
+  for (let p = 0; p < N; p++) { const a = A[p]; lu[p] = lumOf(U[0][p], U[1][p], U[2][p]) * a + 1 - a; }
+  const sc1 = Math.max(1, scale), sig = 2.2 * sc1, bl = blur(lu, W, H, sig), lb = blur(lineA, W, H, 1.2 * sc1);
+  // 큰 그림은 절반 해상도에서 흔들린 선을 만들고 다시 키운다(러프는 어차피 흐릿함)
+  const f = N > 1.5e6 ? 2 : 1, w = Math.ceil(W / f), h = Math.ceil(H / f);
+  const basis = new Float32Array(w * h), bc = new Float32Array(w * h);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x;
+    const gx = bl[x < W - 1 ? p + 1 : p] - bl[x > 0 ? p - 1 : p], gy = bl[y < H - 1 ? p + W : p] - bl[y > 0 ? p - W : p];
+    const e = clamp01(Math.sqrt(gx * gx + gy * gy) * sig / 0.3), q = ((y / f) | 0) * w + ((x / f) | 0);
+    basis[q] += Math.max(clamp01(lb[p] * 1.4), e * e * 0.8); bc[q]++;
+  }
+  for (let q = 0; q < w * h; q++) basis[q] /= bc[q];
+  const bilerp = (arr, fx, fy, ww, hh) => {
+    if (fx < 0 || fy < 0 || fx > ww - 1 || fy > hh - 1) return 0;
+    const x0 = fx | 0, y0 = fy | 0, x1 = Math.min(ww - 1, x0 + 1), y1 = Math.min(hh - 1, y0 + 1), tx = fx - x0, ty = fy - y0;
+    const a = arr[y0 * ww + x0], b = arr[y0 * ww + x1], c = arr[y1 * ww + x0], d = arr[y1 * ww + x1];
+    return (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+  };
+  const acc = new Float32Array(w * h), weights = [0.85, 0.55, 0.4];
+  for (let k = 0; k < 3; k++) {
+    const cell = (35 + 25 * k) * sc1 / f, amp = (2 + 1.6 * k) * sc1 / f;
+    const nx = noiseField(w, h, cell, rnd), ny = noiseField(w, h, cell, rnd);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const p = y * w + x, v = bilerp(basis, x + nx[p] * amp, y + ny[p] * amp, w, h) * weights[k];
+      acc[p] = 1 - (1 - acc[p]) * (1 - v);
+    }
+  }
+  const col = opts.roughColor || '#2f6fe0';
+  const cr = parseInt(col.slice(1, 3), 16), cg = parseInt(col.slice(3, 5), 16), cb = parseInt(col.slice(5, 7), 16);
+  const buf = new Uint8ClampedArray(N * 4);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = f === 1 ? acc[y * w + x] : bilerp(acc, (x + 0.5) / f - 0.5, (y + 0.5) / f - 0.5, w, h);
+    const a = smoothstep(0.1, 0.65, v * (0.7 + 0.3 * rnd()));
+    if (a < 0.02) continue;
+    const i = (y * W + x) * 4; buf[i] = cr; buf[i + 1] = cg; buf[i + 2] = cb; buf[i + 3] = Math.round(a * 255);
+  }
+  return layer('러프 (추정)', 'rough', 'norm', buf, W, H, { opacity: 115, visible: false });
+}
+return { process };
+}
+</script>
+<script>
+/* ============================================================
+ * 최소 PSD 작성기 (RGB 8bit, 레이어/그룹/클리핑/혼합 모드/유니코드 이름, RLE 압축)
+ * ============================================================ */
+const PSD = (() => {
+  class ByteWriter {
+    constructor(n = 4096) { this.buf = new Uint8Array(n); this.pos = 0; }
+    ensure(n) {
+      if (this.pos + n <= this.buf.length) return;
+      let len = this.buf.length * 2; while (len < this.pos + n) len *= 2;
+      const b = new Uint8Array(len); b.set(this.buf.subarray(0, this.pos)); this.buf = b;
+    }
+    u8(v) { this.ensure(1); this.buf[this.pos++] = v & 255; }
+    u16(v) { this.ensure(2); this.buf[this.pos++] = (v >>> 8) & 255; this.buf[this.pos++] = v & 255; }
+    u32(v) { this.ensure(4); for (let s = 24; s >= 0; s -= 8) this.buf[this.pos++] = (v >>> s) & 255; }
+    i32(v) { this.u32(v >>> 0); }
+    ascii(s) { for (let i = 0; i < s.length; i++) this.u8(s.charCodeAt(i)); }
+    bytes(a) { this.ensure(a.length); this.buf.set(a, this.pos); this.pos += a.length; }
+    pad(m) { while (this.pos % m) this.u8(0); }
+    patch32(at, v) { for (let k = 0; k < 4; k++) this.buf[at + k] = (v >>> (24 - 8 * k)) & 255; }
+    out() { return this.buf.subarray(0, this.pos); }
+  }
+
+  // PackBits 한 줄 압축: src[off + i*4] (RGBA 인터리브에서 한 채널)
+  function packRow(src, off, n, out, o) {
+    let i = 0;
+    while (i < n) {
+      const v = src[off + i * 4];
+      let j = i + 1;
+      while (j < n && j - i < 128 && src[off + j * 4] === v) j++;
+      if (j - i >= 3) { out[o++] = 257 - (j - i); out[o++] = v; i = j; continue; }
+      let k = i;
+      while (k < n && k - i < 128) {
+        if (k + 2 < n && src[off + k * 4] === src[off + (k + 1) * 4] && src[off + k * 4] === src[off + (k + 2) * 4]) break;
+        k++;
+      }
+      out[o++] = k - i - 1;
+      for (let t = i; t < k; t++) out[o++] = src[off + t * 4];
+      i = k;
+    }
+    return o;
+  }
+
+  // RLE 채널 여러 개를 [줄 길이 표][데이터] 형태로 (compression 헤더 포함)
+  function rleChannels(rgba, w, h, chans) {
+    const maxRow = w + Math.ceil(w / 128) + 2;
+    const counts = new Uint8Array(2 + chans.length * h * 2), data = new Uint8Array(chans.length * h * maxRow);
+    counts[1] = 1; // compression = 1 (RLE)
+    let o = 0, ci = 2;
+    for (const c of chans) for (let y = 0; y < h; y++) {
+      const start = o;
+      o = packRow(rgba, y * w * 4 + c, w, data, o);
+      const len = o - start;
+      counts[ci++] = len >>> 8; counts[ci++] = len & 255;
+    }
+    return [counts, data.subarray(0, o)];
+  }
+
+  function asciiName(s, fallback) {
+    const a = (s || '').replace(/[^\x20-\x7e]/g, '').trim();
+    return (a || fallback).slice(0, 250);
+  }
+
+  // 트리를 PSD 레코드 목록(아래→위)으로
+  function flatten(layers, list) {
+    for (const L of layers) {
+      if (L.group) {
+        list.push({ name: '</Layer group>', section: 3, blend: 'norm', opacity: 255, visible: true, w: 0, h: 0 });
+        flatten(L.children, list);
+        list.push({ name: L.name, section: L.open === false ? 2 : 1, blend: L.blend || 'pass', opacity: L.opacity, visible: L.visible, clipping: L.clipping, w: 0, h: 0 });
+      } else list.push(L);
+    }
+    return list;
+  }
+
+  const ASCII_KIND = {
+    bg: 'Background', bgfx: 'Background FX', flat: 'Base', shadow: 'Shadow 1', shadow2: 'Shadow 2', highlight: 'Highlight',
+    gradient: 'Gradient', shade: 'Shading', reflect: 'Reflected light', rim: 'Rim light', sparkle: 'Sparkle', effect: 'Light',
+    line: 'Lineart', trace: 'Line color', rough: 'Rough', silhouette: 'Silhouette', part: 'Part', group: 'Group'
+  };
+
+  async function write(doc, onProgress) {
+    const { width, height, composite, hasAlpha } = doc;
+    const recs = flatten(doc.layers, []);
+    const parts = [];
+    const yieldUI = () => new Promise(r => setTimeout(r, 0));
+
+    // 1) 채널 데이터 압축
+    const chanData = [];
+    for (let n = 0; n < recs.length; n++) {
+      const L = recs[n];
+      if (!L.w || !L.h) { chanData.push([[new Uint8Array(2)], [new Uint8Array(2)], [new Uint8Array(2)], [new Uint8Array(2)]]); continue; }
+      const per = [3, 0, 1, 2].map(c => rleChannels(L.data, L.w, L.h, [c]));
+      chanData.push(per);
+      if (onProgress) onProgress(n / recs.length * 0.85);
+      await yieldUI();
+    }
+
+    // 2) 레이어 레코드
+    const rw = new ByteWriter(1 << 16);
+    rw.u32(0); // layer info length (나중에 채움)
+    rw.u16((hasAlpha ? -recs.length : recs.length) & 0xffff);
+    recs.forEach((L, n) => {
+      const top = L.w ? L.y : 0, left = L.w ? L.x : 0;
+      rw.i32(top); rw.i32(left); rw.i32(top + (L.h || 0)); rw.i32(left + (L.w || 0));
+      rw.u16(4);
+      const ids = [-1, 0, 1, 2];
+      ids.forEach((id, k) => { rw.u16(id & 0xffff); rw.u32(chanData[n][k].reduce((s, a) => s + a.length, 0)); });
+      rw.ascii('8BIM'); rw.ascii((L.blend || 'norm').padEnd(4, ' ').slice(0, 4));
+      rw.u8(L.opacity ?? 255);
+      rw.u8(L.clipping ? 1 : 0);
+      rw.u8((L.visible === false ? 2 : 0) | (L.section ? 0x18 : 0));
+      rw.u8(0);
+      const extraAt = rw.pos; rw.u32(0);
+      rw.u32(0); // layer mask
+      rw.u32(40); for (let k = 0; k < 10; k++) rw.u32(0x0000ffff); // blending ranges(회색+4채널, 전체 범위)
+      const nm = asciiName(L.name, L.section === 3 ? '</Layer group>' : (ASCII_KIND[L.kind] || 'Layer') + ' ' + (n + 1));
+      rw.u8(nm.length); rw.ascii(nm);
+      while ((rw.pos - extraAt - 12) % 4) rw.u8(0); // 파스칼 문자열은 4바이트 단위로 패딩
+      // luni (유니코드 레이어 이름)
+      rw.ascii('8BIM'); rw.ascii('luni');
+      const name = L.name || nm;
+      const luniLen = 4 + name.length * 2, luniPad = (4 - luniLen % 4) % 4;
+      rw.u32(luniLen + luniPad); rw.u32(name.length);
+      for (let i = 0; i < name.length; i++) rw.u16(name.charCodeAt(i));
+      for (let i = 0; i < luniPad; i++) rw.u8(0);
+      if (L.section) {
+        rw.ascii('8BIM'); rw.ascii('lsct');
+        if (L.section === 3) { rw.u32(4); rw.u32(3); }
+        else { rw.u32(12); rw.u32(L.section); rw.ascii('8BIM'); rw.ascii((L.blend || 'pass').padEnd(4, ' ')); }
+      }
+      rw.patch32(extraAt, rw.pos - extraAt - 4);
+    });
+    let layerInfoLen = rw.pos - 4;
+    for (const per of chanData) for (const ch of per) for (const a of ch) layerInfoLen += a.length;
+    const layerPad = (4 - layerInfoLen % 4) % 4;
+    layerInfoLen += layerPad;
+    rw.patch32(0, layerInfoLen);
+
+    // 3) 헤더 / 컬러 모드 / 이미지 리소스
+    const hw = new ByteWriter(256);
+    hw.ascii('8BPS'); hw.u16(1); for (let i = 0; i < 6; i++) hw.u8(0);
+    hw.u16(hasAlpha ? 4 : 3); hw.u32(height); hw.u32(width); hw.u16(8); hw.u16(3);
+    hw.u32(0); // color mode data
+    const res = new ByteWriter(64);
+    res.ascii('8BIM'); res.u16(0x03ED); res.u16(0); res.u32(16);
+    res.u32(72 << 16); res.u16(1); res.u16(1); res.u32(72 << 16); res.u16(1); res.u16(1);
+    hw.u32(res.pos); hw.bytes(res.out());
+    hw.u32(4 + layerInfoLen + 4); // layer & mask info 전체 길이
+    parts.push(hw.out(), rw.out());
+    for (const per of chanData) for (const ch of per) for (const a of ch) parts.push(a);
+    parts.push(new Uint8Array(layerPad + 4)); // 패딩 + global layer mask info(길이 0)
+
+    // 4) 병합 이미지
+    if (onProgress) onProgress(0.9);
+    await yieldUI();
+    const merged = rleChannels(composite, width, height, hasAlpha ? [0, 1, 2, 3] : [0, 1, 2]);
+    parts.push(merged[0], merged[1]);
+    if (onProgress) onProgress(1);
+    return new Blob(parts, { type: 'image/vnd.adobe.photoshop' });
+  }
+  return { write };
+})();
+</script>
+<script>
+/* ============================================================
+ * UI
+ * ============================================================ */
+// 오프라인 저장용: 아무것도 바뀌기 전의 이 페이지 전체(스크립트·스타일 포함)
+const PAGE_SOURCE = '<!doctype html>\n' + document.documentElement.outerHTML;
+const $ = id => document.getElementById(id);
+const BLENDS = [
+  ['norm', '표준', 'source-over'], ['mul ', '곱하기', 'multiply'], ['scrn', '스크린', 'screen'],
+  ['over', '오버레이', 'overlay'], ['lddg', '선형 닷지(추가)', 'lighter'], ['sLit', '소프트 라이트', 'soft-light'],
+  ['hLit', '하드 라이트', 'hard-light'], ['dark', '어둡게 하기', 'darken'], ['lite', '밝게 하기', 'lighten'],
+  ['colr', '색상', 'color'], ['lum ', '광도', 'luminosity'], ['pass', '통과', 'source-over']
+];
+const BLEND_OP = Object.fromEntries(BLENDS.map(b => [b[0], b[2]]));
+const BLEND_KO = Object.fromEntries(BLENDS.map(b => [b[0], b[1]]));
+
+const state = { src: null, name: 'illustration', result: null, selected: null, view: 'comp', zoom: 1, tx: 0, ty: 0, busy: false, jobId: 0 };
+let worker = null;
+
+function toast(msg, ms = 2600) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms);
+}
+
+/* ---------- 옵션 ---------- */
+const OPT_LABELS = {
+  lineSens: v => v, lineWidth: v => v == 0 ? '자동' : v + ' px', colors: v => v, merge: v => v, shadow: v => v, sparkle: v => v == 0 ? '자동' : v + ' px'
+};
+for (const k of Object.keys(OPT_LABELS)) {
+  const el = $('o_' + k), upd = () => { $('v_' + k).textContent = OPT_LABELS[k](el.value); };
+  el.addEventListener('input', () => { upd(); markDirty(); }); upd();
+}
+for (const k of ['maxSize', 'lineColor', 'splitColors', 'clip', 'bg', 'rough', 'roughColor']) $('o_' + k).addEventListener('change', markDirty);
+function markDirty() { if (state.result) $('runBtn').textContent = '다시 분리'; }
+function readOpts() {
+  return {
+    lineSens: +$('o_lineSens').value / 100, lineWidth: +$('o_lineWidth').value, lineColor: $('o_lineColor').value,
+    colors: +$('o_colors').value, merge: +$('o_merge').value / 100, shadow: +$('o_shadow').value / 100, sparkle: +$('o_sparkle').value,
+    splitColors: $('o_splitColors').checked, clip: $('o_clip').checked, bg: $('o_bg').checked,
+    rough: $('o_rough').checked, roughColor: $('o_roughColor').value
+  };
+}
+
+/* ---------- 입력 ---------- */
+const drop = $('drop');
+drop.addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ''; });
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) drop.classList.remove('over'); });
+document.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); });
+document.addEventListener('drop', e => { const f = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith('image/')); if (f) loadFile(f); });
+document.addEventListener('paste', e => {
+  const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+  if (it) loadFile(it.getAsFile());
+});
+$('sampleBtn').addEventListener('click', () => setSource(drawSample(), 'sample'));
+$('runBtn').addEventListener('click', run);
+$('saveAppBtn').addEventListener('click', () => {
+  download(new Blob([PAGE_SOURCE], { type: 'text/html' }), 'illustracy.html');
+  toast('저장한 illustracy.html을 더블클릭하면 오프라인에서도 실행됩니다.', 4000);
+});
+
+function loadFile(file) {
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => { URL.revokeObjectURL(url); setSource(im, (file.name || 'illustration').replace(/\.[^.]+$/, '')); };
+  im.onerror = () => { URL.revokeObjectURL(url); toast('이미지를 읽을 수 없습니다.'); };
+  im.src = url;
+}
+
+function setSource(imgOrCanvas, name) {
+  const w0 = imgOrCanvas.naturalWidth || imgOrCanvas.width, h0 = imgOrCanvas.naturalHeight || imgOrCanvas.height;
+  state.original = imgOrCanvas; state.name = name;
+  state.forceBg = state.forceChar = null;
+  prepareSource();
+  if (w0 * h0 > 16e6 && +$('o_maxSize').value === 0) toast('큰 이미지입니다. 처리에 시간이 걸리거나 메모리가 부족할 수 있어요.', 4000);
+  $('runBtn').disabled = false;
+  run();
+}
+function prepareSource() {
+  const im = state.original, w0 = im.naturalWidth || im.width, h0 = im.naturalHeight || im.height;
+  const max = +$('o_maxSize').value, s = max > 0 && Math.max(w0, h0) > max ? max / Math.max(w0, h0) : 1;
+  const w = Math.max(1, Math.round(w0 * s)), h = Math.max(1, Math.round(h0 * s));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.imageSmoothingQuality = 'high'; cx.drawImage(im, 0, 0, w, h);
+  state.src = { canvas: c, data: cx.getImageData(0, 0, w, h) };
+}
+
+/* ---------- 처리 (Web Worker, 실패 시 메인 스레드) ---------- */
+function getWorker() {
+  if (worker !== null) return worker;
+  try {
+    const src = `const Core = (${IllustracyCore.toString()})();
+function collect(ls, t) { for (const l of ls) { if (l.children) collect(l.children, t); else if (l.data && l.data.byteLength) t.push(l.data.buffer); } }
+self.onmessage = e => {
+  const { id, img, opts } = e.data;
+  try {
+    const res = Core.process(img, opts, (p, label) => self.postMessage({ id, type: 'progress', p, label }));
+    const t = []; collect(res.layers, t);
+    self.postMessage({ id, type: 'done', res }, t);
+  } catch (err) { self.postMessage({ id, type: 'error', message: String((err && err.message) || err) }); }
+};`;
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  } catch (e) { worker = false; }
+  return worker;
+}
+function runCore(img, opts, onProgress) {
+  return new Promise((resolve, reject) => {
+    const mainThread = async () => {
+      worker = false;
+      try {
+        onProgress(0.01, '메인 스레드에서 처리 중…');
+        await new Promise(r => setTimeout(r, 40));
+        resolve(IllustracyCore().process(img, opts, () => {}));
+      } catch (e) { reject(e); }
+    };
+    const w = getWorker();
+    if (!w) return mainThread();
+    const id = ++state.jobId;
+    w.onmessage = e => {
+      const d = e.data; if (d.id !== id) return;
+      if (d.type === 'progress') onProgress(d.p, d.label);
+      else if (d.type === 'done') resolve(d.res);
+      else reject(new Error(d.message));
+    };
+    w.onerror = ev => { if (ev.preventDefault) ev.preventDefault(); w.terminate(); mainThread(); };
+    w.postMessage({ id, img: { width: img.width, height: img.height, data: img.data }, opts });
+  });
+}
+
+function setProgress(p, label) {
+  $('progress').classList.add('on');
+  $('progBar').style.width = Math.round(p * 100) + '%';
+  if (label) $('progLabel').textContent = label;
+}
+
+async function run() {
+  if (!state.original || state.busy) return;
+  state.busy = true;
+  $('runBtn').disabled = $('psdBtn').disabled = $('pngBtn').disabled = true;
+  prepareSource();
+  showCanvas(state.src.canvas.width, state.src.canvas.height);
+  drawOriginal();
+  setProgress(0, '분석 준비');
+  try {
+    const res = await runCore(state.src.data, withMasks(readOpts()), setProgress);
+    installResult(res);
+    showStat(res);
+    toast(`분리 완료 — 레이어 ${countLayers(res.layers)}개`);
+  } catch (e) {
+    console.error(e);
+    toast('처리 실패: ' + (e.message || e), 5000);
+  } finally {
+    $('progress').classList.remove('on');
+    state.busy = false;
+    $('runBtn').disabled = false; $('runBtn').textContent = '레이어 분리';
+  }
+}
+const countLayers = ls => ls.reduce((n, l) => n + (l.group ? countLayers(l.children) : 1), 0);
+function showStat(res) {
+  const s = res.stats;
+  $('stat').textContent = `${res.width}×${res.height} · ${(s.ms / 1000).toFixed(1)}초 · 파츠 ${s.parts}개 · 재현 PSNR ${s.psnr >= 99 ? '∞' : s.psnr.toFixed(1)} dB`;
+}
+// 사용자가 칠한 보정 마스크(배경으로 보내기 / 캐릭터로 되돌리기). 같은 그림 · 같은 크기면 옵션을 바꿔 다시 분리해도 유지된다
+function ensureMasks() {
+  const N = state.src.canvas.width * state.src.canvas.height;
+  if (!state.forceBg || state.forceBg.length !== N) { state.forceBg = new Uint8Array(N); state.forceChar = new Uint8Array(N); }
+}
+function withMasks(opts) {
+  ensureMasks();
+  return Object.assign(opts, { forceBg: state.forceBg, forceChar: state.forceChar });
+}
+const maskSnapshot = () => ({ forceBg: Uint8Array.from(state.forceBg), forceChar: Uint8Array.from(state.forceChar) });
+
+function installResult(res, keepUndo) {
+  const walk = ls => ls.forEach(L => {
+    if (L.group) return walk(L.children);
+    if (L.w && L.h) {
+      const c = document.createElement('canvas'); c.width = L.w; c.height = L.h;
+      c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(L.data.buffer, L.data.byteOffset, L.w * L.h * 4), L.w, L.h), 0, 0);
+      L._canvas = c;
+    }
+  });
+  walk(res.layers);
+  state.result = res;
+  state.selected = null;
+  if (!keepUndo) state.undo = [];
+  $('bgToolBtn').disabled = $('charToolBtn').disabled = false; updateUndoBtn();
+  renderLayerList();
+  render();
+  $('psdBtn').disabled = $('pngBtn').disabled = false;
+}
+
+/* ---------- 합성 ---------- */
+// Photoshop처럼 합성: 클리핑된 레이어는 바로 아래 기본 레이어와 한 묶음으로 합성한 뒤, 기본 레이어의 알파 안에서만 보이게
+function compositeInto(ctx, layers) {
+  const draw = (c, L, dx, dy) => {
+    c.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over'; c.globalAlpha = L.opacity / 255;
+    c.drawImage(L._canvas, L.x - dx, L.y - dy);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+  };
+  for (let i = 0; i < layers.length; i++) {
+    const L = layers[i];
+    const clipped = [];
+    while (i + 1 < layers.length && layers[i + 1].clipping) clipped.push(layers[++i]);
+    if (!L.visible) continue;                          // 기본 레이어가 숨겨지면 클리핑된 레이어도 숨김
+    if (L.group) {
+      if (L.opacity < 255 || (L.blend !== 'pass' && L.blend !== 'norm')) {
+        const off = document.createElement('canvas'); off.width = ctx.canvas.width; off.height = ctx.canvas.height;
+        compositeInto(off.getContext('2d'), L.children);
+        ctx.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over'; ctx.globalAlpha = L.opacity / 255;
+        ctx.drawImage(off, 0, 0);
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+      } else compositeInto(ctx, L.children);
+      for (const C of clipped) if (C.visible && C._canvas) draw(ctx, C, 0, 0);
+      continue;
+    }
+    if (!L._canvas) continue;
+    const vis = clipped.filter(C => C.visible && C._canvas);
+    if (!vis.length) { draw(ctx, L, 0, 0); continue; }
+    // 클리핑 그룹: 불투명하게 만든 기본 레이어 색 위에 클리핑 레이어를 혼합한 뒤, 기본 레이어 알파로 한 번만 자른다
+    if (!L._opaque) {
+      const o = document.createElement('canvas'); o.width = L.w; o.height = L.h;
+      const d = new ImageData(new Uint8ClampedArray(L.data), L.w, L.h);
+      for (let k = 3; k < d.data.length; k += 4) d.data[k] = 255;
+      o.getContext('2d').putImageData(d, 0, 0);
+      L._opaque = o;
+    }
+    const g = document.createElement('canvas'); g.width = L.w; g.height = L.h;
+    const gx = g.getContext('2d');
+    gx.drawImage(L._opaque, 0, 0);
+    for (const C of vis) draw(gx, C, L.x, L.y);
+    gx.globalCompositeOperation = 'destination-in'; gx.drawImage(L._canvas, 0, 0);
+    ctx.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over'; ctx.globalAlpha = L.opacity / 255;
+    ctx.drawImage(g, L.x, L.y);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  }
+}
+function compositeCanvas(opaque) {
+  const r = state.result, c = document.createElement('canvas'); c.width = r.width; c.height = r.height;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  if (opaque) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+  compositeInto(ctx, r.layers);
+  return c;
+}
+
+function showCanvas(w, h) {
+  const v = $('view');
+  if (v.width !== w || v.height !== h) { v.width = w; v.height = h; $('wrap').hidden = false; $('empty').hidden = true; fit(); }
+}
+function drawOriginal() {
+  const ctx = $('view').getContext('2d');
+  ctx.clearRect(0, 0, $('view').width, $('view').height);
+  ctx.drawImage(state.src.canvas, 0, 0);
+}
+function render() {
+  const r = state.result; if (!r) return;
+  const v = $('view'), ctx = v.getContext('2d', { willReadFrequently: true });
+  showCanvas(r.width, r.height);
+  ctx.clearRect(0, 0, v.width, v.height);
+  if (state.view === 'orig') return drawOriginal();
+  if (state.view === 'solo') {
+    const L = state.selected;
+    if (!L) { ctx.fillStyle = '#888'; ctx.font = '20px sans-serif'; ctx.fillText('레이어를 선택하세요', 20, 40); return; }
+    if (L.group) compositeInto(ctx, L.children);
+    else if (L._canvas) ctx.drawImage(L._canvas, L.x, L.y);
+    return;
+  }
+  if (state.view === 'diff') {
+    const a = compositeCanvas(!r.stats.hasAlpha).getContext('2d').getImageData(0, 0, v.width, v.height).data;
+    const b = state.src.data.data, out = ctx.createImageData(v.width, v.height), o = out.data;
+    for (let i = 0; i < a.length; i += 4) {
+      for (let c = 0; c < 3; c++) o[i + c] = Math.min(255, Math.abs(a[i + c] - b[i + c]) * 8);
+      o[i + 3] = 255;
+    }
+    ctx.putImageData(out, 0, 0);
+    return;
+  }
+  compositeInto(ctx, r.layers);
+}
+
+document.querySelectorAll('#viewSeg button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#viewSeg button').forEach(x => x.classList.toggle('on', x === b));
+  state.view = b.dataset.view;
+  if (state.result) render(); else if (state.src) drawOriginal();
+}));
+
+/* ---------- 확대/이동 ---------- */
+const stage = $('stage'), wrap = $('wrap');
+function applyTransform() {
+  wrap.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.zoom})`;
+  $('view').style.imageRendering = state.zoom >= 2 ? 'pixelated' : 'auto';
+  $('zoomLbl').textContent = Math.round(state.zoom * 100) + '%';
+}
+function fit() {
+  const v = $('view'), sw = stage.clientWidth, sh = stage.clientHeight;
+  if (!v.width || !sw) return;
+  state.zoom = Math.min((sw - 32) / v.width, (sh - 32) / v.height, 4);
+  state.tx = (sw - v.width * state.zoom) / 2; state.ty = (sh - v.height * state.zoom) / 2;
+  applyTransform();
+}
+function zoomAt(z, cx, cy) {
+  z = Math.min(32, Math.max(0.05, z));
+  state.tx = cx - (cx - state.tx) * z / state.zoom; state.ty = cy - (cy - state.ty) * z / state.zoom; state.zoom = z;
+  applyTransform();
+}
+$('fitBtn').addEventListener('click', fit);
+$('oneBtn').addEventListener('click', () => zoomAt(1, stage.clientWidth / 2, stage.clientHeight / 2));
+stage.addEventListener('wheel', e => {
+  if (wrap.hidden) return; e.preventDefault();
+  const r = stage.getBoundingClientRect();
+  zoomAt(state.zoom * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+let drag = null;
+const toCanvas = e => { const r = wrap.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / state.zoom), Math.floor((e.clientY - r.top) / state.zoom)]; };
+stage.addEventListener('pointerdown', e => {
+  if (wrap.hidden) return;
+  stage.setPointerCapture(e.pointerId);
+  // 보정 붓 모드: 왼쪽 버튼 드래그 = 칠하기(획), 가운데/오른쪽 버튼 드래그 = 화면 이동
+  if (state.tool && state.result && e.button === 0) {
+    if (state.busy) { toast('다시 분리하는 중입니다. 잠시 후에 칠해 주세요.'); return; }
+    drag = { stroke: [toCanvas(e)] }; strokeOverlay(drag.stroke); return;
+  }
+  drag = { x: e.clientX, y: e.clientY, tx: state.tx, ty: state.ty };
+  stage.classList.add('dragging');
+});
+stage.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (drag.stroke) {
+    const [x, y] = toCanvas(e), [px, py] = drag.stroke[drag.stroke.length - 1];
+    const n = Math.max(1, Math.ceil(Math.hypot(x - px, y - py) / 3));   // 3px 간격으로 촘촘히
+    for (let k = 1; k <= n; k++) drag.stroke.push([Math.round(px + (x - px) * k / n), Math.round(py + (y - py) * k / n)]);
+    strokeOverlay(drag.stroke);
+    return;
+  }
+  state.tx = drag.tx + e.clientX - drag.x; state.ty = drag.ty + e.clientY - drag.y; applyTransform();
+});
+stage.addEventListener('pointerup', () => {
+  const d = drag; drag = null; stage.classList.remove('dragging');
+  if (d && d.stroke) { strokeOverlay(null); if (state.tool === 'char') returnToCharacter(d.stroke); else sendToBackground(d.stroke); }
+});
+stage.addEventListener('contextmenu', e => { if (state.tool) e.preventDefault(); });
+const brushReach = () => state.result ? Math.max(24, Math.round(Math.max(state.result.width, state.result.height) * 0.05)) : 40;
+function strokeOverlay(pts) {                         // 칠하는 중인 획과 붓 폭 표시
+  let c = $('strokeCanvas');
+  if (!pts) { if (c) c.hidden = true; return; }
+  const v = $('view');
+  if (!c) { c = document.createElement('canvas'); c.id = 'strokeCanvas'; c.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none'; wrap.appendChild(c); }
+  if (c.width !== v.width || c.height !== v.height) { c.width = v.width; c.height = v.height; }
+  c.style.width = v.width + 'px'; c.style.height = v.height + 'px'; c.hidden = false;
+  const x = c.getContext('2d');
+  x.clearRect(0, 0, c.width, c.height);
+  x.lineCap = x.lineJoin = 'round';
+  const path = () => { x.beginPath(); pts.forEach(([px, py], i) => i ? x.lineTo(px + 0.5, py + 0.5) : x.moveTo(px + 0.5, py + 0.5)); if (pts.length === 1) x.lineTo(pts[0][0] + 0.6, pts[0][1] + 0.5); };
+  const rgb = state.tool === 'char' ? '40, 190, 255' : '255, 60, 160';   // 캐릭터로 = 하늘색, 배경으로 = 분홍
+  x.strokeStyle = `rgba(${rgb}, 0.18)`; x.lineWidth = brushReach() * 2; path(); x.stroke();   // 가져갈 수 있는 범위
+  x.strokeStyle = `rgba(${rgb}, 0.9)`; x.lineWidth = Math.max(2, 3 / state.zoom); path(); x.stroke();
+}
+window.addEventListener('resize', () => { if (!wrap.hidden) fit(); });
+
+/* ---------- 레이어 패널 ---------- */
+function thumbFor(L) {
+  const r = state.result, s = 44 / Math.max(r.width, r.height);
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(r.width * s)); c.height = Math.max(1, Math.round(r.height * s));
+  const ctx = c.getContext('2d');
+  if (L._canvas) ctx.drawImage(L._canvas, L.x * s, L.y * s, L.w * s, L.h * s);
+  return c;
+}
+function renderLayerList() {
+  const box = $('layers'); box.innerHTML = '';
+  const addRows = (layers, depth) => {
+    for (let i = layers.length - 1; i >= 0; i--) {
+      const L = layers[i];
+      box.appendChild(layerRow(L, depth));
+      if (L.group && L.open) addRows(L.children, depth + 1);
+    }
+  };
+  addRows(state.result.layers, 0);
+}
+function layerRow(L, depth) {
+  const row = document.createElement('div');
+  row.className = 'layer' + (L.group ? ' group' : '') + (state.selected === L ? ' sel' : '');
+  row.style.paddingLeft = (10 + depth * 16) + 'px';
+  const eye = document.createElement('button');
+  eye.className = 'eye' + (L.visible ? ' on' : ''); eye.title = '표시/숨김';
+  eye.addEventListener('click', e => { e.stopPropagation(); L.visible = !L.visible; eye.classList.toggle('on', L.visible); render(); });
+  const th = document.createElement('div'); th.className = 'thumb' + (L.group ? ' folder' : '');
+  if (L.group) {
+    th.textContent = L.open ? '▾' : '▸'; th.title = '펼치기/접기';
+    if (L.color) { th.style.boxShadow = `inset 0 -8px 0 ${L.color}`; }
+    th.addEventListener('click', e => { e.stopPropagation(); L.open = !L.open; renderLayerList(); });
+  } else th.appendChild(thumbFor(L));
+  const meta = document.createElement('div'); meta.className = 'meta';
+  const nm = document.createElement('div'); nm.className = 'name'; nm.textContent = L.name;
+  nm.addEventListener('dblclick', e => {
+    e.stopPropagation(); nm.contentEditable = 'true'; nm.focus();
+    document.getSelection().selectAllChildren(nm);
+  });
+  nm.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); nm.blur(); } });
+  nm.addEventListener('blur', () => { nm.contentEditable = 'false'; L.name = nm.textContent.trim() || L.name; nm.textContent = L.name; });
+  const sub = document.createElement('div'); sub.className = 'sub';
+  const info = L.group ? `그룹 · ${L.children.length}개` : `${BLEND_KO[L.blend] || L.blend} · ${Math.round(L.opacity / 2.55)}%` + (L.w ? '' : ' · 비어 있음');
+  sub.innerHTML = (L.clipping ? '<span class="clip" title="아래 레이어에 클리핑">↳</span>' : '') + `<span>${info}</span>`;
+  meta.append(nm, sub);
+  row.append(eye, th, meta);
+
+  const ctrl = document.createElement('div'); ctrl.className = 'ctrl';
+  const sel = document.createElement('select');
+  for (const [k, ko] of BLENDS) { if (k === 'pass' && !L.group) continue; const o = new Option(ko, k); o.selected = k === L.blend; sel.appendChild(o); }
+  sel.addEventListener('click', e => e.stopPropagation());
+  sel.addEventListener('change', () => { L.blend = sel.value; render(); updateSub(); });
+  const op = document.createElement('input'); op.type = 'range'; op.min = 0; op.max = 100; op.value = Math.round(L.opacity / 2.55);
+  const opv = document.createElement('span'); opv.className = 'op'; opv.textContent = op.value + '%';
+  op.addEventListener('click', e => e.stopPropagation());
+  op.addEventListener('input', () => { L.opacity = Math.round(op.value * 2.55); opv.textContent = op.value + '%'; render(); updateSub(); });
+  ctrl.append(sel, op, opv);
+  if (!L.group && L.w) {
+    const dl = document.createElement('button'); dl.textContent = 'PNG'; dl.title = '이 레이어만 PNG로 저장';
+    dl.addEventListener('click', e => { e.stopPropagation(); saveLayerPNG(L); });
+    ctrl.appendChild(dl);
+  }
+  row.appendChild(ctrl);
+  function updateSub() { sub.querySelector('span:last-child').textContent = L.group ? `그룹 · ${L.children.length}개` : `${BLEND_KO[L.blend] || L.blend} · ${Math.round(L.opacity / 2.55)}%` + (L.w ? '' : ' · 비어 있음'); }
+
+  row.addEventListener('click', () => {
+    state.selected = state.selected === L ? null : L;
+    document.querySelectorAll('.layer.sel').forEach(x => x.classList.remove('sel'));
+    if (state.selected) row.classList.add('sel');
+    if (state.view === 'solo') render();
+  });
+  return row;
+}
+
+/* ---------- 배경으로 보내기 (수동 보정) ----------
+ * 자동 판정으로 캐릭터 쪽에 남은 배경 물건(탁자, 의자 …)을 클릭하거나 칠하면, 획이 닿은 파츠(밑색)와
+ * 그와 거의 같은 색(ΔE<12, 색상 차이 Δab<9)의 파츠 안에서 선을 넘지 않고 색이 이어지는 영역을 골라 배경 레이어로 옮긴다.
+ * 의자 다리처럼 밝은 면·어두운 면이 여러 파츠로 나뉜 물건도 한 획으로 옮겨지고,
+ * 선 없이 맞닿은 치마(검은 부분은 탁자 모서리와 ΔE 13, 빛 받은 부분은 밝기가 같고 색상만 Δab 10.6 차이)는 섞이지 않는다.
+ * 획이 선 위를 지나거나, 획 끝(12px)에서만 옆 파츠에 닿은 경우 그 파츠는 씨앗으로 쓰지 않는다. 옮긴 픽셀은 배경에 원본 색으로 들어가고 캐릭터 쪽 레이어에서는 지워지므로
+ * 합성 결과는 그대로 원본과 같다. */
+function rgbLab(r, g, b) {
+  const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const R = lin(r), G = lin(g), B = lin(b), f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  const fx = f((0.4124564 * R + 0.3575761 * G + 0.1804375 * B) / 0.95047), fy = f(0.2126729 * R + 0.7151522 * G + 0.0721750 * B);
+  const fz = f((0.0193339 * R + 0.1191920 * G + 0.9503041 * B) / 1.08883);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+const leafLayers = (ls, out = []) => { for (const L of ls) { if (L.group) leafLayers(L.children, out); else out.push(L); } return out; };
+function fullAlpha(L, W, H) {                         // 레이어 알파를 캔버스 크기로
+  const a = new Uint8Array(W * H);
+  if (!L || !L.w) return a;
+  for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) a[(y + L.y) * W + x + L.x] = L.data[(y * L.w + x) * 4 + 3];
+  return a;
+}
+function refreshCanvas(L) {
+  L._opaque = null;
+  if (!L.w || !L.h) { L._canvas = null; return; }
+  if (!L._canvas || L._canvas.width !== L.w || L._canvas.height !== L.h) { L._canvas = document.createElement('canvas'); L._canvas.width = L.w; L._canvas.height = L.h; }
+  L._canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(L.data.buffer, L.data.byteOffset, L.w * L.h * 4), L.w, L.h), 0, 0);
+}
+function updateUndoBtn() { $('undoBtn').disabled = !(state.undo && state.undo.length); }
+
+function sendToBackground(points) {
+  const res = state.result, W = res.width, H = res.height, N = W * H;
+  const leaves = leafLayers(res.layers), bgL = leaves.find(L => L.kind === 'bg');
+  if (!bgL && res.stats.hasAlpha) { toast('투명 배경 그림에는 배경 레이어를 만들지 않습니다.'); return; }
+  // 배경이 자동으로 감지되지 않은 그림: 고른 부분으로 배경 레이어를 새로 만든다(다시 분리)
+  const orig = state.src.data.data, bgA = bgL ? fullAlpha(bgL, W, H) : new Uint8Array(N), la = fullAlpha(leaves.find(L => L.kind === 'line'), W, H);
+  const flats = leaves.filter(L => L.kind === 'flat'), pid = new Int32Array(N).fill(-1);
+  flats.forEach((L, k) => { const a = fullAlpha(L, W, H); for (let p = 0; p < N; p++) if (a[p]) pid[p] = k; });
+  const byPart = flats.length > 1;
+  const T = 110, tol = byPart ? 40 : 26;               // 선 경계(알파 0.43), 이웃 색 차이 허용치
+  // 획이 닿은 파츠 + 그와 거의 같은 색의 파츠만 허용
+  const allowed = new Uint8Array(flats.length);
+  const isClick = points.every(([x, y]) => Math.abs(x - points[0][0]) + Math.abs(y - points[0][1]) <= 4);
+  const inner = new Uint8Array(points.length);         // 획 끝(시작·끝 12px)이 아닌 점
+  {
+    const along = [0];                                 // 획을 따라간 거리
+    for (let i = 1; i < points.length; i++) along.push(along[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
+    const len = along[along.length - 1], tip = len >= 48 ? 12 : 0;
+    for (let i = 0; i < points.length; i++) inner[i] = isClick || (along[i] >= tip && along[i] <= len - tip) ? 1 : 0;
+  }
+  if (byPart) {
+    const flatLab = flats.map(L => { for (let i = 3; i < L.data.length; i += 4) if (L.data[i]) return rgbLab(L.data[i - 3], L.data[i - 2], L.data[i - 1]); return [0, 0, 0]; });
+    const seeds = new Set();
+    for (let i = 0; i < points.length; i++) {
+      const [cx, cy] = points[i];
+      if (cx < 0 || cy < 0 || cx >= W || cy >= H || !inner[i]) continue;
+      const p = cy * W + cx;
+      if (!bgA[p] && la[p] < T && pid[p] >= 0) seeds.add(pid[p]);
+    }
+
+    for (let k = 0; k < flats.length; k++) for (const sd of seeds) {
+      const a = flatLab[k], b = flatLab[sd];
+      // 밝기 차이(명암)는 넉넉히, 색상 차이는 좁게: 같은 나무의 밝은 면·어두운 면은 받고,
+      // 밝기는 같은데 색만 다른 맞닿은 치마(나무와 Δab 10.6)는 받지 않는다
+      if (Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 12 && Math.hypot(a[1] - b[1], a[2] - b[2]) < 9) { allowed[k] = 1; break; }
+    }
+  }
+  // 붓 폭: 획에서 이 거리 안쪽만 가져간다(삐져나간 한 점이 캐릭터 파츠 전체를 끌어오지 않게)
+  const reach = brushReach(), dist = new Uint16Array(N).fill(65535);
+  {
+    let front = [];
+    for (const [cx, cy] of points) if (cx >= 0 && cy >= 0 && cx < W && cy < H && dist[cy * W + cx]) { dist[cy * W + cx] = 0; front.push(cy * W + cx); }
+    for (let d = 1; d <= reach && front.length; d++) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q >= 0 && dist[q] === 65535) { dist[q] = d; next.push(q); }
+        }
+      }
+      front = next;
+    }
+  }
+  const near = q => dist[q] <= reach;
+  // 1) 획의 점마다: 같은 파츠 안에서 선을 넘지 않고 색이 이어지는 영역(합집합)
+  // 획 끝은 채우기를 시작하지 않는다: 가장자리를 살짝 넘겨 옆 물건(치마, 스타킹 …)에 닿는 일이 흔하고,
+  // 그 물건이 가구와 같은 파츠로 묶여 있으면 따로 채워져 버린다. 끝의 픽셀은 가운데에서 시작한 채우기가 닿을 때만 옮겨진다
+  const R = new Uint8Array(N), rid = new Int32Array(N).fill(-1), rArea = [];
+  let n = 0, hitBg = 0, lineAmbiguous = false;
+  for (let i = 0; i < points.length; i++) {
+    const [cx, cy] = points[i];
+    if (!inner[i]) continue;
+    if (cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
+    let p0 = cy * W + cx;
+    if (bgA[p0]) { hitBg++; continue; }
+    if (R[p0]) continue;
+    if (la[p0] >= T) {
+      // 칠하는 중(획)에 선 위를 지난 점은 건너뛴다: 선 건너편(맞닿은 치마 등)을 씨앗으로 잘못 잡지 않게.
+      // 한 번 클릭이 선 위라면 가까운 칠한 곳에서 시작
+      if (!isClick) continue;
+      // 선 양쪽이 서로 다른 파츠(탁자 | 치마)거나 한쪽이 이미 배경이면 어느 쪽인지 알 수 없으므로 고르지 않는다
+      let best = -1, bd = 1e9, sides = new Set();
+      for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+        const x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const q = y * W + x;
+        if (la[q] >= T) continue;
+        if (bgA[q]) { sides.add(-2); continue; }       // 이미 배경인 쪽도 한 편으로 친다
+        sides.add(pid[q]); if (dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = q; }
+      }
+      if (sides.size > 1) { lineAmbiguous = true; continue; }
+      if (best < 0 || R[best]) continue;
+      p0 = best;
+    }
+    if (byPart && pid[p0] >= 0) allowed[pid[p0]] = 1;
+    const stack = [p0], k = rArea.length;
+    R[p0] = 1; rid[p0] = k; n++;
+    let area = 1;
+    while (stack.length) {
+      const p = stack.pop(), x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q < 0 || R[q] || !near(q) || bgA[q] || la[q] >= T) continue;
+        if (byPart && !(pid[q] >= 0 && allowed[pid[q]])) continue;
+        const i = p * 4, j = q * 4;
+        if (Math.max(Math.abs(orig[i] - orig[j]), Math.abs(orig[i + 1] - orig[j + 1]), Math.abs(orig[i + 2] - orig[j + 2])) > tol) continue;
+        R[q] = 1; rid[q] = k; n++; area++; stack.push(q);
+      }
+    }
+    rArea.push(area);
+  }
+  // 획 가운데가 10px 이상 지나간 채우기만 남긴다: 획이 옆 물건(스타킹 등)의 가장자리를 스치기만 한 경우는 버린다.
+  // (점 개수가 아니라 길이로 센다: 마우스를 천천히 움직이면 같은 자리에 점이 여러 개 찍힌다)
+  if (!isClick && rArea.length) {
+    const support = new Float64Array(rArea.length);
+    for (let i = 1; i < points.length; i++) {           // 획 끝 구간은 세지 않는다
+      const [cx, cy] = points[i], [px, py] = points[i - 1];
+      if (!inner[i] || !inner[i - 1] || cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
+      const k = rid[cy * W + cx]; if (k >= 0) support[k] += Math.hypot(cx - px, cy - py);
+    }
+    const drop = rArea.map((_, k) => support[k] < 10);
+    if (drop.some(Boolean)) for (let p = 0; p < N; p++) if (R[p] && drop[rid[p]]) { R[p] = 0; n--; }
+  }
+  if (n < 16) {
+    toast(lineAmbiguous ? '선 위를 누르셨어요. 선 양쪽이 서로 다른 부분이라, 옮길 물건의 안쪽을 눌러 주세요.'
+      : hitBg ? '이미 배경입니다.' : '선택된 영역이 너무 작습니다. 조금 더 넓은 곳을 칠해 보세요.', 4000);
+    return;
+  }
+  // 2) 둘레의 선: 가장 가까운 칠한 영역 쪽으로 나눔(이 물건 또는 배경 쪽이면 함께 옮긴다)
+  const lab = new Uint8Array(N);                      // 1 = 이 물건, 2 = 배경, 3 = 나머지 캐릭터
+  let front = [];
+  for (let p = 0; p < N; p++) {
+    if (la[p] >= 20) continue;
+    lab[p] = R[p] ? 1 : bgA[p] ? 2 : 3;
+    front.push(p);
+  }
+  for (let d = 0; d < 10 && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !lab[q]) { lab[q] = lab[p]; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  const M = new Uint8Array(N);
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let p = 0; p < N; p++) {
+    if (bgA[p]) continue;
+    if (R[p] || (la[p] >= 20 && lab[p] === 1 && near(p))) M[p] = 1;
+  }
+  // 물건과 배경 사이의 윤곽선(배경 쪽 절반)도 물건 쪽 선에 이어져 있으면 함께
+  front = [];
+  for (let p = 0; p < N; p++) if (M[p] && la[p] >= 20) front.push(p);
+  for (let d = 0; d < 8 && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !M[q] && near(q) && !bgA[q] && la[q] >= 20 && lab[q] === 2) { M[q] = 1; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  // 캐릭터와 맞닿은 윤곽선(스타킹 | 의자 다리, 치마 | 탁자)은 캐릭터 쪽에 남긴다:
+  // 남은 캐릭터 픽셀에서 4px 안에 닿는 선 픽셀과, 캐릭터 색이 매끄럽게 이어지는 가장자리 픽셀은 옮기지 않는다
+  {
+    const keep = new Uint8Array(N);
+    front = [];
+    for (let p = 0; p < N; p++) if (!M[p] && !bgA[p] && la[p] < 20 && pid[p] >= 0) front.push(p);
+    for (let d = 0; d < 4 && front.length; d++) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q < 0 || keep[q] || !M[q]) continue;
+          const i = p * 4, j = q * 4;
+          const smooth = Math.max(Math.abs(orig[i] - orig[j]), Math.abs(orig[i + 1] - orig[j + 1]), Math.abs(orig[i + 2] - orig[j + 2])) < 16;
+          if (la[q] >= 20 || smooth) { keep[q] = 1; next.push(q); }
+        }
+      }
+      front = next;
+    }
+    for (let p = 0; p < N; p++) if (keep[p]) M[p] = 0;
+  }
+  let count = 0;
+  for (let p = 0; p < N; p++) if (M[p]) { count++; const x = p % W, y = (p / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  // 보정 마스크에 기록(나중에 옵션을 바꿔 다시 분리해도 유지)
+  ensureMasks();
+  const before = maskSnapshot();
+  for (let p = 0; p < N; p++) if (M[p]) { state.forceBg[p] = 1; state.forceChar[p] = 0; }
+  if (!bgL) { rerunForced(before, '배경 레이어를 만드는 중'); return; }
+  // 3) 적용 (되돌리기용으로 바뀌는 사각형만 저장)
+  const undo = [{ masks: before }];
+  for (const L of leaves) {
+    if (L === bgL || L.kind === 'bgfx' || L.kind === 'rough' || !L.w) continue;
+    const ax = Math.max(x0, L.x), ay = Math.max(y0, L.y), bx = Math.min(x1, L.x + L.w - 1), by = Math.min(y1, L.y + L.h - 1);
+    if (ax > bx || ay > by) continue;
+    const saved = { L, ax, ay, bx, by, rows: [] };
+    let touched = false;
+    for (let y = ay; y <= by; y++) {
+      const off = ((y - L.y) * L.w + (ax - L.x)) * 4;
+      saved.rows.push(L.data.slice(off, off + (bx - ax + 1) * 4));
+      for (let x = ax; x <= bx; x++) if (M[y * W + x]) { const i = ((y - L.y) * L.w + (x - L.x)) * 4 + 3; if (L.data[i]) { L.data[i] = 0; touched = true; } }
+    }
+    if (touched) { undo.push(saved); refreshCanvas(L); }
+  }
+  undo.push({ L: bgL, whole: { data: bgL.data, x: bgL.x, y: bgL.y, w: bgL.w, h: bgL.h } });
+  const full = new Uint8ClampedArray(N * 4);            // 배경 레이어를 캔버스 크기로 펼친 뒤 옮긴 픽셀을 원본 색으로
+  for (let y = 0; y < bgL.h; y++) full.set(bgL.data.subarray(y * bgL.w * 4, (y + 1) * bgL.w * 4), ((y + bgL.y) * W + bgL.x) * 4);
+  for (let p = 0; p < N; p++) if (M[p]) { const i = p * 4; full[i] = orig[i]; full[i + 1] = orig[i + 1]; full[i + 2] = orig[i + 2]; full[i + 3] = 255; }
+  Object.assign(bgL, { data: full, x: 0, y: 0, w: W, h: H });
+  refreshCanvas(bgL);
+  state.undo.push(undo);
+  updateUndoBtn();
+  renderLayerList(); render();
+  toast(`배경으로 옮겼습니다 (${count.toLocaleString()} px). 되돌리기: Ctrl+Z`);
+}
+/* 캐릭터로 되돌리기: 배경에 잘못 들어간 캐릭터 부분(화면 가장자리에서 잘린 모자 · 소매 · 다리 등)을 칠하면
+ * 선을 넘지 않고 색이 이어지는 배경 영역을 고른 뒤, "여기는 캐릭터"로 표시하고 다시 분리한다.
+ * 다시 분리해야 밑색 · 그림자 · 하이라이트 · 명암이 제대로 나뉘므로 몇 초 걸린다. */
+function returnToCharacter(points) {
+  const res = state.result, W = res.width, H = res.height, N = W * H;
+  const leaves = leafLayers(res.layers), bgL = leaves.find(L => L.kind === 'bg');
+  if (!bgL) { toast('배경 레이어가 없는 그림입니다. 모두 캐릭터 쪽에 있어요.'); return; }
+  const orig = state.src.data.data, bgA = fullAlpha(bgL, W, H), la = fullAlpha(leaves.find(L => L.kind === 'line'), W, H);
+  const T = 110, tol = 40;
+  const isClick = points.every(([x, y]) => Math.abs(x - points[0][0]) + Math.abs(y - points[0][1]) <= 4);
+  const inner = new Uint8Array(points.length);
+  {
+    const along = [0];
+    for (let i = 1; i < points.length; i++) along.push(along[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
+    const len = along[along.length - 1], tip = len >= 48 ? 12 : 0;
+    for (let i = 0; i < points.length; i++) inner[i] = isClick || (along[i] >= tip && along[i] <= len - tip) ? 1 : 0;
+  }
+  const reach = brushReach(), dist = new Uint16Array(N).fill(65535);
+  {
+    let front = [];
+    for (const [cx, cy] of points) if (cx >= 0 && cy >= 0 && cx < W && cy < H && dist[cy * W + cx]) { dist[cy * W + cx] = 0; front.push(cy * W + cx); }
+    for (let d = 1; d <= reach && front.length; d++) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q >= 0 && dist[q] === 65535) { dist[q] = d; next.push(q); }
+        }
+      }
+      front = next;
+    }
+  }
+  const R = new Uint8Array(N), rid = new Int32Array(N).fill(-1), rArea = [];
+  let n = 0, hitChar = 0;
+  for (let i = 0; i < points.length; i++) {
+    const [cx, cy] = points[i];
+    if (!inner[i] || cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
+    const p0 = cy * W + cx;
+    if (!bgA[p0]) { hitChar++; continue; }
+    if (R[p0] || la[p0] >= T) continue;
+    const stack = [p0], k = rArea.length;
+    R[p0] = 1; rid[p0] = k; n++;
+    let area = 1;
+    while (stack.length) {
+      const p = stack.pop(), x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q < 0 || R[q] || !bgA[q] || dist[q] > reach || la[q] >= T) continue;
+        const i = p * 4, j = q * 4;
+        if (Math.max(Math.abs(orig[i] - orig[j]), Math.abs(orig[i + 1] - orig[j + 1]), Math.abs(orig[i + 2] - orig[j + 2])) > tol) continue;
+        R[q] = 1; rid[q] = k; n++; area++; stack.push(q);
+      }
+    }
+    rArea.push(area);
+  }
+  if (!isClick && rArea.length) {                      // 획 가운데가 10px 이상 지나간 채우기만
+    const support = new Float64Array(rArea.length);
+    for (let i = 1; i < points.length; i++) {
+      const [cx, cy] = points[i], [px, py] = points[i - 1];
+      if (!inner[i] || !inner[i - 1] || cx < 0 || cy < 0 || cx >= W || cy >= H) continue;
+      const k = rid[cy * W + cx]; if (k >= 0) support[k] += Math.hypot(cx - px, cy - py);
+    }
+    const drop = rArea.map((_, k) => support[k] < 10);
+    if (drop.some(Boolean)) for (let p = 0; p < N; p++) if (R[p] && drop[rid[p]]) { R[p] = 0; n--; }
+  }
+  if (n < 16) { toast(hitChar && !n ? '이미 캐릭터 쪽입니다.' : '선택된 영역이 너무 작습니다. 조금 더 넓은 곳을 칠해 보세요.', 4000); return; }
+  // 윤곽선 쪽 가장자리(안티에일리어싱) 2px도 함께
+  let front = [];
+  for (let p = 0; p < N; p++) if (R[p]) front.push(p);
+  for (let d = 0; d < 2; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !R[q] && bgA[q] && dist[q] <= reach) { R[q] = 1; n++; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  ensureMasks();
+  const before = maskSnapshot();
+  for (let p = 0; p < N; p++) if (R[p]) { state.forceChar[p] = 1; state.forceBg[p] = 0; }
+  rerunForced(before, `캐릭터로 되돌리는 중 (${n.toLocaleString()} px)`);
+}
+// 보정 마스크를 반영해 다시 분리. 되돌리기는 이전 결과를 그대로 복원한다
+async function rerunForced(before, label) {
+  if (state.busy) return;
+  state.busy = true;
+  const prevResult = state.result;
+  setProgress(0, label);
+  try {
+    const res = await runCore(state.src.data, withMasks(readOpts()), setProgress);
+    installResult(res, true);
+    showStat(res);
+    state.undo.push([{ rerun: prevResult, masks: before }]);
+    updateUndoBtn();
+    toast('다시 분리했습니다. 되돌리기: Ctrl+Z');
+  } catch (e) {
+    console.error(e);
+    state.forceBg = before.forceBg; state.forceChar = before.forceChar;
+    toast('처리 실패: ' + (e.message || e), 5000);
+  } finally {
+    $('progress').classList.remove('on');
+    state.busy = false;
+  }
+}
+function undoBackground() {
+  if (state.busy) return;
+  const undo = state.undo && state.undo.pop();
+  if (!undo) return;
+  for (const u of undo) {
+    if (u.masks) { state.forceBg = u.masks.forceBg; state.forceChar = u.masks.forceChar; }
+    if (u.rerun) { state.result = u.rerun; state.selected = null; showStat(u.rerun); continue; }
+    if (u.masks) continue;
+    if (u.whole) { Object.assign(u.L, u.whole); refreshCanvas(u.L); continue; }
+    const { L, ax, ay, bx, rows } = u;
+    rows.forEach((row, k) => L.data.set(row, ((ay + k - L.y) * L.w + (ax - L.x)) * 4));
+    refreshCanvas(L);
+  }
+  updateUndoBtn();
+  renderLayerList(); render();
+  toast('되돌렸습니다.');
+}
+function setTool(t) {
+  state.tool = state.tool === t ? null : t;
+  $('bgToolBtn').classList.toggle('on', state.tool === 'bg');
+  $('charToolBtn').classList.toggle('on', state.tool === 'char');
+  stage.classList.toggle('picking', !!state.tool);
+  if (state.tool === 'bg') toast('배경으로 보낼 물건(탁자, 의자 …)을 클릭하거나 문질러 칠하세요. 옅은 분홍 띠 안의 같은 물건만 옮겨집니다. 화면 이동은 오른쪽 버튼 드래그.', 6000);
+  if (state.tool === 'char') toast('배경에 잘못 들어간 캐릭터 부분(모자, 소매, 다리 …)을 클릭하거나 문질러 칠하세요. 칠할 때마다 다시 분리합니다(몇 초). 화면 이동은 오른쪽 버튼 드래그.', 6000);
+}
+$('bgToolBtn').addEventListener('click', () => setTool('bg'));
+$('charToolBtn').addEventListener('click', () => setTool('char'));
+$('undoBtn').addEventListener('click', undoBackground);
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.target.isContentEditable) { e.preventDefault(); undoBackground(); }
+});
+
+/* ---------- 저장 ---------- */
+function download(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function saveLayerPNG(L) {
+  const r = state.result, c = document.createElement('canvas'); c.width = r.width; c.height = r.height;
+  c.getContext('2d').drawImage(L._canvas, L.x, L.y);
+  c.toBlob(b => download(b, `${state.name}_${L.name.replace(/[\\/:*?"<>|#\s]+/g, '_')}.png`), 'image/png');
+}
+$('pngBtn').addEventListener('click', () => {
+  compositeCanvas(!state.result.stats.hasAlpha).toBlob(b => download(b, `${state.name}_composite.png`), 'image/png');
+});
+$('psdBtn').addEventListener('click', async () => {
+  const r = state.result; if (!r) return;
+  $('psdBtn').disabled = true;
+  setProgress(0, 'PSD 작성 중');
+  try {
+    const comp = compositeCanvas(!r.stats.hasAlpha).getContext('2d').getImageData(0, 0, r.width, r.height).data;
+    const blob = await PSD.write({ width: r.width, height: r.height, layers: r.layers, composite: comp, hasAlpha: r.stats.hasAlpha },
+      p => setProgress(p, 'PSD 작성 중'));
+    download(blob, `${state.name}_layers.psd`);
+    toast(`PSD 저장 (${(blob.size / 1048576).toFixed(1)} MB)`);
+  } catch (e) {
+    console.error(e); toast('PSD 작성 실패: ' + (e.message || e), 5000);
+  } finally {
+    $('progress').classList.remove('on'); $('psdBtn').disabled = false;
+  }
+});
+
+/* ---------- 예제 그림 (셀 채색 + 선화 + 하이라이트 + 반짝임 + 빛 효과) ---------- */
+function drawSample() {
+  const S = 800, c = document.createElement('canvas'); c.width = c.height = S;
+  const x = c.getContext('2d');
+  const LINE = '#2b2233', lw = 5;
+  x.lineJoin = x.lineCap = 'round';
+  x.fillStyle = '#eef0fb'; x.fillRect(0, 0, S, S);
+  const shape = (path, base, shade, extra) => {
+    x.save(); path(); x.fillStyle = base; x.fill();
+    x.clip(); if (shade) shade(); if (extra) extra(); x.restore();
+    x.save(); path(); x.strokeStyle = LINE; x.lineWidth = lw; x.stroke(); x.restore();
+  };
+  const ell = (cx, cy, rx, ry) => () => { x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); };
+  const fillE = (cx, cy, rx, ry, col) => { x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); x.fillStyle = col; x.fill(); };
+  // 뒷머리
+  shape(() => { x.beginPath(); x.moveTo(215, 330); x.bezierCurveTo(190, 520, 230, 640, 260, 660); x.lineTo(540, 660); x.bezierCurveTo(575, 620, 610, 520, 585, 330); x.closePath(); },
+    '#7a55b5', () => { x.fillStyle = '#563a8a'; x.fillRect(200, 470, 420, 220); });
+  // 몸통(셔츠)
+  shape(() => { x.beginPath(); x.moveTo(290, 590); x.quadraticCurveTo(400, 560, 510, 590); x.lineTo(610, 800); x.lineTo(190, 800); x.closePath(); },
+    '#f28c8c', () => { fillE(250, 760, 120, 170, '#c9646e'); },
+    () => { x.fillStyle = '#ffffff'; x.strokeStyle = LINE; x.lineWidth = lw; x.beginPath(); x.moveTo(360, 580); x.lineTo(400, 650); x.lineTo(440, 580); x.closePath(); x.fill(); x.stroke(); });
+  // 목
+  shape(() => { x.beginPath(); x.rect(365, 470, 70, 120); }, '#ffe0cc', () => { fillE(400, 490, 60, 45, '#f0b9a5'); });
+  // 얼굴
+  shape(ell(400, 340, 165, 175), '#ffe0cc', () => {
+    x.fillStyle = '#f0b9a5'; x.fillRect(200, 150, 420, 400);
+    fillE(425, 318, 160, 170, '#ffe0cc');
+    fillE(310, 405, 30, 16, '#ffc4c0'); fillE(492, 405, 30, 16, '#ffc4c0');
+  });
+  // 눈
+  for (const ex of [330, 470]) {
+    shape(ell(ex, 350, 38, 46), '#ffffff', () => { fillE(ex, 318, 44, 22, '#dcd8ee'); });
+    shape(ell(ex, 358, 27, 36), '#3a7bd5', () => { fillE(ex, 330, 34, 20, '#24508f'); fillE(ex, 360, 12, 16, '#1b2a4a'); fillE(ex, 385, 18, 8, '#7fb0f0'); });
+    fillE(ex - 10, 340, 9, 11, '#ffffff'); fillE(ex + 11, 372, 4.5, 4.5, '#ffffff');
+  }
+  // 입
+  x.beginPath(); x.arc(400, 440, 18, 0.15 * Math.PI, 0.85 * Math.PI); x.strokeStyle = LINE; x.lineWidth = 4; x.stroke();
+  // 앞머리
+  shape(() => {
+    x.beginPath(); x.moveTo(225, 330); x.bezierCurveTo(215, 190, 300, 135, 400, 135); x.bezierCurveTo(505, 135, 590, 190, 578, 330);
+    x.lineTo(545, 270); x.lineTo(515, 320); x.lineTo(470, 240); x.lineTo(430, 300); x.lineTo(395, 230); x.lineTo(350, 300);
+    x.lineTo(320, 245); x.lineTo(280, 320); x.lineTo(255, 270); x.closePath();
+  }, '#7a55b5', () => {
+    x.fillStyle = '#563a8a'; x.beginPath(); x.moveTo(200, 250); x.lineTo(300, 250); x.lineTo(270, 340); x.lineTo(200, 340); x.fill();
+    x.beginPath(); x.moveTo(600, 240); x.lineTo(520, 250); x.lineTo(560, 340); x.lineTo(600, 340); x.fill();
+  }, () => {
+    x.strokeStyle = '#b39ae0'; x.lineWidth = 16; x.beginPath(); x.arc(400, 330, 150, 1.22 * Math.PI, 1.42 * Math.PI); x.stroke();
+    x.beginPath(); x.arc(400, 330, 150, 1.55 * Math.PI, 1.75 * Math.PI); x.stroke();
+  });
+  // 반짝임(별)
+  const star = (cx, cy, r) => {
+    x.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * 0.22 : r; x.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+    x.closePath(); x.fillStyle = '#ffffff'; x.fill();
+  };
+  star(520, 200, 13); star(270, 700, 10); star(455, 690, 8); star(335, 185, 7);
+  // 빛 효과
+  x.globalCompositeOperation = 'screen';
+  const g = x.createRadialGradient(740, 70, 10, 740, 70, 330);
+  g.addColorStop(0, 'rgba(255,214,120,0.55)'); g.addColorStop(1, 'rgba(255,214,120,0)');
+  x.fillStyle = g; x.fillRect(0, 0, S, S);
+  x.globalCompositeOperation = 'source-over';
+  return c;
+}
+</script>
+</body>
+</html>
