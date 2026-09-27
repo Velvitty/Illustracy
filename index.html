@@ -304,7 +304,10 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
   </section>
 
   <aside class="right">
-    <div class="section" style="padding-bottom:8px"><h2 style="margin:0">레이어</h2></div>
+    <div class="section" style="padding-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <h2 style="margin:0">레이어</h2>
+      <button id="allVisBtn" disabled title="모든 레이어를 한 번에 끕니다. 다시 누르면 끄기 전 상태로 켭니다" style="padding:3px 9px;font-size:12px">모두 끄기</button>
+    </div>
     <div class="layers" id="layers"></div>
     <div class="layers-foot">
       <div class="info" id="layerInfo">레이어를 클릭하면 혼합 모드·불투명도를 바꿀 수 있습니다. 이름은 더블클릭으로 수정.</div>
@@ -2618,6 +2621,7 @@ function installResult(res, keepUndo) {
   walk(res.layers);
   state.result = res;
   state.selected = null;
+  state.visSnapshot = null;
   if (!keepUndo) state.undo = [];
   $('bgToolBtn').disabled = $('charToolBtn').disabled = false; updateUndoBtn();
   renderLayerList();
@@ -2818,14 +2822,38 @@ function renderLayerList() {
     }
   };
   addRows(state.result.layers, 0);
+  updateAllVisBtn();
 }
+/* 레이어 모두 끄기 / 모두 켜기: 폴더는 그대로 두고 레이어만 끈다(하나씩 다시 켜서 볼 수 있게).
+ * 켤 때는 끄기 전 상태로 되돌린다(처음부터 숨겨져 있던 러프 · 실루엣은 숨긴 채로) */
+const defaultVisible = L => L.kind !== 'rough' && L.kind !== 'silhouette';
+function updateAllVisBtn() {
+  const b = $('allVisBtn'), r = state.result;
+  b.disabled = !r;
+  if (r) b.textContent = leafLayers(r.layers).some(L => L.visible) ? '모두 끄기' : '모두 켜기';
+}
+function toggleAllLayers() {
+  const r = state.result; if (!r) return;
+  const leaves = leafLayers(r.layers);
+  if (leaves.some(L => L.visible)) {
+    if (!state.visSnapshot) state.visSnapshot = new Map(leaves.map(L => [L, L.visible]));
+    leaves.forEach(L => { L.visible = false; });
+  } else {
+    const snap = state.visSnapshot;
+    leaves.forEach(L => { L.visible = snap && snap.has(L) ? snap.get(L) : defaultVisible(L); });
+    if (!leaves.some(L => L.visible)) leaves.forEach(L => { L.visible = defaultVisible(L); });
+    state.visSnapshot = null;
+  }
+  renderLayerList(); render();
+}
+$('allVisBtn').addEventListener('click', toggleAllLayers);
 function layerRow(L, depth) {
   const row = document.createElement('div');
   row.className = 'layer' + (L.group ? ' group' : '') + (state.selected === L ? ' sel' : '');
   row.style.paddingLeft = (10 + depth * 16) + 'px';
   const eye = document.createElement('button');
   eye.className = 'eye' + (L.visible ? ' on' : ''); eye.title = '표시/숨김';
-  eye.addEventListener('click', e => { e.stopPropagation(); L.visible = !L.visible; eye.classList.toggle('on', L.visible); render(); });
+  eye.addEventListener('click', e => { e.stopPropagation(); L.visible = !L.visible; eye.classList.toggle('on', L.visible); render(); updateAllVisBtn(); });
   const th = document.createElement('div'); th.className = 'thumb' + (L.group ? ' folder' : '');
   if (L.group) {
     th.textContent = L.open ? '▾' : '▸'; th.title = '펼치기/접기';
@@ -3325,7 +3353,7 @@ function undoBackground() {
   if (!undo) return;
   for (const u of undo) {
     if (u.masks) { state.forceBg = u.masks.forceBg; state.forceChar = u.masks.forceChar; }
-    if (u.rerun) { state.result = u.rerun; state.selected = null; showStat(u.rerun); continue; }
+    if (u.rerun) { state.result = u.rerun; state.selected = null; state.visSnapshot = null; showStat(u.rerun); continue; }
     if (u.masks) continue;
     if (u.whole) { Object.assign(u.L, u.whole); refreshCanvas(u.L); continue; }
     const { L, ax, ay, bx, rows } = u;
