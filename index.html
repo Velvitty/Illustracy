@@ -306,7 +306,7 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
   <aside class="right">
     <div class="section" style="padding-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px">
       <h2 style="margin:0">레이어</h2>
-      <button id="allVisBtn" disabled title="모든 레이어를 한 번에 끕니다. 다시 누르면 끄기 전 상태로 켭니다" style="padding:3px 9px;font-size:12px">모두 끄기</button>
+      <button id="allVisBtn" disabled title="모두 끄기" aria-label="모두 끄기" style="padding:2px 7px;line-height:0"></button>
     </div>
     <div class="layers" id="layers"></div>
     <div class="layers-foot">
@@ -2827,11 +2827,17 @@ function renderLayerList() {
 /* 레이어 모두 끄기 / 모두 켜기: 폴더는 그대로 두고 레이어만 끈다(하나씩 다시 켜서 볼 수 있게).
  * 켤 때는 끄기 전 상태로 되돌린다(처음부터 숨겨져 있던 러프 · 실루엣은 숨긴 채로) */
 const defaultVisible = L => L.kind !== 'rough' && L.kind !== 'silhouette';
+// 눈 뜬 모양 = 보이는 레이어가 있음(누르면 모두 끄기), 눈 감은 모양 = 모두 꺼짐(누르면 끄기 전 상태로)
+const EYE_OPEN = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_CLOSED = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10c2.4 3.2 5.5 4.8 9 4.8s6.6-1.6 9-4.8"/><path d="M6.4 13.4 5 16M12 14.8v3M17.6 13.4 19 16"/></svg>';
 function updateAllVisBtn() {
   const b = $('allVisBtn'), r = state.result;
   b.disabled = !r;
-  if (r) b.textContent = leafLayers(r.layers).some(L => L.visible) ? '모두 끄기' : '모두 켜기';
+  const on = !r || leafLayers(r.layers).some(L => L.visible), label = on ? '모두 끄기' : '모두 켜기 (끄기 전 상태로)';
+  b.innerHTML = on ? EYE_OPEN : EYE_CLOSED;
+  b.title = label; b.setAttribute('aria-label', label);
 }
+updateAllVisBtn();
 function toggleAllLayers() {
   const r = state.result; if (!r) return;
   const leaves = leafLayers(r.layers);
