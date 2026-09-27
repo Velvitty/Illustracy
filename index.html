@@ -36,6 +36,8 @@ button {
 }
 button:hover:not(:disabled) { border-color: #4a4e59; background: #2e3139; }
 button:disabled { opacity: .45; cursor: default; }
+button.link { background: none; border: 0; padding: 8px 0 0; color: var(--muted); font-size: 12px; text-decoration: underline; }
+button.link:hover:not(:disabled) { background: none; color: var(--text); }
 button.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; font-weight: 600; }
 button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
 select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
@@ -119,7 +121,6 @@ aside.right { border-left: 1px solid var(--line); display: flex; flex-direction:
 }
 .layer:hover { background: #24272d; }
 .layer.sel { background: var(--sel); }
-.layer.child { padding-left: 26px; }
 .layer.group { background: #22252b; }
 .layer .eye { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; background: transparent; padding: 0; }
 .layer .eye.on::after { content: "●"; color: var(--text); }
@@ -183,6 +184,7 @@ aside.right { border-left: 1px solid var(--line); display: flex; flex-direction:
         <button id="sampleBtn">예제 그림</button>
         <button id="runBtn" class="primary" disabled>레이어 분리</button>
       </div>
+      <button id="saveAppBtn" class="link" title="이 HTML 파일 하나만 있으면 인터넷 없이 실행됩니다">⬇ 프로그램 저장 (오프라인 실행용)</button>
     </div>
 
     <div class="section">
@@ -214,7 +216,8 @@ aside.right { border-left: 1px solid var(--line); display: flex; flex-direction:
       <div class="field">
         <label class="row">선 색상</label>
         <select id="o_lineColor" style="width:100%">
-          <option value="original" selected>원본 색 유지 (정확 재현)</option>
+          <option value="trace" selected>선화 + 색트레스 (작가식)</option>
+          <option value="original">원본 선 색 그대로 (한 장)</option>
           <option value="black">검정 단색</option>
         </select>
       </div>
@@ -245,8 +248,8 @@ aside.right { border-left: 1px solid var(--line); display: flex; flex-direction:
 
     <div class="section">
       <h2>레이어 구성</h2>
-      <div class="field"><label class="check"><input type="checkbox" id="o_splitColors" checked> 채색을 색상별 레이어로 분리</label></div>
-      <div class="field"><label class="check"><input type="checkbox" id="o_clip" checked> 명암·효과 레이어를 채색에 클리핑</label></div>
+      <div class="field"><label class="check"><input type="checkbox" id="o_splitColors" checked> 채색을 파츠별 폴더로 나누기</label></div>
+      <div class="field"><label class="check"><input type="checkbox" id="o_clip" checked> 그림자·하이라이트를 밑색에 클리핑</label></div>
       <div class="field"><label class="check"><input type="checkbox" id="o_bg" checked> 단색 배경 자동 분리</label></div>
       <div class="field"><label class="check"><input type="checkbox" id="o_rough" checked> 러프 스케치 생성</label></div>
       <div class="field">
@@ -255,9 +258,11 @@ aside.right { border-left: 1px solid var(--line); display: flex; flex-direction:
     </div>
 
     <div class="section note">
-      <b>동작 방식</b> — 모든 처리는 브라우저 안에서만 이루어지며 이미지는 어디에도 업로드되지 않습니다.
-      레이어는 원본을 정확히 재현하도록 계산됩니다(채색 × 그림자 × 명암 → 스크린 하이라이트·반짝임·효과 → 선화).
-      러프는 완성본에서 역으로 생성한 <b>추정 스케치</b>이며 기본적으로 숨김 상태입니다.
+      <b>오프라인 동작</b> — 이 파일 하나만 있으면 인터넷 없이 실행됩니다. 외부 라이브러리·서버·유료 API를 쓰지 않고,
+      이미지는 어디에도 업로드되지 않습니다.<br><br>
+      <b>레이어 구성</b> — 작가가 칠하는 순서대로 파츠마다 <b>밑색 → 1차·2차 그림자(곱하기) → 하이라이트</b>를 클리핑으로 쌓고,
+      그 위에 명암 · 효과(빛, 반짝임) · 선화(+색트레스)를 둡니다. 다시 합치면 원본이 재현되도록 계산합니다.
+      러프는 완성본에서 역으로 만든 <b>추정 스케치</b>이며 기본적으로 숨김 상태입니다.
     </div>
   </aside>
 
@@ -278,7 +283,7 @@ aside.right { border-left: 1px solid var(--line); display: flex; flex-direction:
       <div class="canvas-wrap" id="wrap" hidden><canvas id="view"></canvas></div>
       <div class="empty" id="empty">
         <div class="big">일러스트를 넣어 주세요</div>
-        <div>선화 · 채색 · 그림자 · 명암 · 하이라이트 · 반짝임 · 효과 · 러프로 분리해 PSD로 저장합니다.</div>
+        <div>선화 · 채색(파츠별 밑색) · 그림자 · 하이라이트 · 명암 · 효과 · 러프로 분리해 PSD로 저장합니다.</div>
       </div>
       <div class="progress" id="progress">
         <div class="label" id="progLabel">준비 중…</div>
@@ -413,11 +418,11 @@ function toLab(Rp, Gp, Bp, N) {
 
 const NB8X = [-1, 0, 1, -1, 1, -1, 0, 1], NB8Y = [-1, -1, -1, 0, 0, 1, 1, 1];
 
-/* 모르는 픽셀(known=0)을 바깥쪽부터 한 겹씩 이웃 평균으로 채움 */
-function inpaint(planes, known, W, H) {
+/* 모르는 픽셀(known=0)을 바깥쪽부터 한 겹씩 이웃 평균으로 채움. skip=1 픽셀은 건드리지 않음 */
+function inpaint(planes, known, W, H, skip) {
   const N = W * H, dist = new Int32Array(N).fill(-1);
   let front = new Int32Array(N), next = new Int32Array(N), nf = 0;
-  for (let p = 0; p < N; p++) if (known[p]) dist[p] = 0;
+  for (let p = 0; p < N; p++) if (skip && skip[p]) dist[p] = -2; else if (known[p]) dist[p] = 0;
   for (let p = 0; p < N; p++) {
     if (dist[p] !== -1) continue;
     const x = p % W, y = (p / W) | 0;
@@ -744,6 +749,54 @@ function process(img, opts, progress) {
     lineA[p] = a;
   }
 
+  /* 2-1) 선화 + 색트레스: 작가처럼 한 가지 색의 선화를 그리고, 색이 다른 부분만 위에 클리핑한 색트레스로 */
+  let lineK0 = null, traceMask = null;
+  if (opts.lineColor === 'trace') {
+    const solve = (p, C) => {                          // 선 색 C가 정해졌을 때의 알파(최소제곱)
+      let num = 0, den = 0;
+      for (let c = 0; c < 3; c++) { const du = U[c][p] - C[c]; num += (U[c][p] - O[c][p]) * du; den += du * du; }
+      return den > 1e-5 ? clamp01(num / den) : 0;
+    };
+    // 기본 선 색 = 선이 완전히 덮은 픽셀(중심부) 원본 색의 중앙값
+    const hist = [new Int32Array(256), new Int32Array(256), new Int32Array(256)];
+    let nc = 0;
+    for (let p = 0; p < N; p++) if (lineMask[p] && lineA[p] >= 0.85) { nc++; for (let c = 0; c < 3; c++) hist[c][Math.round(O[c][p] * 255)]++; }
+    if (nc) {
+      const med = h => { let s = 0; for (let v = 0; v < 256; v++) { s += h[v]; if (s * 2 >= nc) return v / 255; } return 0; };
+      lineK0 = [med(hist[0]), med(hist[1]), med(hist[2])];
+      const k0 = labOf(lineK0[0], lineK0[1], lineK0[2]);
+      // 기본 선 색으로 봤을 때 완전히 덮인 픽셀의 원본 색 = 그 자리의 실제 선 색 → 선 전체로 퍼뜨림
+      const Cs = [new Float32Array(N).fill(lineK0[0]), new Float32Array(N).fill(lineK0[1]), new Float32Array(N).fill(lineK0[2])];
+      const core = new Uint8Array(N), skip = new Uint8Array(N);
+      for (let p = 0; p < N; p++) {
+        skip[p] = inMask[p] ? 0 : 1;
+        if (inMask[p] && A[p] > 0.02 && lineA[p] > 0 && solve(p, lineK0) >= 0.9) { core[p] = 1; for (let c = 0; c < 3; c++) Cs[c][p] = O[c][p]; }
+      }
+      inpaint(Cs, core, W, H, skip);
+      traceMask = new Uint8Array(N);
+      let tw = 0, aw = 0;
+      const col = [0, 0, 0];
+      for (let p = 0; p < N; p++) {
+        if (!inMask[p] || A[p] <= 0.02) continue;
+        const cl = labOf(Cs[0][p], Cs[1][p], Cs[2][p]);
+        const tr = Math.hypot(cl[0] - k0[0], cl[1] - k0[1], cl[2] - k0[2]) > 10;
+        for (let c = 0; c < 3; c++) col[c] = tr ? Cs[c][p] : lineK0[c];
+        let a = solve(p, col);
+        if (a <= 0.02) { a = 0; U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p]; }
+        lineA[p] = a;
+        for (let c = 0; c < 3; c++) lineC[c][p] = col[c];
+        if (tr && a > 0) { traceMask[p] = 1; tw += a; }
+        aw += a;
+      }
+      if (tw < aw * 0.003) {                           // 색트레스가 거의 없으면 선화 한 장으로
+        for (let p = 0; p < N; p++) if (traceMask[p]) {
+          lineA[p] = solve(p, lineK0); for (let c = 0; c < 3; c++) lineC[c][p] = lineK0[c];
+        }
+        traceMask = null;
+      }
+    }
+  }
+
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
   const bgMask = opts.bg && !hasAlpha ? detectBackground(U, known, W, H) : null;
@@ -993,7 +1046,7 @@ function process(img, opts, progress) {
   const shadowThr = 0.86 + 0.12 * opts.shadow;
   const sparkR = opts.sparkle > 0 ? opts.sparkle : Math.max(4, Math.round(7 * scale));
   const sparkArea = Math.PI * sparkR * sparkR * 3;
-  const toneG = new Float32Array(nT * 3).fill(1), toneH = new Float32Array(nT * 3), toneHi = new Uint8Array(nT);
+  const toneG = new Float32Array(nT * 3).fill(1), toneHi = new Uint8Array(nT);
   for (let t = 0; t < nT; t++) {
     const g = toneGroup[t];
     if (t === baseTone[g]) continue;
@@ -1004,10 +1057,7 @@ function process(img, opts, progress) {
       continue;
     }
     const ll = lumOf(cl[0], cl[1], cl[2]);
-    if (lf < 0.995 && 1 - (1 - ll) / (1 - lf) > 0.12) {
-      toneHi[t] = 1;
-      for (let c = 0; c < 3; c++) toneH[t * 3 + c] = F[c] < 0.996 ? clamp01(1 - (1 - cl[c]) / (1 - F[c])) : 0;
-    }
+    if (lf < 0.995 && 1 - (1 - ll) / (1 - lf) > 0.12) toneHi[t] = 1;
   }
   // 작은 하이라이트 조각은 반짝임으로
   const sparkPix = new Uint8Array(N);
@@ -1021,15 +1071,12 @@ function process(img, opts, progress) {
 
   return buildLayers({
     W, H, N, scale, rnd, opts, progress, t0, hasAlpha,
-    R, G: Gc, B, A, U, lineA, lineC, inMask, bgMask, tone, nT, bgTone, toneGroup, nG: nGroups, base, toneG, toneH, sparkPix, sparkR, sparkArea,
+    R, G: Gc, B, A, U, lineA, lineC, lineK0, traceMask, inMask, bgMask, tone, nT, bgTone, toneGroup, nG: nGroups, base,
+    toneG, toneHi, toneCol: tMean, tCnt, sparkPix, sparkR, sparkArea,
     counts: { regions: nR, tones: nT }
   });
 }
-/* ---------------- 레이어 분해 ----------------
- * 합성 순서(아래→위):
- *   채색 F → ×그림자 G → ×명암 M → 스크린 하이라이트 H → 스크린 반짝임 S1 → 스크린 효과 S2 → 선화(표준)
- * 곱하기 레이어(색 K, 알파 a)는 x·(1-a+aK), 스크린 레이어는 1-(1-x)(1-aK)이므로
- * 픽셀마다 역산하면 원본을 (8비트 반올림 오차 내에서) 그대로 재현할 수 있다. */
+/* ---------------- 레이어 분해 ---------------- */
 function cropLayer(full, W, H) {
   let x0 = W, y0 = H, x1 = -1, y1 = -1;
   for (let y = 0; y < H; y++) {
@@ -1059,13 +1106,43 @@ function putMinAlpha(buf, i, v0, v1, v2, a0) {
   buf[i + 3] = Math.round(aq * a0 * 255);
 }
 
+// 파츠 이름: 밑색으로 대략적인 색 이름을 붙인다(피부색은 "피부")
+function colorName(rgb) {
+  const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  const v = mx, s = mx ? (mx - mn) / mx : 0;
+  let h = 0;
+  if (mx !== mn) h = 60 * (mx === r ? ((g - b) / (mx - mn) + 6) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4);
+  if (v < 0.18) return '검정';
+  if (s < 0.1) return v > 0.9 ? '흰색' : '회색';
+  if (h >= 5 && h <= 45 && s >= 0.08 && s <= 0.55 && v >= 0.7) return '피부';
+  if (h < 15 || h >= 345) return v < 0.45 ? '갈색' : s < 0.5 && v > 0.8 ? '분홍' : '빨강';
+  if (h < 40) return v < 0.6 ? '갈색' : '주황';
+  if (h < 65) return v < 0.5 ? '갈색' : '노랑';
+  if (h < 160) return '초록';
+  if (h < 200) return '청록';
+  if (h < 255) return '파랑';
+  if (h < 290) return '보라';
+  return '분홍';
+}
+
+/* 레이어 구성 — 실제 작가가 PSD를 나누는 방식:
+ *   배경
+ *   채색 폴더
+ *     파츠 폴더(피부, 머리카락 …): 밑색 + 1차 그림자(곱하기, 클리핑) + 2차 그림자(곱하기, 클리핑) + 하이라이트(표준, 클리핑)
+ *     명암(곱하기) — 파츠 단위로 설명되지 않는 부드러운 음영
+ *   효과 폴더: 빛(스크린), 반짝임(스크린)
+ *   선화(단색) + 색트레스(클리핑)
+ *   러프(숨김)
+ * 곱하기(색 K, 알파 a)는 x·(1-a+aK), 스크린은 1-(1-x)(1-aK)이므로 픽셀마다 역산해 원본을 재현한다. */
 function buildLayers(ctx) {
-  const { W, H, N, scale, rnd, opts, progress, t0, R, G, B, A, U, lineA, lineC, bgMask, tone, nT, bgTone, toneGroup, nG, base, toneG, toneH, sparkPix, sparkR, sparkArea } = ctx;
+  const { W, H, N, scale, rnd, opts, progress, t0, R, G, B, A, U, lineA, lineC, lineK0, traceMask, bgMask, tone, nT, bgTone,
+    toneGroup, nG, base, toneG, toneHi, toneCol, tCnt, sparkPix, sparkR, sparkArea } = ctx;
   const O = [R, G, B];
   const isBg = p => bgTone >= 0 && tone[p] === bgTone;
+  const q8 = v => Math.round(clamp01(v) * 255) / 255;
 
-  /* 팔레트: 거의 같은 밑색(ΔE<2.5)은 한 레이어로 */
-  progress(0.62, '팔레트 구성');
+  /* 파츠(팔레트): 거의 같은 밑색(ΔE<2.5)은 하나의 파츠로 */
+  progress(0.62, '파츠 구성');
   const gArea = new Float64Array(nG);
   for (let p = 0; p < N; p++) { const t = tone[p]; if (t >= 0 && t < nT && A[p] > 0.02) gArea[toneGroup[t]]++; }
   const pal = [], palOf = new Int32Array(nG);
@@ -1077,162 +1154,213 @@ function buildLayers(ctx) {
     if (hit < 0) { pal.push({ rgb, lab, area: 0 }); hit = pal.length - 1; }
     palOf[g] = hit; pal[hit].area += gArea[g];
   }
-  const Fg = new Float32Array(nG * 3);
-  for (let g = 0; g < nG; g++) for (let c = 0; c < 3; c++) Fg[g * 3 + c] = pal[palOf[g]].rgb[c] / 255;
+  const nP = pal.length;
 
-  /* 선화 레이어 */
-  const lineB = new Uint8ClampedArray(N * 4), black = opts.lineColor === 'black';
-  for (let p = 0; p < N; p++) {
-    const a = lineA[p]; if (a <= 0) continue;
-    const i = p * 4;
-    if (!black) { lineB[i] = Math.round(lineC[0][p] * 255); lineB[i + 1] = Math.round(lineC[1][p] * 255); lineB[i + 2] = Math.round(lineC[2][p] * 255); }
-    lineB[i + 3] = Math.round(a * A[p] * 255);
+  /* 파츠별 그림자 단계: 밝은 그림자 톤 → 1차, 확실히 더 어두운 톤 → 2차(1차 위에 한 번 더 곱하기) */
+  const toneLevel = new Uint8Array(nT), sh1 = new Float32Array(nP * 3).fill(1), sh2 = new Float32Array(nP * 3).fill(1);
+  {
+    const byPart = pal.map(() => []);
+    for (let t = 0; t < nT; t++) {
+      if (!(toneG[t * 3] < 0.998 || toneG[t * 3 + 1] < 0.998 || toneG[t * 3 + 2] < 0.998)) continue;
+      byPart[palOf[toneGroup[t]]].push({ t, l: lumOf(toneG[t * 3], toneG[t * 3 + 1], toneG[t * 3 + 2]), n: Math.max(1, tCnt[t]) });
+    }
+    const avg = (items, f) => {
+      const s = [0, 0, 0]; let n = 0;
+      for (const it of items) { const v = f(it.t); for (let c = 0; c < 3; c++) s[c] += v[c] * it.n; n += it.n; }
+      return s.map(v => q8(v / n));
+    };
+    byPart.forEach((list, k) => {
+      if (!list.length) return;
+      list.sort((a, b) => b.l - a.l);
+      let split = list.length;
+      if (list[0].l - list[list.length - 1].l >= 0.07) {
+        let gap = 0, at = -1;
+        for (let i = 1; i < list.length; i++) { const d = list[i - 1].l - list[i].l; if (d > gap) { gap = d; at = i; } }
+        if (gap >= 0.04) split = at;
+      }
+      const c1 = avg(list.slice(0, split), t => [toneG[t * 3], toneG[t * 3 + 1], toneG[t * 3 + 2]]);
+      for (let c = 0; c < 3; c++) sh1[k * 3 + c] = c1[c];
+      if (split < list.length) {
+        const c2 = avg(list.slice(split), t => [0, 1, 2].map(c => Math.min(1, toneG[t * 3 + c] / Math.max(c1[c], 1e-3))));
+        for (let c = 0; c < 3; c++) sh2[k * 3 + c] = c2[c];
+      }
+      list.forEach((it, i) => { toneLevel[it.t] = i < split ? 1 : 2; });
+    });
   }
 
-  /* 1차: 그림자 / 명암 / 하이라이트 확정, 남는 밝아짐 S 계산 */
-  progress(0.66, '명암 분해');
-  const shadowB = new Uint8ClampedArray(N * 4), shadeB = new Uint8ClampedArray(N * 4), hiB = new Uint8ClampedArray(N * 4);
+  /* 1차: 밑색 → 그림자 → 하이라이트(표준)까지 칠한 뒤, 남는 차이를 명암(곱하기)과 밝아짐 S로 */
+  progress(0.66, '그림자 · 하이라이트 · 명암 분해');
+  const part = new Int32Array(N).fill(-1);
+  const baseB = new Uint8ClampedArray(N * 4), sh1B = new Uint8ClampedArray(N * 4), sh2B = new Uint8ClampedArray(N * 4);
+  const hlB = new Uint8ClampedArray(N * 4), shadeB = new Uint8ClampedArray(N * 4);
   const S = [new Float32Array(N), new Float32Array(N), new Float32Array(N)], sMax = new Float32Array(N);
-  const Mv = [0, 0, 0], Hv = [0, 0, 0];
+  const Mv = [0, 0, 0];
   for (let p = 0; p < N; p++) {
     const a0 = A[p]; if (a0 <= 0.02 || isBg(p)) continue;
-    const t = tone[p], g = toneGroup[t], spark = sparkPix[p], i = p * 4;
-    let shadowOn = false, sm = 0;
+    const t = tone[p], k = palOf[toneGroup[t]], lv = toneLevel[t], hi = toneHi[t] && !sparkPix[p], i = p * 4, al = Math.round(a0 * 255);
+    part[p] = k;
+    let sm = 0;
     for (let c = 0; c < 3; c++) {
-      const F = Fg[g * 3 + c], gv = toneG[t * 3 + c], hv = spark ? 0 : toneH[t * 3 + c], u = U[c][p];
-      const gq = Math.round(gv * 255) / 255;
-      if (gv < 0.998) shadowOn = true;
-      const x1 = F * gq, y = 1 - (1 - x1) * (1 - hv);
-      let M = 1, h = hv, s = 0;
-      if (u <= y + 1.2 / 255) {                      // 1단계 이하 밝아짐은 노이즈로 보고 무시
-        h = Math.min(hv, u);
-        M = h >= 0.999 || x1 <= 0.002 ? 1 : clamp01((1 - (1 - u) / (1 - h)) / x1);
-      } else {
-        const den = (1 - x1) * (1 - hv);
-        s = den > 1e-6 ? clamp01(1 - (1 - u) / den) : 0;
-      }
-      Mv[c] = 1 - M; Hv[c] = h; S[c][p] = s; if (s > sm) sm = s;
+      let x = pal[k].rgb[c] / 255;
+      if (lv >= 1) x *= sh1[k * 3 + c];
+      if (lv === 2) x *= sh2[k * 3 + c];
+      if (hi) x = q8(toneCol[t * 3 + c]);
+      const u = U[c][p];
+      let M = 1, s = 0;
+      if (u <= x + 1.2 / 255) M = x > 0.002 ? clamp01(u / x) : 1;   // 1단계 이하 밝아짐은 노이즈로 무시
+      else s = x < 0.9999 ? clamp01(1 - (1 - u) / (1 - x)) : 0;
+      Mv[c] = 1 - M; S[c][p] = s; if (s > sm) sm = s;
+      baseB[i + c] = pal[k].rgb[c];
+      if (lv >= 1) sh1B[i + c] = Math.round(sh1[k * 3 + c] * 255);
+      if (lv === 2) sh2B[i + c] = Math.round(sh2[k * 3 + c] * 255);
+      if (hi) hlB[i + c] = Math.round(clamp01(toneCol[t * 3 + c]) * 255);
     }
     sMax[p] = sm;
-    if (shadowOn) {
-      for (let c = 0; c < 3; c++) shadowB[i + c] = Math.round(toneG[t * 3 + c] * 255);
-      shadowB[i + 3] = Math.round(a0 * 255);
-    }
+    baseB[i + 3] = al;
+    if (lv >= 1) sh1B[i + 3] = al;
+    if (lv === 2) sh2B[i + 3] = al;
+    if (hi) hlB[i + 3] = al;
     // 곱하기는 1-a(1-K) 이므로 (1-M)을 최소 알파로 기록한 뒤 색을 뒤집는다
     putMinAlpha(shadeB, i, Mv[0], Mv[1], Mv[2], a0);
     if (shadeB[i + 3]) for (let c = 0; c < 3; c++) shadeB[i + c] = 255 - shadeB[i + c];
-    putMinAlpha(hiB, i, Hv[0], Hv[1], Hv[2], a0);
   }
 
-  /* 2차: 밝아짐을 "작은 반짝임"(화이트 탑햇)과 "넓은 효과광"으로 분리 + 재현 오차 측정 */
-  progress(0.76, '반짝임 · 효과 분리');
+  /* 2차: 밝아짐을 "작은 반짝임"(화이트 탑햇, 작은 조각)과 "넓은 빛"으로 */
+  progress(0.76, '빛 · 반짝임 분리');
   const open = blur(dilate(erode(sMax, W, H, sparkR), W, H, sparkR), W, H, sparkR * 0.5);
-  // 주변과 떨어진 작은 밝은 조각은 통째로 반짝임
   const smallS = new Uint8Array(N);
   {
     const on = new Uint8Array(N);
     for (let p = 0; p < N; p++) on[p] = sMax[p] > 3 / 255 ? 1 : 0;
-    const sc = components(new Int32Array(N), on, W, H), sa = new Int32Array(sc.count), sm = new Float32Array(sc.count);
-    for (let p = 0; p < N; p++) { const r = sc.rid[p]; if (r >= 0) { sa[r]++; if (sMax[p] > sm[r]) sm[r] = sMax[p]; } }
-    for (let p = 0; p < N; p++) { const r = sc.rid[p]; if (r >= 0 && sa[r] <= sparkArea && sm[r] > 0.15) smallS[p] = 1; }
+    const sc = components(new Int32Array(N), on, W, H), sa = new Int32Array(sc.count), smx = new Float32Array(sc.count);
+    for (let p = 0; p < N; p++) { const r = sc.rid[p]; if (r >= 0) { sa[r]++; if (sMax[p] > smx[r]) smx[r] = sMax[p]; } }
+    for (let p = 0; p < N; p++) { const r = sc.rid[p]; if (r >= 0 && sa[r] <= sparkArea && smx[r] > 0.15) smallS[p] = 1; }
   }
   const sparkB = new Uint8ClampedArray(N * 4), fxB = new Uint8ClampedArray(N * 4), bgB = bgMask ? new Uint8ClampedArray(N * 4) : null;
-  let err = 0, errN = 0;
-  const x = [0, 0, 0], sa3 = [0, 0, 0], se3 = [0, 0, 0], scr = [hiB, sparkB, fxB];
+  const sa3 = [0, 0, 0], se3 = [0, 0, 0];
   for (let p = 0; p < N; p++) {
     const a0 = A[p]; if (a0 <= 0.02) continue;
     const i = p * 4;
-    if (isBg(p)) {
-      for (let c = 0; c < 3; c++) { bgB[i + c] = Math.round(U[c][p] * 255); x[c] = bgB[i + c] / 255; }
-      bgB[i + 3] = 255;
-    } else {
-      const t = tone[p], g = toneGroup[t], sm = sMax[p];
-      let w = 0;
-      if (sm > 1e-4) {
-        w = sparkPix[p] || smallS[p] ? 1 : clamp01((sm - open[p]) / sm) * smoothstep(0.45, 0.8, Math.max(U[0][p], U[1][p], U[2][p]));
-        for (let c = 0; c < 3; c++) {
-          const s = S[c][p], a = s * w;
-          sa3[c] = a; se3[c] = a < 0.9999 ? clamp01(1 - (1 - s) / (1 - a)) : 0;
-        }
-        putMinAlpha(sparkB, i, sa3[0], sa3[1], sa3[2], a0);
-        putMinAlpha(fxB, i, se3[0], se3[1], se3[2], a0);
-      }
-      // 저장된 8비트 값으로 다시 합성해서 검증
-      for (let c = 0; c < 3; c++) {
-        let v = Fg[g * 3 + c];
-        if (shadowB[i + 3]) { const sa = shadowB[i + 3] / 255; v *= 1 - sa + sa * shadowB[i + c] / 255; }
-        if (shadeB[i + 3]) { const sa = shadeB[i + 3] / 255; v *= 1 - sa + sa * shadeB[i + c] / 255; }
-        for (let k = 0; k < 3; k++) { const L = scr[k]; if (L[i + 3]) v = 1 - (1 - v) * (1 - L[i + 3] / 255 * L[i + c] / 255); }
-        x[c] = v;
-      }
+    if (isBg(p)) { for (let c = 0; c < 3; c++) bgB[i + c] = Math.round(U[c][p] * 255); bgB[i + 3] = 255; continue; }
+    const sm = sMax[p]; if (sm <= 1e-4) continue;
+    const w = sparkPix[p] || smallS[p] ? 1 : clamp01((sm - open[p]) / sm) * smoothstep(0.45, 0.8, Math.max(U[0][p], U[1][p], U[2][p]));
+    for (let c = 0; c < 3; c++) {
+      const s = S[c][p], a = s * w;
+      sa3[c] = a; se3[c] = a < 0.9999 ? clamp01(1 - (1 - s) / (1 - a)) : 0;
     }
-    if (lineB[i + 3]) { const la = lineB[i + 3] / 255; for (let c = 0; c < 3; c++) x[c] = x[c] * (1 - la) + la * lineB[i + c] / 255; }
-    if (a0 > 0.98) { for (let c = 0; c < 3; c++) { const d = (x[c] - O[c][p]) * 255; err += d * d; } errN += 3; }
+    putMinAlpha(sparkB, i, sa3[0], sa3[1], sa3[2], a0);
+    putMinAlpha(fxB, i, se3[0], se3[1], se3[2], a0);
+  }
+  // 거의 비어 있는 보조 레이어는 만들지 않는다(실제 작업 파일처럼)
+  const meaningful = buf => { let n = 0; for (let i = 3; i < buf.length; i += 4) if (buf[i] > 8 && ++n >= 24) return true; return false; };
+  for (const b of [shadeB, sparkB, fxB]) if (!meaningful(b)) b.fill(0);
+
+  /* 선화 / 색트레스 */
+  const lineB = new Uint8ClampedArray(N * 4), traceB = traceMask ? new Uint8ClampedArray(N * 4) : null;
+  const black = opts.lineColor === 'black', K0 = lineK0 ? lineK0.map(v => Math.round(v * 255)) : null;
+  for (let p = 0; p < N; p++) {
+    const a = lineA[p]; if (a <= 0) continue;
+    const i = p * 4;
+    if (K0) { lineB[i] = K0[0]; lineB[i + 1] = K0[1]; lineB[i + 2] = K0[2]; }
+    else if (!black) for (let c = 0; c < 3; c++) lineB[i + c] = Math.round(lineC[c][p] * 255);
+    lineB[i + 3] = Math.round(a * A[p] * 255);
+    if (traceB && traceMask[p]) { for (let c = 0; c < 3; c++) traceB[i + c] = Math.round(lineC[c][p] * 255); traceB[i + 3] = 255; }
+  }
+
+  /* 저장될 8비트 값으로 다시 합성해 원본과 비교 */
+  progress(0.82, '재현 검증');
+  let err = 0, errN = 0;
+  const x = [0, 0, 0], scr = [sparkB, fxB];
+  for (let p = 0; p < N; p++) {
+    const a0 = A[p]; if (a0 <= 0.98) continue;
+    const i = p * 4;
+    for (let c = 0; c < 3; c++) {
+      let v;
+      if (bgB && isBg(p)) v = bgB[i + c] / 255;
+      else {
+        v = baseB[i + c] / 255;
+        if (sh1B[i + 3]) v *= sh1B[i + c] / 255;
+        if (sh2B[i + 3]) v *= sh2B[i + c] / 255;
+        if (hlB[i + 3]) v = hlB[i + c] / 255;
+        if (shadeB[i + 3]) { const sa = shadeB[i + 3] / 255; v *= 1 - sa + sa * shadeB[i + c] / 255; }
+        for (let k = 0; k < 2; k++) { const L = scr[k]; if (L[i + 3]) v = 1 - (1 - v) * (1 - L[i + 3] / 255 * L[i + c] / 255); }
+      }
+      if (lineB[i + 3]) {
+        const la = lineB[i + 3] / 255, lc = traceB && traceB[i + 3] ? traceB[i + c] : lineB[i + c];
+        v = v * (1 - la) + la * lc / 255;
+      }
+      const d = (v - O[c][p]) * 255; err += d * d;
+    }
+    errN += 3;
   }
   const mse = errN ? err / errN : 0;
   const psnr = mse > 1e-9 ? 10 * Math.log10(255 * 255 / mse) : 99;
 
-  /* 채색(밑색) 레이어 */
-  progress(0.84, '채색 레이어');
-  const flatLayers = [];
-  const palBox = pal.map(() => [W, H, -1, -1]);
+  /* 레이어 트리 조립 */
+  progress(0.86, '레이어 정리');
+  const clip = opts.clip !== false;
+  const boxes = pal.map(() => [W, H, -1, -1]);
   for (let p = 0; p < N; p++) {
-    if (A[p] <= 0.02 || isBg(p)) continue;
-    const b = palBox[palOf[toneGroup[tone[p]]]], x0 = p % W, y0 = (p / W) | 0;
+    const k = part[p]; if (k < 0) continue;
+    const b = boxes[k], x0 = p % W, y0 = (p / W) | 0;
     if (x0 < b[0]) b[0] = x0; if (x0 > b[2]) b[2] = x0; if (y0 < b[1]) b[1] = y0; if (y0 > b[3]) b[3] = y0;
   }
-  const palIdx = pal.map((_, i) => i).filter(i => palBox[i][2] >= 0).sort((a, b) => pal[a].area - pal[b].area);
-  if (opts.splitColors) {
-    const bufs = pal.map((_, i) => palBox[i][2] >= 0 ? new Uint8ClampedArray((palBox[i][2] - palBox[i][0] + 1) * (palBox[i][3] - palBox[i][1] + 1) * 4) : null);
-    for (let p = 0; p < N; p++) {
-      if (A[p] <= 0.02 || isBg(p)) continue;
-      const k = palOf[toneGroup[tone[p]]], b = palBox[k], bw = b[2] - b[0] + 1, j = (((p / W) | 0) - b[1]) * bw + (p % W) - b[0], rgb = pal[k].rgb;
-      bufs[k][j * 4] = rgb[0]; bufs[k][j * 4 + 1] = rgb[1]; bufs[k][j * 4 + 2] = rgb[2]; bufs[k][j * 4 + 3] = Math.round(A[p] * 255);
+  // 파츠 k에 속한 픽셀만 잘라낸 레이어 (비어 있으면 null)
+  const partLayer = (name, kind, blend, full, k, extra) => {
+    const [x0, y0, x1, y1] = boxes[k], w = x1 - x0 + 1, h = y1 - y0 + 1, data = new Uint8ClampedArray(w * h * 4);
+    let any = false;
+    for (let y = y0; y <= y1; y++) for (let xx = x0; xx <= x1; xx++) {
+      const p = y * W + xx, si = p * 4;
+      if (part[p] !== k || !full[si + 3]) continue;
+      const di = ((y - y0) * w + xx - x0) * 4;
+      data[di] = full[si]; data[di + 1] = full[si + 1]; data[di + 2] = full[si + 2]; data[di + 3] = full[si + 3]; any = true;
     }
-    // 넓은 색이 아래로 가도록(겹치지 않으므로 순서는 보기 편의용)
-    palIdx.slice().reverse().forEach((k, n) => {
-      const b = palBox[k];
-      flatLayers.push({
-        name: `채색 ${String(n + 1).padStart(2, '0')} ${hex(pal[k].rgb)}`, kind: 'flat', blend: 'norm', opacity: 255, visible: true, clipping: false,
-        x: b[0], y: b[1], w: b[2] - b[0] + 1, h: b[3] - b[1] + 1, data: bufs[k], color: hex(pal[k].rgb)
-      });
-    });
+    if (!any) return null;
+    const c = cropLayer(data, w, h); c.x += x0; c.y += y0;
+    return Object.assign({ name, kind, blend, opacity: 255, visible: true, clipping: false }, c, extra || {});
+  };
+  const fullLayer = (name, kind, blend, full, extra) => {
+    const L = layer(name, kind, blend, full, W, H, extra);
+    return L.w ? L : null;
+  };
+  const group = (name, children, extra) => Object.assign({ name, kind: 'group', group: true, blend: 'pass', opacity: 255, visible: true, open: true, children }, extra || {});
+
+  const colorKids = [];
+  const parts = pal.map((_, k) => k).filter(k => boxes[k][2] >= 0).sort((a, b) => pal[b].area - pal[a].area);
+  if (opts.splitColors) {
+    const used = {};
+    for (const k of parts) {                         // 넓은 파츠가 아래(파츠끼리는 겹치지 않음)
+      let nm = colorName(pal[k].rgb);
+      used[nm] = (used[nm] || 0) + 1;
+      if (used[nm] > 1) nm += ' ' + used[nm];
+      const kids = [partLayer(`밑색 ${hex(pal[k].rgb)}`, 'flat', 'norm', baseB, k),
+        partLayer('1차 그림자', 'shadow', 'mul ', sh1B, k, { clipping: clip }),
+        partLayer('2차 그림자', 'shadow2', 'mul ', sh2B, k, { clipping: clip }),
+        partLayer('하이라이트', 'highlight', 'norm', hlB, k, { clipping: clip })].filter(Boolean);
+      colorKids.push(group(nm, kids, { kind: 'part', open: false, color: hex(pal[k].rgb) }));
+    }
   } else {
-    const flatB = new Uint8ClampedArray(N * 4);
-    for (let p = 0; p < N; p++) {
-      if (A[p] <= 0.02 || isBg(p)) continue;
-      const rgb = pal[palOf[toneGroup[tone[p]]]].rgb, i = p * 4;
-      flatB[i] = rgb[0]; flatB[i + 1] = rgb[1]; flatB[i + 2] = rgb[2]; flatB[i + 3] = Math.round(A[p] * 255);
-    }
-    flatLayers.push(layer('채색', 'flat', 'norm', flatB, W, H));
+    colorKids.push(...[fullLayer('밑색', 'flat', 'norm', baseB),
+      fullLayer('1차 그림자', 'shadow', 'mul ', sh1B, { clipping: clip }),
+      fullLayer('2차 그림자', 'shadow2', 'mul ', sh2B, { clipping: clip }),
+      fullLayer('하이라이트', 'highlight', 'norm', hlB, { clipping: clip })].filter(Boolean));
   }
+  const shadeL = fullLayer('명암', 'shade', 'mul ', shadeB);
+  if (shadeL) colorKids.push(shadeL);
 
-  /* 러프: 완성본에서 역으로 만든 추정 스케치 */
-  let roughL = null;
-  if (opts.rough) {
-    progress(0.9, '러프 스케치 생성');
-    roughL = makeRough(ctx);
-  }
-
-  progress(0.96, '레이어 정리');
-  const clip = !!opts.clip, out = [];
+  const out = [];
   if (bgB) out.push(layer('배경', 'bg', 'norm', bgB, W, H));
-  if (opts.splitColors) {
-    // PSD 레이어 순서는 아래→위. 그룹 안의 children도 아래→위
-    out.push({ name: '채색', kind: 'group', group: true, blend: 'pass', opacity: 255, visible: true, open: true, children: flatLayers.slice().reverse() });
-  } else out.push(flatLayers[0]);
-  out.push(layer('그림자', 'shadow', 'mul ', shadowB, W, H, { clipping: clip }));
-  out.push(layer('명암', 'shade', 'mul ', shadeB, W, H, { clipping: clip }));
-  out.push(layer('하이라이트', 'highlight', 'scrn', hiB, W, H, { clipping: clip }));
-  out.push(layer('반짝임', 'sparkle', 'scrn', sparkB, W, H, { clipping: clip }));
-  out.push(layer('효과', 'effect', 'scrn', fxB, W, H, { clipping: clip }));
+  out.push(group('채색', colorKids));
+  const fxKids = [fullLayer('빛', 'effect', 'scrn', fxB), fullLayer('반짝임', 'sparkle', 'scrn', sparkB)].filter(Boolean);
+  if (fxKids.length) out.push(group('효과', fxKids));
   out.push(layer('선화', 'line', 'norm', lineB, W, H));
-  if (roughL) out.push(roughL);
+  if (traceB) { const tl = fullLayer('색트레스', 'trace', 'norm', traceB, { clipping: true }); if (tl) out.push(tl); }
+  if (opts.rough) { progress(0.9, '러프 스케치 생성'); out.push(makeRough(ctx)); }
   progress(1, '완료');
   return {
     width: W, height: H, layers: out,
     stats: {
-      ms: Date.now() - t0, psnr, regions: ctx.counts.regions, tones: ctx.counts.tones, materials: nG, colors: pal.length, hasAlpha: ctx.hasAlpha,
+      ms: Date.now() - t0, psnr, regions: ctx.counts.regions, tones: ctx.counts.tones, parts: parts.length, hasAlpha: ctx.hasAlpha,
       background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR
     }
   };
@@ -1446,6 +1574,8 @@ const PSD = (() => {
 /* ============================================================
  * UI
  * ============================================================ */
+// 오프라인 저장용: 아무것도 바뀌기 전의 이 페이지 전체(스크립트·스타일 포함)
+const PAGE_SOURCE = '<!doctype html>\n' + document.documentElement.outerHTML;
 const $ = id => document.getElementById(id);
 const BLENDS = [
   ['norm', '표준', 'source-over'], ['mul ', '곱하기', 'multiply'], ['scrn', '스크린', 'screen'],
@@ -1497,6 +1627,10 @@ document.addEventListener('paste', e => {
 });
 $('sampleBtn').addEventListener('click', () => setSource(drawSample(), 'sample'));
 $('runBtn').addEventListener('click', run);
+$('saveAppBtn').addEventListener('click', () => {
+  download(new Blob([PAGE_SOURCE], { type: 'text/html' }), 'illustracy.html');
+  toast('저장한 illustracy.html을 더블클릭하면 오프라인에서도 실행됩니다.', 4000);
+});
 
 function loadFile(file) {
   const url = URL.createObjectURL(file), im = new Image();
@@ -1583,7 +1717,7 @@ async function run() {
     const res = await runCore(state.src.data, readOpts(), setProgress);
     installResult(res);
     const s = res.stats;
-    $('stat').textContent = `${res.width}×${res.height} · ${(s.ms / 1000).toFixed(1)}초 · 밑색 ${s.colors}색 · 재현 PSNR ${s.psnr >= 99 ? '∞' : s.psnr.toFixed(1)} dB`;
+    $('stat').textContent = `${res.width}×${res.height} · ${(s.ms / 1000).toFixed(1)}초 · 파츠 ${s.parts}개 · 재현 PSNR ${s.psnr >= 99 ? '∞' : s.psnr.toFixed(1)} dB`;
     toast(`분리 완료 — 레이어 ${countLayers(res.layers)}개`);
   } catch (e) {
     console.error(e);
@@ -1614,26 +1748,49 @@ function installResult(res) {
 }
 
 /* ---------- 합성 ---------- */
+// Photoshop처럼 합성: 클리핑된 레이어는 바로 아래 기본 레이어와 한 묶음으로 합성한 뒤, 기본 레이어의 알파 안에서만 보이게
 function compositeInto(ctx, layers) {
-  let baseVisible = true;
-  for (const L of layers) {
-    if (!L.clipping) baseVisible = L.visible;
-    if (!L.visible || (L.clipping && !baseVisible)) continue;
+  const draw = (c, L, dx, dy) => {
+    c.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over'; c.globalAlpha = L.opacity / 255;
+    c.drawImage(L._canvas, L.x - dx, L.y - dy);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+  };
+  for (let i = 0; i < layers.length; i++) {
+    const L = layers[i];
+    const clipped = [];
+    while (i + 1 < layers.length && layers[i + 1].clipping) clipped.push(layers[++i]);
+    if (!L.visible) continue;                          // 기본 레이어가 숨겨지면 클리핑된 레이어도 숨김
     if (L.group) {
       if (L.opacity < 255 || (L.blend !== 'pass' && L.blend !== 'norm')) {
         const off = document.createElement('canvas'); off.width = ctx.canvas.width; off.height = ctx.canvas.height;
         compositeInto(off.getContext('2d'), L.children);
         ctx.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over'; ctx.globalAlpha = L.opacity / 255;
         ctx.drawImage(off, 0, 0);
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
       } else compositeInto(ctx, L.children);
+      for (const C of clipped) if (C.visible && C._canvas) draw(ctx, C, 0, 0);
       continue;
     }
     if (!L._canvas) continue;
-    ctx.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over';
-    ctx.globalAlpha = L.opacity / 255;
-    ctx.drawImage(L._canvas, L.x, L.y);
+    const vis = clipped.filter(C => C.visible && C._canvas);
+    if (!vis.length) { draw(ctx, L, 0, 0); continue; }
+    // 클리핑 그룹: 불투명하게 만든 기본 레이어 색 위에 클리핑 레이어를 혼합한 뒤, 기본 레이어 알파로 한 번만 자른다
+    if (!L._opaque) {
+      const o = document.createElement('canvas'); o.width = L.w; o.height = L.h;
+      const d = new ImageData(new Uint8ClampedArray(L.data), L.w, L.h);
+      for (let k = 3; k < d.data.length; k += 4) d.data[k] = 255;
+      o.getContext('2d').putImageData(d, 0, 0);
+      L._opaque = o;
+    }
+    const g = document.createElement('canvas'); g.width = L.w; g.height = L.h;
+    const gx = g.getContext('2d');
+    gx.drawImage(L._opaque, 0, 0);
+    for (const C of vis) draw(gx, C, L.x, L.y);
+    gx.globalCompositeOperation = 'destination-in'; gx.drawImage(L._canvas, 0, 0);
+    ctx.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over'; ctx.globalAlpha = L.opacity / 255;
+    ctx.drawImage(g, L.x, L.y);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
   }
-  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
 }
 function compositeCanvas(opaque) {
   const r = state.result, c = document.createElement('canvas'); c.width = r.width; c.height = r.height;
@@ -1726,24 +1883,26 @@ function thumbFor(L) {
 }
 function renderLayerList() {
   const box = $('layers'); box.innerHTML = '';
-  const addRows = (layers, child) => {
+  const addRows = (layers, depth) => {
     for (let i = layers.length - 1; i >= 0; i--) {
       const L = layers[i];
-      box.appendChild(layerRow(L, child));
-      if (L.group && L.open) addRows(L.children, true);
+      box.appendChild(layerRow(L, depth));
+      if (L.group && L.open) addRows(L.children, depth + 1);
     }
   };
-  addRows(state.result.layers, false);
+  addRows(state.result.layers, 0);
 }
-function layerRow(L, child) {
+function layerRow(L, depth) {
   const row = document.createElement('div');
-  row.className = 'layer' + (child ? ' child' : '') + (L.group ? ' group' : '') + (state.selected === L ? ' sel' : '');
+  row.className = 'layer' + (L.group ? ' group' : '') + (state.selected === L ? ' sel' : '');
+  row.style.paddingLeft = (10 + depth * 16) + 'px';
   const eye = document.createElement('button');
   eye.className = 'eye' + (L.visible ? ' on' : ''); eye.title = '표시/숨김';
   eye.addEventListener('click', e => { e.stopPropagation(); L.visible = !L.visible; eye.classList.toggle('on', L.visible); render(); });
   const th = document.createElement('div'); th.className = 'thumb' + (L.group ? ' folder' : '');
   if (L.group) {
     th.textContent = L.open ? '▾' : '▸'; th.title = '펼치기/접기';
+    if (L.color) { th.style.boxShadow = `inset 0 -8px 0 ${L.color}`; }
     th.addEventListener('click', e => { e.stopPropagation(); L.open = !L.open; renderLayerList(); });
   } else th.appendChild(thumbFor(L));
   const meta = document.createElement('div'); meta.className = 'meta';
