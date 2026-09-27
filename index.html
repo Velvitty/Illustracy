@@ -1,0 +1,1887 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Illustracy 레이어 분리기</title>
+<style>
+:root {
+  --bg: #16171b;
+  --panel: #1f2126;
+  --panel-2: #272a31;
+  --line: #34373f;
+  --text: #e7e8ec;
+  --muted: #9a9ea8;
+  --accent: #6c8cff;
+  --accent-2: #4b6ae0;
+  --ok: #4cc38a;
+  --warn: #e0a84b;
+  --danger: #e06363;
+  --sel: #2e3650;
+  --radius: 8px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, select, input { font: inherit; color: inherit; }
+button {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 10px; cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: #4a4e59; background: #2e3139; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent-2); border-color: var(--accent-2); color: #fff; font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=checkbox] { accent-color: var(--accent); }
+input[type=color] { width: 36px; height: 24px; border: 1px solid var(--line); border-radius: 4px; background: none; padding: 0; }
+
+header {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  border-bottom: 1px solid var(--line); background: var(--panel); flex: none;
+}
+header h1 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: .2px; }
+header h1 span { color: var(--muted); font-weight: 500; margin-left: 6px; font-size: 12px; }
+header .spacer { flex: 1; }
+header .stat { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+main { flex: 1; display: grid; grid-template-columns: 270px 1fr 310px; min-height: 0; }
+aside { background: var(--panel); overflow-y: auto; min-height: 0; }
+aside.left { border-right: 1px solid var(--line); }
+aside.right { border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+.section { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.section h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 10px; font-weight: 700; }
+.field { margin-bottom: 11px; }
+.field:last-child { margin-bottom: 0; }
+.field label.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 3px; }
+.field .val { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.field .hint { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+.drop {
+  border: 1.5px dashed #4a4e59; border-radius: var(--radius); padding: 16px 10px; text-align: center;
+  color: var(--muted); cursor: pointer; transition: border-color .15s, background .15s;
+}
+.drop:hover, .drop.over { border-color: var(--accent); background: #232839; color: var(--text); }
+.drop strong { color: var(--text); display: block; margin-bottom: 2px; }
+.btn-row { display: flex; gap: 6px; margin-top: 8px; }
+.btn-row > * { flex: 1; }
+
+.viewer { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.toolbar {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line);
+  background: var(--panel); flex-wrap: wrap;
+}
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; padding: 4px 10px; }
+.seg button.on { background: var(--sel); color: #fff; }
+.toolbar .spacer { flex: 1; }
+.toolbar .zoom { color: var(--muted); min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.stage { flex: 1; position: relative; overflow: hidden; cursor: grab; background: #101114; touch-action: none; }
+.stage.dragging { cursor: grabbing; }
+.canvas-wrap {
+  position: absolute; left: 0; top: 0; transform-origin: 0 0;
+  background-color: #fff;
+  background-image: linear-gradient(45deg, #d9d9d9 25%, transparent 25%), linear-gradient(-45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d9d9d9 75%), linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
+  background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  box-shadow: 0 2px 20px rgba(0,0,0,.5);
+}
+.canvas-wrap canvas { display: block; }
+.empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+  color: var(--muted); gap: 10px; text-align: center; padding: 20px; pointer-events: none;
+}
+.empty .big { font-size: 18px; color: var(--text); font-weight: 600; }
+.empty button { pointer-events: auto; }
+
+.progress {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, 80%);
+  background: rgba(31,33,38,.96); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: none;
+  box-shadow: 0 10px 40px rgba(0,0,0,.5);
+}
+.progress.on { display: block; }
+.progress .label { margin-bottom: 8px; }
+.bar { height: 6px; border-radius: 3px; background: #33363e; overflow: hidden; }
+.bar > div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+
+.layers { flex: 1; overflow-y: auto; min-height: 0; }
+.layer {
+  display: grid; grid-template-columns: 22px 46px 1fr; gap: 8px; align-items: center;
+  padding: 6px 10px; border-bottom: 1px solid #2a2d33; cursor: pointer;
+}
+.layer:hover { background: #24272d; }
+.layer.sel { background: var(--sel); }
+.layer.child { padding-left: 26px; }
+.layer.group { background: #22252b; }
+.layer .eye { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; background: transparent; padding: 0; }
+.layer .eye.on::after { content: "●"; color: var(--text); }
+.layer .thumb {
+  width: 46px; height: 46px; border-radius: 4px; border: 1px solid var(--line); overflow: hidden;
+  background-color: #fff;
+  background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.layer .thumb canvas { max-width: 100%; max-height: 100%; display: block; }
+.layer .thumb.folder { background: #2c3038; font-size: 20px; color: var(--muted); }
+.layer .meta { min-width: 0; }
+.layer .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; outline: none; border-radius: 3px; }
+.layer .name[contenteditable=true] { background: #111; padding: 0 3px; }
+.layer .sub { color: var(--muted); font-size: 11px; display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.layer .sub .clip { color: var(--warn); }
+.layer .ctrl { display: none; grid-column: 1 / -1; gap: 6px; align-items: center; padding-top: 4px; }
+.layer.sel .ctrl { display: flex; }
+.layer .ctrl select { flex: 1; min-width: 0; }
+.layer .ctrl input[type=range] { width: 90px; flex: none; }
+.layer .ctrl .op { width: 34px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.layer .ctrl button { padding: 3px 7px; font-size: 12px; }
+.layers-foot { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; flex: none; }
+.layers-foot .info { color: var(--muted); font-size: 11px; }
+.note { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.note b { color: var(--text); font-weight: 600; }
+.toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #2b2f38; border: 1px solid var(--line);
+  padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10;
+}
+.toast.on { opacity: 1; }
+
+@media (max-width: 900px) {
+  body { overflow: auto; height: auto; }
+  main { grid-template-columns: 1fr; }
+  aside.left, aside.right { border: 0; border-bottom: 1px solid var(--line); }
+  .viewer { height: 70vh; }
+  .layers { max-height: none; }
+  header .stat { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Illustracy<span>일러스트 → 레이어 분리 PSD</span></h1>
+  <div class="spacer"></div>
+  <div class="stat" id="stat"></div>
+</header>
+<main>
+  <aside class="left">
+    <div class="section">
+      <h2>입력</h2>
+      <div class="drop" id="drop">
+        <strong>이미지를 끌어다 놓거나 클릭</strong>
+        PNG · JPG · WebP (Ctrl+V 붙여넣기 가능)
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="btn-row">
+        <button id="sampleBtn">예제 그림</button>
+        <button id="runBtn" class="primary" disabled>레이어 분리</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>처리</h2>
+      <div class="field">
+        <label class="row">처리 해상도 (긴 변)</label>
+        <select id="o_maxSize" style="width:100%">
+          <option value="1024">1024 px</option>
+          <option value="1536">1536 px</option>
+          <option value="2048" selected>2048 px</option>
+          <option value="3072">3072 px</option>
+          <option value="4096">4096 px</option>
+          <option value="0">원본 크기</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>선화</h2>
+      <div class="field">
+        <label class="row">선 감도 <span class="val" id="v_lineSens"></span></label>
+        <input type="range" id="o_lineSens" min="0" max="100" value="50">
+      </div>
+      <div class="field">
+        <label class="row">최대 선 굵기 <span class="val" id="v_lineWidth"></span></label>
+        <input type="range" id="o_lineWidth" min="0" max="16" value="0">
+        <div class="hint">0 = 해상도에 맞춰 자동</div>
+      </div>
+      <div class="field">
+        <label class="row">선 색상</label>
+        <select id="o_lineColor" style="width:100%">
+          <option value="original" selected>원본 색 유지 (정확 재현)</option>
+          <option value="black">검정 단색</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>채색 · 명암</h2>
+      <div class="field">
+        <label class="row">색상 군집 수 <span class="val" id="v_colors"></span></label>
+        <input type="range" id="o_colors" min="6" max="40" value="18">
+      </div>
+      <div class="field">
+        <label class="row">밑색 병합 강도 <span class="val" id="v_merge"></span></label>
+        <input type="range" id="o_merge" min="0" max="100" value="50">
+        <div class="hint">높을수록 음영 톤을 같은 밑색으로 묶음</div>
+      </div>
+      <div class="field">
+        <label class="row">그림자 판정 기준 <span class="val" id="v_shadow"></span></label>
+        <input type="range" id="o_shadow" min="0" max="100" value="50">
+        <div class="hint">높을수록 옅은 음영도 그림자 레이어로</div>
+      </div>
+      <div class="field">
+        <label class="row">반짝임 최대 크기 <span class="val" id="v_sparkle"></span></label>
+        <input type="range" id="o_sparkle" min="0" max="30" value="0">
+        <div class="hint">0 = 자동</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>레이어 구성</h2>
+      <div class="field"><label class="check"><input type="checkbox" id="o_splitColors" checked> 채색을 색상별 레이어로 분리</label></div>
+      <div class="field"><label class="check"><input type="checkbox" id="o_clip" checked> 명암·효과 레이어를 채색에 클리핑</label></div>
+      <div class="field"><label class="check"><input type="checkbox" id="o_bg" checked> 단색 배경 자동 분리</label></div>
+      <div class="field"><label class="check"><input type="checkbox" id="o_rough" checked> 러프 스케치 생성</label></div>
+      <div class="field">
+        <label class="row">러프 색상 <input type="color" id="o_roughColor" value="#2f6fe0"></label>
+      </div>
+    </div>
+
+    <div class="section note">
+      <b>동작 방식</b> — 모든 처리는 브라우저 안에서만 이루어지며 이미지는 어디에도 업로드되지 않습니다.
+      레이어는 원본을 정확히 재현하도록 계산됩니다(채색 × 그림자 × 명암 → 스크린 하이라이트·반짝임·효과 → 선화).
+      러프는 완성본에서 역으로 생성한 <b>추정 스케치</b>이며 기본적으로 숨김 상태입니다.
+    </div>
+  </aside>
+
+  <section class="viewer">
+    <div class="toolbar">
+      <div class="seg" id="viewSeg">
+        <button data-view="comp" class="on">합성</button>
+        <button data-view="orig">원본</button>
+        <button data-view="solo">선택 레이어</button>
+        <button data-view="diff">차이 ×8</button>
+      </div>
+      <div class="spacer"></div>
+      <button id="fitBtn" title="화면에 맞춤">맞춤</button>
+      <button id="oneBtn" title="100%">1:1</button>
+      <span class="zoom" id="zoomLbl"></span>
+    </div>
+    <div class="stage" id="stage">
+      <div class="canvas-wrap" id="wrap" hidden><canvas id="view"></canvas></div>
+      <div class="empty" id="empty">
+        <div class="big">일러스트를 넣어 주세요</div>
+        <div>선화 · 채색 · 그림자 · 명암 · 하이라이트 · 반짝임 · 효과 · 러프로 분리해 PSD로 저장합니다.</div>
+      </div>
+      <div class="progress" id="progress">
+        <div class="label" id="progLabel">준비 중…</div>
+        <div class="bar"><div id="progBar"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="section" style="padding-bottom:8px"><h2 style="margin:0">레이어</h2></div>
+    <div class="layers" id="layers"></div>
+    <div class="layers-foot">
+      <div class="info" id="layerInfo">레이어를 클릭하면 혼합 모드·불투명도를 바꿀 수 있습니다. 이름은 더블클릭으로 수정.</div>
+      <button id="psdBtn" class="primary" disabled>PSD 다운로드</button>
+      <button id="pngBtn" disabled>합성 결과 PNG 저장</button>
+    </div>
+  </aside>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+ * Illustracy core — 이미지 분해 알고리즘.
+ * 이 함수는 Web Worker 안에서(toString()으로 직렬화) 또는
+ * 워커를 쓸 수 없는 환경에서는 메인 스레드에서 그대로 실행된다.
+ * ============================================================ */
+function IllustracyCore() {
+'use strict';
+/* ---------------- 공용 유틸 ---------------- */
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const smoothstep = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+const lumOf = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// 1차원 슬라이딩 최대/최소 (단조 덱, O(n))
+function slide1D(inp, out, n, r, isMax, dq) {
+  let head = 0, tail = 0, j = 0;
+  for (let i = 0; i < n; i++) {
+    const hi = i + r < n ? i + r : n - 1;
+    while (j <= hi) {
+      const v = inp[j];
+      if (isMax) { while (tail > head && inp[dq[tail - 1]] <= v) tail--; }
+      else { while (tail > head && inp[dq[tail - 1]] >= v) tail--; }
+      dq[tail++] = j++;
+    }
+    while (dq[head] < i - r) head++;
+    out[i] = inp[dq[head]];
+  }
+}
+
+// 정사각형 구조 요소 팽창(max) / 침식(min)
+function morph(src, W, H, r, isMax) {
+  const N = W * H, tmp = new Float32Array(N), out = new Float32Array(N);
+  if (r <= 0) { out.set(src); return out; }
+  const n = Math.max(W, H), line = new Float32Array(n), res = new Float32Array(n), dq = new Int32Array(n);
+  for (let y = 0; y < H; y++) {
+    const o = y * W;
+    for (let x = 0; x < W; x++) line[x] = src[o + x];
+    slide1D(line, res, W, r, isMax, dq);
+    for (let x = 0; x < W; x++) tmp[o + x] = res[x];
+  }
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) line[y] = tmp[y * W + x];
+    slide1D(line, res, H, r, isMax, dq);
+    for (let y = 0; y < H; y++) out[y * W + x] = res[y];
+  }
+  return out;
+}
+const dilate = (s, W, H, r) => morph(s, W, H, r, true);
+const erode = (s, W, H, r) => morph(s, W, H, r, false);
+
+function box1D(inp, out, n, r) {
+  const w = 2 * r + 1, last = n - 1;
+  let s = 0;
+  for (let k = -r; k <= r; k++) s += inp[k < 0 ? 0 : k > last ? last : k];
+  for (let i = 0; i < n; i++) {
+    out[i] = s / w;
+    const a = i + r + 1, b = i - r;
+    s += inp[a > last ? last : a] - inp[b < 0 ? 0 : b];
+  }
+}
+
+// 가우시안 근사 (박스 블러 3회)
+function blur(src, W, H, sigma) {
+  const N = W * H, out = new Float32Array(src);
+  if (sigma < 0.3) return out;
+  const r = Math.max(1, Math.round((Math.sqrt(4 * sigma * sigma + 1) - 1) / 2));
+  const n = Math.max(W, H), a = new Float32Array(n), b = new Float32Array(n);
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < H; y++) {
+      const o = y * W;
+      for (let x = 0; x < W; x++) a[x] = out[o + x];
+      box1D(a, b, W, r);
+      for (let x = 0; x < W; x++) out[o + x] = b[x];
+    }
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < H; y++) a[y] = out[y * W + x];
+      box1D(a, b, H, r);
+      for (let y = 0; y < H; y++) out[y * W + x] = b[y];
+    }
+  }
+  return out;
+}
+
+/* sRGB → CIELAB */
+const LIN = new Float32Array(256);
+for (let i = 0; i < 256; i++) { const c = i / 255; LIN[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+const labF = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+function labOf(r, g, b) {
+  const R = LIN[Math.round(clamp01(r) * 255)], G = LIN[Math.round(clamp01(g) * 255)], B = LIN[Math.round(clamp01(b) * 255)];
+  const fx = labF((0.4124564 * R + 0.3575761 * G + 0.1804375 * B) / 0.95047);
+  const fy = labF(0.2126729 * R + 0.7151522 * G + 0.0721750 * B);
+  const fz = labF((0.0193339 * R + 0.1191920 * G + 0.9503041 * B) / 1.08883);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function toLab(Rp, Gp, Bp, N) {
+  const L = new Float32Array(N), A = new Float32Array(N), Bb = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const v = labOf(Rp[i], Gp[i], Bp[i]);
+    L[i] = v[0]; A[i] = v[1]; Bb[i] = v[2];
+  }
+  return [L, A, Bb];
+}
+
+const NB8X = [-1, 0, 1, -1, 1, -1, 0, 1], NB8Y = [-1, -1, -1, 0, 0, 1, 1, 1];
+
+/* 모르는 픽셀(known=0)을 바깥쪽부터 한 겹씩 이웃 평균으로 채움 */
+function inpaint(planes, known, W, H) {
+  const N = W * H, dist = new Int32Array(N).fill(-1);
+  let front = new Int32Array(N), next = new Int32Array(N), nf = 0;
+  for (let p = 0; p < N; p++) if (known[p]) dist[p] = 0;
+  for (let p = 0; p < N; p++) {
+    if (dist[p] !== -1) continue;
+    const x = p % W, y = (p / W) | 0;
+    for (let k = 0; k < 8; k++) {
+      const xx = x + NB8X[k], yy = y + NB8Y[k];
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      if (dist[yy * W + xx] === 0) { dist[p] = 1; front[nf++] = p; break; }
+    }
+  }
+  const np = planes.length, acc = new Float64Array(np);
+  let level = 1;
+  while (nf > 0) {
+    for (let i = 0; i < nf; i++) {
+      const p = front[i], x = p % W, y = (p / W) | 0;
+      acc.fill(0); let c = 0;
+      for (let k = 0; k < 8; k++) {
+        const xx = x + NB8X[k], yy = y + NB8Y[k];
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const q = yy * W + xx, d = dist[q];
+        if (d >= 0 && d < level) { for (let j = 0; j < np; j++) acc[j] += planes[j][q]; c++; }
+      }
+      if (c) for (let j = 0; j < np; j++) planes[j][p] = acc[j] / c;
+    }
+    let nn = 0;
+    for (let i = 0; i < nf; i++) {
+      const p = front[i], x = p % W, y = (p / W) | 0;
+      for (let k = 0; k < 8; k++) {
+        const xx = x + NB8X[k], yy = y + NB8Y[k];
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const q = yy * W + xx;
+        if (dist[q] === -1) { dist[q] = level + 1; next[nn++] = q; }
+      }
+    }
+    const t = front; front = next; next = t; nf = nn; level++;
+  }
+}
+
+/* 라벨(-1 = 미정)을 가장 가까운 확정 라벨의 다수결로 채움 */
+function fillLabels(lab, W, H) {
+  const N = W * H, dist = new Int32Array(N).fill(-1);
+  let front = new Int32Array(N), next = new Int32Array(N), nf = 0;
+  for (let p = 0; p < N; p++) if (lab[p] >= 0) dist[p] = 0;
+  for (let p = 0; p < N; p++) {
+    if (dist[p] !== -1) continue;
+    const x = p % W, y = (p / W) | 0;
+    for (let k = 0; k < 8; k++) {
+      const xx = x + NB8X[k], yy = y + NB8Y[k];
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      if (dist[yy * W + xx] === 0) { dist[p] = 1; front[nf++] = p; break; }
+    }
+  }
+  const cand = new Int32Array(8), cnt = new Int32Array(8);
+  let level = 1;
+  while (nf > 0) {
+    for (let i = 0; i < nf; i++) {
+      const p = front[i], x = p % W, y = (p / W) | 0;
+      let m = 0;
+      for (let k = 0; k < 8; k++) {
+        const xx = x + NB8X[k], yy = y + NB8Y[k];
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const q = yy * W + xx, d = dist[q];
+        if (d >= 0 && d < level) {
+          const l = lab[q]; let j = 0;
+          while (j < m && cand[j] !== l) j++;
+          if (j === m) { cand[m] = l; cnt[m] = 0; m++; }
+          cnt[j] += (k === 1 || k === 3 || k === 4 || k === 6) ? 2 : 1; // 4-이웃 가중
+        }
+      }
+      let best = -1, bc = -1;
+      for (let j = 0; j < m; j++) if (cnt[j] > bc) { bc = cnt[j]; best = cand[j]; }
+      lab[p] = best;
+    }
+    let nn = 0;
+    for (let i = 0; i < nf; i++) {
+      const p = front[i], x = p % W, y = (p / W) | 0;
+      for (let k = 0; k < 8; k++) {
+        const xx = x + NB8X[k], yy = y + NB8Y[k];
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const q = yy * W + xx;
+        if (dist[q] === -1) { dist[q] = level + 1; next[nn++] = q; }
+      }
+    }
+    const t = front; front = next; next = t; nf = nn; level++;
+  }
+}
+
+/* 같은 라벨끼리 4-연결 성분 분할. valid=0 픽셀은 제외(-1) */
+function components(lab, valid, W, H) {
+  const N = W * H, rid = new Int32Array(N).fill(-1), stack = new Int32Array(N);
+  let count = 0;
+  for (let s = 0; s < N; s++) {
+    if (rid[s] !== -1 || !valid[s]) continue;
+    const l = lab[s]; let sp = 0;
+    stack[sp++] = s; rid[s] = count;
+    while (sp) {
+      const p = stack[--sp], x = p % W;
+      if (x > 0) { const q = p - 1; if (rid[q] === -1 && valid[q] && lab[q] === l) { rid[q] = count; stack[sp++] = q; } }
+      if (x < W - 1) { const q = p + 1; if (rid[q] === -1 && valid[q] && lab[q] === l) { rid[q] = count; stack[sp++] = q; } }
+      if (p >= W) { const q = p - W; if (rid[q] === -1 && valid[q] && lab[q] === l) { rid[q] = count; stack[sp++] = q; } }
+      if (p < N - W) { const q = p + W; if (rid[q] === -1 && valid[q] && lab[q] === l) { rid[q] = count; stack[sp++] = q; } }
+    }
+    count++;
+  }
+  return { rid, count };
+}
+
+function makeUF(n) {
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = a => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  return { parent, find };
+}
+
+/* 부드러운 값 노이즈 필드 (러프 스케치 흔들림용) */
+function noiseField(W, H, cell, rnd) {
+  const gw = Math.ceil(W / cell) + 2, gh = Math.ceil(H / cell) + 2, g = new Float32Array(gw * gh);
+  for (let i = 0; i < g.length; i++) g[i] = rnd() * 2 - 1;
+  const out = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const fy = y / cell, iy = fy | 0, ty = fy - iy, sy = ty * ty * (3 - 2 * ty);
+    for (let x = 0; x < W; x++) {
+      const fx = x / cell, ix = fx | 0, tx = fx - ix, sx = tx * tx * (3 - 2 * tx);
+      const a = g[iy * gw + ix], b = g[iy * gw + ix + 1], c = g[(iy + 1) * gw + ix], d = g[(iy + 1) * gw + ix + 1];
+      out[y * W + x] = (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
+    }
+  }
+  return out;
+}
+/* ---------------- 분석 파이프라인 ---------------- */
+function lch(rgb) {
+  const l = labOf(rgb[0], rgb[1], rgb[2]);
+  return { L: l[0], a: l[1], b: l[2], C: Math.hypot(l[1], l[2]), h: Math.atan2(l[2], l[1]) * 180 / Math.PI };
+}
+function hueDiff(h1, h2) { let d = Math.abs(h1 - h2) % 360; return d > 180 ? 360 - d : d; }
+
+// 두 색이 "같은 재질의 명암 변화"로 볼 수 있는 관계인지
+function shadeRelated(c1, c2, hueTol, simTol) {
+  const dE = Math.hypot(c1.L - c2.L, c1.a - c2.a, c1.b - c2.b);
+  if (dE < simTol) return true;
+  const n1 = c1.C < 12, n2 = c2.C < 12;
+  if (n1 && n2) return true;                        // 무채색끼리의 명암
+  if (!n1 && !n2) {
+    const ratio = c1.C / c2.C;
+    return hueDiff(c1.h, c2.h) < hueTol && ratio > 0.3 && ratio < 3.3;
+  }
+  const nu = n1 ? c1 : c2, ch = n1 ? c2 : c1;       // 한쪽만 무채색: 밝은 하이라이트만 허용
+  return nu.L > ch.L + 8 && nu.L > 70;
+}
+
+function detectBackground(U, known, W, H) {
+  const N = W * H, hist = new Int32Array(4096), border = [];
+  for (let x = 0; x < W; x++) { border.push(x, (H - 1) * W + x); }
+  for (let y = 1; y < H - 1; y++) { border.push(y * W, y * W + W - 1); }
+  const q4 = p => ((U[0][p] * 15.99) | 0) << 8 | ((U[1][p] * 15.99) | 0) << 4 | ((U[2][p] * 15.99) | 0);
+  let nb = 0;
+  for (const p of border) if (known[p]) { hist[q4(p)]++; nb++; }
+  if (nb < 16) return null;
+  let mode = 0;
+  for (let i = 1; i < 4096; i++) if (hist[i] > hist[mode]) mode = i;
+  const ref = [0, 0, 0]; let rc = 0;
+  for (const p of border) if (known[p] && q4(p) === mode) { ref[0] += U[0][p]; ref[1] += U[1][p]; ref[2] += U[2][p]; rc++; }
+  ref[0] /= rc; ref[1] /= rc; ref[2] /= rc;
+  const dRef = p => Math.max(Math.abs(U[0][p] - ref[0]), Math.abs(U[1][p] - ref[1]), Math.abs(U[2][p] - ref[2]));
+  let match = 0;
+  for (const p of border) if (known[p] && dRef(p) < 0.1) match++;
+  if (match < nb * 0.45) return null;
+  const bg = new Uint8Array(N), stack = new Int32Array(N);
+  let sp = 0, area = 0;
+  for (const p of border) if (known[p] && !bg[p] && dRef(p) < 0.12) { bg[p] = 1; stack[sp++] = p; }
+  while (sp) {
+    const p = stack[--sp], x = p % W; area++;
+    const nb4 = [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1];
+    for (const q of nb4) {
+      if (q < 0 || bg[q] || !known[q]) continue;
+      const step = Math.max(Math.abs(U[0][q] - U[0][p]), Math.abs(U[1][q] - U[1][p]), Math.abs(U[2][q] - U[2][p]));
+      if (step < 0.035 && dRef(q) < 0.22) { bg[q] = 1; stack[sp++] = q; }
+    }
+  }
+  if (area < N * 0.03 || area > N * 0.97) return null;
+  return bg;
+}
+
+function kmeans(Lp, Ap, Bp, idx, K, rnd, maxSamples = 50000) {
+  const M = Math.min(idx.length, maxSamples), sL = new Float32Array(M), sA = new Float32Array(M), sB = new Float32Array(M);
+  for (let i = 0; i < M; i++) {
+    const p = idx.length > M ? idx[(rnd() * idx.length) | 0] : idx[i];
+    sL[i] = Lp[p]; sA[i] = Ap[p]; sB[i] = Bp[p];
+  }
+  const cL = new Float64Array(K), cA = new Float64Array(K), cB = new Float64Array(K), d2 = new Float64Array(M);
+  let f = (rnd() * M) | 0; cL[0] = sL[f]; cA[0] = sA[f]; cB[0] = sB[f];
+  d2.fill(Infinity);
+  for (let k = 1; k < K; k++) {                    // k-means++ 초기화
+    let sum = 0;
+    for (let i = 0; i < M; i++) {
+      const d = (sL[i] - cL[k - 1]) ** 2 + (sA[i] - cA[k - 1]) ** 2 + (sB[i] - cB[k - 1]) ** 2;
+      if (d < d2[i]) d2[i] = d;
+      sum += d2[i];
+    }
+    let t = rnd() * sum, i = 0;
+    while (i < M - 1 && (t -= d2[i]) > 0) i++;
+    cL[k] = sL[i]; cA[k] = sA[i]; cB[k] = sB[i];
+  }
+  const asg = new Int32Array(M), nL = new Float64Array(K), nA = new Float64Array(K), nB = new Float64Array(K), nc = new Int32Array(K);
+  for (let it = 0; it < 18; it++) {
+    nL.fill(0); nA.fill(0); nB.fill(0); nc.fill(0);
+    let moved = 0;
+    for (let i = 0; i < M; i++) {
+      let best = 0, bd = Infinity;
+      for (let k = 0; k < K; k++) {
+        const d = (sL[i] - cL[k]) ** 2 + (sA[i] - cA[k]) ** 2 + (sB[i] - cB[k]) ** 2;
+        if (d < bd) { bd = d; best = k; }
+      }
+      if (asg[i] !== best) moved++;
+      asg[i] = best; d2[i] = bd;
+      nL[best] += sL[i]; nA[best] += sA[i]; nB[best] += sB[i]; nc[best]++;
+    }
+    for (let k = 0; k < K; k++) {
+      if (nc[k]) { cL[k] = nL[k] / nc[k]; cA[k] = nA[k] / nc[k]; cB[k] = nB[k] / nc[k]; }
+      else {                                        // 빈 군집 → 가장 먼 표본으로 재배치
+        let far = 0; for (let i = 1; i < M; i++) if (d2[i] > d2[far]) far = i;
+        cL[k] = sL[far]; cA[k] = sA[far]; cB[k] = sB[far]; d2[far] = 0;
+      }
+    }
+    if (it > 2 && moved < M * 0.001) break;
+  }
+  return { cL, cA, cB };
+}
+
+function process(img, opts, progress) {
+  const t0 = Date.now();
+  const W = img.width, H = img.height, N = W * H, src = img.data;
+  const scale = Math.max(W, H) / 1000;
+  const rnd = mulberry32(12345);
+  progress(0.03, '픽셀 분석');
+  const R = new Float32Array(N), Gc = new Float32Array(N), B = new Float32Array(N), A = new Float32Array(N), Lw = new Float32Array(N);
+  let transparent = 0;
+  for (let i = 0, j = 0; i < N; i++, j += 4) {
+    const a = src[j + 3] / 255, r = src[j] / 255, g = src[j + 1] / 255, b = src[j + 2] / 255;
+    R[i] = r; Gc[i] = g; B[i] = b; A[i] = a;
+    if (a < 0.98) transparent++;
+    Lw[i] = lumOf(r * a + 1 - a, g * a + 1 - a, b * a + 1 - a);
+  }
+  const hasAlpha = transparent > N * 0.001;
+
+  /* 1) 선화 검출: 블랙 탑햇(closing - 원본)으로 얇고 어두운 구조만 추출 + 히스테리시스 */
+  progress(0.08, '선화 검출');
+  const lw = opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale));
+  const closeL = erode(dilate(Lw, W, H, lw), W, H, lw);
+  const strength = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const c = closeL[i], d = c - Lw[i];
+    strength[i] = c > 0.02 && d > 0 ? Math.min(d / c, d / 0.3) : 0;
+  }
+  const tHigh = 0.58 - 0.34 * opts.lineSens, tLow = tHigh * 0.45;
+  const lineMask = new Uint8Array(N);
+  {
+    const seen = new Uint8Array(N), stack = new Int32Array(N), comp = new Int32Array(N);
+    const minLine = Math.max(4, Math.round(6 * scale));
+    for (let s0 = 0; s0 < N; s0++) {
+      if (seen[s0] || strength[s0] < tHigh) continue;
+      let sp = 0, cn = 0; stack[sp++] = s0; seen[s0] = 1;
+      while (sp) {
+        const p = stack[--sp], x = p % W, y = (p / W) | 0; comp[cn++] = p;
+        for (let k = 0; k < 8; k++) {
+          const xx = x + NB8X[k], yy = y + NB8Y[k];
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const q = yy * W + xx;
+          if (!seen[q] && strength[q] >= tLow) { seen[q] = 1; stack[sp++] = q; }
+        }
+      }
+      if (cn >= minLine) for (let i = 0; i < cn; i++) lineMask[comp[i]] = 1;
+    }
+  }
+  // 선이 모이는 교차점처럼 closing 창보다 넓은 어두운 덩어리는 선에서 이어서 채움
+  {
+    const ref = new Float32Array(N), dist = new Int32Array(N).fill(-1);
+    let front = [], lvl = 0;
+    for (let p = 0; p < N; p++) if (lineMask[p]) { dist[p] = 0; ref[p] = Lw[p]; front.push(p); }
+    while (front.length && lvl < lw) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W, y = (p / W) | 0;
+        for (let k = 0; k < 8; k++) {
+          const xx = x + NB8X[k], yy = y + NB8Y[k];
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const q = yy * W + xx;
+          if (dist[q] >= 0 || Lw[q] > ref[p] + 0.05 || Lw[q] > 0.5) continue;
+          dist[q] = lvl + 1; ref[q] = ref[p]; lineMask[q] = 1; next.push(q);
+        }
+      }
+      front = next; lvl++;
+    }
+  }
+  const inMask = new Uint8Array(N);                  // 선 + 안티에일리어싱 가장자리 1px
+  for (let p = 0; p < N; p++) {
+    if (!lineMask[p]) continue;
+    const x = p % W, y = (p / W) | 0; inMask[p] = 1;
+    for (let k = 0; k < 8; k++) {
+      const xx = x + NB8X[k], yy = y + NB8Y[k];
+      if (xx >= 0 && yy >= 0 && xx < W && yy < H) inMask[yy * W + xx] = 1;
+    }
+  }
+  const known = new Uint8Array(N);
+  for (let p = 0; p < N; p++) known[p] = !inMask[p] && A[p] > 0.02 ? 1 : 0;
+
+  /* 2) 선 아래 색 복원(인페인팅) → U, 선 알파/색 역산 */
+  progress(0.16, '선 아래 색 복원');
+  const U = [Float32Array.from(R), Float32Array.from(Gc), Float32Array.from(B)];
+  inpaint(U, known, W, H);
+  const lineA = new Float32Array(N), lineC = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+  const O = [R, Gc, B], blackLine = opts.lineColor === 'black';
+  for (let p = 0; p < N; p++) {
+    if (!inMask[p] || A[p] <= 0.02) continue;
+    let a = 0;
+    if (blackLine) {
+      const lu = lumOf(U[0][p], U[1][p], U[2][p]), lo = lumOf(R[p], Gc[p], B[p]);
+      a = lu > 0.01 ? clamp01(1 - lo / lu) : 0;
+    } else {
+      for (let c = 0; c < 3; c++) { const u = U[c][p]; if (u > 0.004) a = Math.max(a, 1 - O[c][p] / u); }
+      a = clamp01(a);
+      if (a > 0.02) for (let c = 0; c < 3; c++) lineC[c][p] = clamp01((O[c][p] - (1 - a) * U[c][p]) / a);
+    }
+    if (a <= 0.02) { a = 0; U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p]; }
+    lineA[p] = a;
+  }
+
+  /* 3) 단색 배경 분리 */
+  progress(0.24, '배경 판별');
+  const bgMask = opts.bg && !hasAlpha ? detectBackground(U, known, W, H) : null;
+
+  /* 4) 색 군집화(Lab k-means) → 연결 성분 → 잔조각 제거 */
+  progress(0.3, '색 군집화');
+  const valid = new Uint8Array(N); let nValid = 0;
+  for (let p = 0; p < N; p++) if (known[p] && !(bgMask && bgMask[p])) { valid[p] = 1; nValid++; }
+  const vidx = new Int32Array(nValid);
+  for (let p = 0, i = 0; p < N; p++) if (valid[p]) vidx[i++] = p;
+  const [Lp, Ap, Bp] = toLab(U[0], U[1], U[2], N);
+  const K = Math.max(2, Math.min(opts.colors, nValid || 2));
+  const clus = new Int32Array(N).fill(-1);
+  if (nValid) {
+    const { cL, cA, cB } = kmeans(Lp, Ap, Bp, vidx, K, rnd);
+    for (const p of vidx) {
+      let best = 0, bd = Infinity;
+      for (let k = 0; k < K; k++) {
+        const d = (Lp[p] - cL[k]) ** 2 + (Ap[p] - cA[k]) ** 2 + (Bp[p] - cB[k]) ** 2;
+        if (d < bd) { bd = d; best = k; }
+      }
+      clus[p] = best;
+    }
+  }
+  progress(0.42, '영역 분할');
+  const cc = components(clus, valid, W, H);
+  const cArea = new Int32Array(cc.count), cPerim = new Int32Array(cc.count), cClus = new Int32Array(cc.count);
+  for (let p = 0; p < N; p++) {
+    const r = cc.rid[p]; if (r < 0) continue;
+    cArea[r]++; cClus[r] = clus[p];
+    const x = p % W;
+    if (x === 0 || cc.rid[p - 1] !== r) cPerim[r]++;
+    if (x === W - 1 || cc.rid[p + 1] !== r) cPerim[r]++;
+    if (p < W || cc.rid[p - W] !== r) cPerim[r]++;
+    if (p >= N - W || cc.rid[p + W] !== r) cPerim[r]++;
+  }
+  const minArea = Math.max(10, Math.round(12 * scale * scale));
+  const remap = new Int32Array(cc.count).fill(-1);
+  let nR = 0;
+  for (let r = 0; r < cc.count; r++) if (cArea[r] >= minArea && cArea[r] >= 0.75 * cPerim[r]) remap[r] = nR++;
+  const clusterOf = new Int32Array(Math.max(1, nR));
+  for (let r = 0; r < cc.count; r++) if (remap[r] >= 0) clusterOf[remap[r]] = cClus[r];
+  const bgId = bgMask ? nR : -1;
+  const reg = new Int32Array(N).fill(-1);
+  for (let p = 0; p < N; p++) {
+    if (bgMask && bgMask[p]) reg[p] = bgId;
+    else if (cc.rid[p] >= 0 && remap[cc.rid[p]] >= 0) reg[p] = remap[cc.rid[p]];
+  }
+  if (nR || bgMask) fillLabels(reg, W, H); else reg.fill(0);
+  if (!nR && !bgMask) nR = 1;
+
+  /* 5) 영역 통계: 평균 / 상위 평균(밝은 쪽) / 하위 평균(어두운 쪽) */
+  progress(0.5, '영역 통계');
+  const cnt = new Float64Array(nR), areaAll = new Int32Array(nR), sum = new Float64Array(nR * 3);
+  for (let p = 0; p < N; p++) {
+    const r = reg[p]; if (r < 0 || r >= nR) continue;
+    areaAll[r]++;
+    if (!valid[p]) continue;
+    cnt[r]++; sum[r * 3] += U[0][p]; sum[r * 3 + 1] += U[1][p]; sum[r * 3 + 2] += U[2][p];
+  }
+  const mean = new Float64Array(nR * 3), mLum = new Float64Array(nR);
+  for (let r = 0; r < nR; r++) {
+    const n = cnt[r] || 1;
+    for (let c = 0; c < 3; c++) mean[r * 3 + c] = cnt[r] ? sum[r * 3 + c] / n : 0.5;
+    mLum[r] = lumOf(mean[r * 3], mean[r * 3 + 1], mean[r * 3 + 2]);
+  }
+  const up = new Float64Array(nR * 3), upN = new Float64Array(nR), lo = new Float64Array(nR * 3), loN = new Float64Array(nR);
+  for (let p = 0; p < N; p++) {
+    const r = reg[p]; if (r < 0 || r >= nR || !valid[p]) continue;
+    const l = lumOf(U[0][p], U[1][p], U[2][p]);
+    if (l >= mLum[r]) { upN[r]++; for (let c = 0; c < 3; c++) up[r * 3 + c] += U[c][p]; }
+    if (l <= mLum[r]) { loN[r]++; for (let c = 0; c < 3; c++) lo[r * 3 + c] += U[c][p]; }
+  }
+  for (let r = 0; r < nR; r++) for (let c = 0; c < 3; c++) {
+    up[r * 3 + c] = upN[r] ? up[r * 3 + c] / upN[r] : mean[r * 3 + c];
+    lo[r * 3 + c] = loN[r] ? lo[r * 3 + c] / loN[r] : mean[r * 3 + c];
+  }
+  const regCol = [];
+  for (let r = 0; r < nR; r++) regCol.push(lch([mean[r * 3], mean[r * 3 + 1], mean[r * 3 + 2]]));
+
+  /* 6) 영역 인접 그래프: 경계가 선으로 막혔는지(lined) 열려 있는지(open) 집계 */
+  progress(0.56, '재질(밑색) 병합');
+  const edgeIdx = new Map(), eA = [], eB = [], eOpen = [], eLined = [];
+  const addEdge = (a, b, lined) => {
+    if (a > b) { const t = a; a = b; b = t; }
+    const key = a * nR + b;
+    let i = edgeIdx.get(key);
+    if (i === undefined) { i = eA.length; edgeIdx.set(key, i); eA.push(a); eB.push(b); eOpen.push(0); eLined.push(0); }
+    if (lined) eLined[i]++; else eOpen[i]++;
+  };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x, a = reg[p];
+    if (a < 0 || a >= nR || A[p] <= 0.02) continue;
+    if (x < W - 1) { const q = p + 1, b = reg[q]; if (b !== a && b >= 0 && b < nR && A[q] > 0.02) addEdge(a, b, inMask[p] || inMask[q]); }
+    if (y < H - 1) { const q = p + W, b = reg[q]; if (b !== a && b >= 0 && b < nR && A[q] > 0.02) addEdge(a, b, inMask[p] || inMask[q]); }
+  }
+  const m = opts.merge;
+  const hueTol = 14 + 40 * m, simTol = 5 + 12 * m, minOpenRatio = 0.8 - 0.45 * m;
+  const uf = makeUF(nR), rep = new Int32Array(nR), gArea = new Float64Array(nR);
+  for (let r = 0; r < nR; r++) { rep[r] = r; gArea[r] = cnt[r]; }
+  const order = eA.map((_, i) => i).sort((i, j) => eOpen[j] - eOpen[i]);
+  for (const i of order) {
+    const o = eOpen[i], l = eLined[i];
+    if (o < 3 || o / (o + l) < minOpenRatio) continue;
+    const a = eA[i], b = eB[i], ga = uf.find(a), gb = uf.find(b);
+    if (ga === gb) continue;
+    if (!shadeRelated(regCol[a], regCol[b], hueTol, simTol)) continue;
+    if (!shadeRelated(regCol[rep[ga]], regCol[rep[gb]], hueTol * 1.5, simTol * 1.5)) continue;
+    const big = gArea[ga] >= gArea[gb] ? ga : gb, small = big === ga ? gb : ga;
+    uf.parent[small] = big;
+    gArea[big] += gArea[small];
+    if (cnt[rep[small]] > cnt[rep[big]]) rep[big] = rep[small];
+  }
+  const gid = new Int32Array(nR).fill(-1); let nG = 0;
+  const grp = new Int32Array(nR);
+  for (let r = 0; r < nR; r++) { const g = uf.find(r); if (gid[g] < 0) gid[g] = nG++; grp[r] = gid[g]; }
+
+  /* 7) 재질별 톤 재군집: 재질(그룹) 안에서만 다시 k-means → 밑색/그림자/하이라이트 톤 */
+  progress(0.6, '톤 분석');
+  const gCount = new Int32Array(nG + 1), gOff = new Int32Array(nG + 1);
+  for (const p of vidx) gCount[grp[reg[p]]]++;
+  for (let g = 1; g <= nG; g++) gOff[g] = gOff[g - 1] + gCount[g - 1];
+  const gIdx = new Int32Array(nValid), gFill = gOff.slice();
+  for (const p of vidx) gIdx[gFill[grp[reg[p]]]++] = p;
+  const toneOf = new Int32Array(N).fill(-1), toneGroup = [], toneLab = [];
+  const gFirstReg = new Int32Array(nG).fill(-1);
+  for (let r = 0; r < nR; r++) if (gFirstReg[grp[r]] < 0) gFirstReg[grp[r]] = r;
+  for (let g = 0; g < nG; g++) {
+    const n = gCount[g], idx = gIdx.subarray(gOff[g], gOff[g] + n), first = toneGroup.length;
+    if (!n) { const c = regCol[gFirstReg[g]]; toneGroup.push(g); toneLab.push([c.L, c.a, c.b]); continue; }
+    const kl = Math.min(6, Math.max(1, Math.floor(n / 40)));
+    let cents;
+    if (kl === 1) {
+      let a = 0, b = 0, l = 0; for (const p of idx) { l += Lp[p]; a += Ap[p]; b += Bp[p]; }
+      cents = [[l / n, a / n, b / n]];
+    } else {
+      const km = kmeans(Lp, Ap, Bp, idx, kl, rnd, 6000);
+      cents = Array.from({ length: kl }, (_, k) => [km.cL[k], km.cA[k], km.cB[k]]);
+    }
+    for (const c of cents) {                          // 가까운 중심(ΔE<8)은 한 톤으로
+      let hit = -1;
+      for (let t = first; t < toneLab.length; t++) {
+        const d = toneLab[t]; if (Math.hypot(d[0] - c[0], d[1] - c[1], d[2] - c[2]) < 8) { hit = t; break; }
+      }
+      if (hit < 0) { toneGroup.push(g); toneLab.push(c.slice()); }
+    }
+    const last = toneLab.length;
+    for (const p of idx) {
+      let best = first, bd = Infinity;
+      for (let t = first; t < last; t++) {
+        const d = toneLab[t], e = (Lp[p] - d[0]) ** 2 + (Ap[p] - d[1]) ** 2 + (Bp[p] - d[2]) ** 2;
+        if (e < bd) { bd = e; best = t; }
+      }
+      toneOf[p] = best;
+    }
+  }
+  if (!toneGroup.length) { toneGroup.push(0); toneLab.push([100, 0, 0]); }
+  const nT = toneGroup.length, nGroups = Math.max(1, nG), bgTone = bgMask ? nT : -1;
+  // 잔조각 톤 제거 후 선/빈 곳 채우기
+  const tc = components(toneOf, valid, W, H);
+  const tArea = new Int32Array(tc.count), tPerim = new Int32Array(tc.count);
+  for (let p = 0; p < N; p++) {
+    const r = tc.rid[p]; if (r < 0) continue;
+    tArea[r]++;
+    const x = p % W;
+    if (x === 0 || tc.rid[p - 1] !== r) tPerim[r]++;
+    if (x === W - 1 || tc.rid[p + 1] !== r) tPerim[r]++;
+    if (p < W || tc.rid[p - W] !== r) tPerim[r]++;
+    if (p >= N - W || tc.rid[p + W] !== r) tPerim[r]++;
+  }
+  const tone = new Int32Array(N).fill(-1);
+  for (let p = 0; p < N; p++) {
+    if (bgMask && bgMask[p]) tone[p] = bgTone;
+    else { const r = tc.rid[p]; if (r >= 0 && tArea[r] >= minArea && tArea[r] >= 0.75 * tPerim[r]) tone[p] = toneOf[p]; }
+  }
+  let anyTone = false;
+  for (let p = 0; p < N && !anyTone; p++) if (tone[p] >= 0) anyTone = true;
+  if (anyTone) fillLabels(tone, W, H); else tone.fill(0);
+
+  /* 8) 톤 통계 → 재질별 밑색 선택 → 그림자/하이라이트 톤 분류 */
+  progress(0.64, '밑색 · 그림자 판정');
+  const tCnt = new Float64Array(nT), tSum = new Float64Array(nT * 3), tLum = new Float64Array(nT);
+  for (const p of vidx) { const t = tone[p]; if (t < 0 || t >= nT || toneOf[p] !== t) continue; tCnt[t]++; for (let c = 0; c < 3; c++) tSum[t * 3 + c] += U[c][p]; }
+  const tMean = new Float64Array(nT * 3);
+  for (let t = 0; t < nT; t++) {
+    if (tCnt[t]) for (let c = 0; c < 3; c++) tMean[t * 3 + c] = tSum[t * 3 + c] / tCnt[t];
+    else {                                            // 표본 없는 톤은 Lab 중심값에서
+      const d = toneLab[t], fy = (d[0] + 16) / 116, fx = fy + d[1] / 500, fz = fy - d[2] / 200;
+      const inv = v => v ** 3 > 0.008856 ? v ** 3 : (v - 16 / 116) / 7.787;
+      const X = inv(fx) * 0.95047, Y = inv(fy), Z = inv(fz) * 1.08883;
+      const lin = [3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z, -0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z, 0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z];
+      for (let c = 0; c < 3; c++) { const v = clamp01(lin[c]); tMean[t * 3 + c] = v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055; }
+    }
+    tLum[t] = lumOf(tMean[t * 3], tMean[t * 3 + 1], tMean[t * 3 + 2]);
+  }
+  const tUp = new Float64Array(nT * 3), tUpN = new Float64Array(nT), tLo = new Float64Array(nT * 3), tLoN = new Float64Array(nT);
+  for (const p of vidx) {
+    const t = tone[p]; if (t < 0 || t >= nT || toneOf[p] !== t) continue;
+    const l = lumOf(U[0][p], U[1][p], U[2][p]);
+    if (l >= tLum[t] - 0.01) { tUpN[t]++; for (let c = 0; c < 3; c++) tUp[t * 3 + c] += U[c][p]; }
+    if (l <= tLum[t] + 0.01) { tLoN[t]++; for (let c = 0; c < 3; c++) tLo[t * 3 + c] += U[c][p]; }
+  }
+  for (let t = 0; t < nT; t++) for (let c = 0; c < 3; c++) {
+    tUp[t * 3 + c] = tUpN[t] ? tUp[t * 3 + c] / tUpN[t] : tMean[t * 3 + c];
+    tLo[t * 3 + c] = tLoN[t] ? tLo[t * 3 + c] / tLoN[t] : tMean[t * 3 + c];
+  }
+  // 밑색 = 가장 넓은 톤(거의 비슷한 넓이의 더 밝은 톤이 있으면 그쪽)의 상위 평균
+  const gMax = new Float64Array(nGroups), baseTone = new Int32Array(nGroups).fill(-1), baseL = new Float64Array(nGroups).fill(-1);
+  for (let t = 0; t < nT; t++) if (tCnt[t] > gMax[toneGroup[t]]) gMax[toneGroup[t]] = tCnt[t];
+  for (let t = 0; t < nT; t++) {
+    const g = toneGroup[t];
+    if (tCnt[t] < gMax[g] * 0.75) continue;
+    const L = labOf(tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2])[0];
+    if (L > baseL[g]) { baseL[g] = L; baseTone[g] = t; }
+  }
+  const base = new Float64Array(nGroups * 3).fill(0.5);
+  for (let t = 0; t < nT; t++) { const g = toneGroup[t]; if (baseTone[g] < 0) baseTone[g] = t; }
+  // 선으로 나뉜 같은 재질(예: 앞머리/뒷머리): 더 넓은 재질의 밑색과 같은 톤이 있으면 그 톤을 밑색으로
+  {
+    const gTot = new Float64Array(nGroups);
+    for (let t = 0; t < nT; t++) gTot[toneGroup[t]] += tCnt[t];
+    const labUp = t => labOf(tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2]);
+    const gs = Array.from({ length: nGroups }, (_, g) => g).sort((a, b) => gTot[b] - gTot[a]);
+    const done = [];
+    for (const g of gs) {
+      if (baseTone[g] < 0) continue;
+      if (done.length) {
+        let best = -1, bestD = 7;
+        for (let t = 0; t < nT; t++) {
+          if (toneGroup[t] !== g || t === baseTone[g] || tCnt[t] < gTot[g] * 0.1) continue;
+          const lt = labUp(t);
+          for (const ref of done) {
+            const d = Math.hypot(lt[0] - ref[0], lt[1] - ref[1], lt[2] - ref[2]);
+            if (d < bestD) { bestD = d; best = t; }
+          }
+        }
+        if (best >= 0) {
+          const lb = labUp(baseTone[g]);
+          if (!done.some(ref => Math.hypot(lb[0] - ref[0], lb[1] - ref[1], lb[2] - ref[2]) < bestD)) baseTone[g] = best;
+        }
+      }
+      done.push(labUp(baseTone[g]));
+    }
+  }
+  for (let g = 0; g < nGroups; g++) if (baseTone[g] >= 0) for (let c = 0; c < 3; c++) base[g * 3 + c] = tUp[baseTone[g] * 3 + c];
+
+  const shadowThr = 0.86 + 0.12 * opts.shadow;
+  const sparkR = opts.sparkle > 0 ? opts.sparkle : Math.max(4, Math.round(7 * scale));
+  const sparkArea = Math.PI * sparkR * sparkR * 3;
+  const toneG = new Float32Array(nT * 3).fill(1), toneH = new Float32Array(nT * 3), toneHi = new Uint8Array(nT);
+  for (let t = 0; t < nT; t++) {
+    const g = toneGroup[t];
+    if (t === baseTone[g]) continue;
+    const F = [base[g * 3], base[g * 3 + 1], base[g * 3 + 2]], lf = lumOf(F[0], F[1], F[2]);
+    const cu = [tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2]], cl = [tLo[t * 3], tLo[t * 3 + 1], tLo[t * 3 + 2]];
+    if (lf > 0.01 && tLum[t] / lf < shadowThr) {
+      for (let c = 0; c < 3; c++) toneG[t * 3 + c] = F[c] > 0.004 ? Math.min(1, cu[c] / F[c]) : 1;
+      continue;
+    }
+    const ll = lumOf(cl[0], cl[1], cl[2]);
+    if (lf < 0.995 && 1 - (1 - ll) / (1 - lf) > 0.12) {
+      toneHi[t] = 1;
+      for (let c = 0; c < 3; c++) toneH[t * 3 + c] = F[c] < 0.996 ? clamp01(1 - (1 - cl[c]) / (1 - F[c])) : 0;
+    }
+  }
+  // 작은 하이라이트 조각은 반짝임으로
+  const sparkPix = new Uint8Array(N);
+  {
+    const vis = new Uint8Array(N);
+    for (let p = 0; p < N; p++) vis[p] = A[p] > 0.02 && tone[p] >= 0 && tone[p] < nT && toneHi[tone[p]] ? 1 : 0;
+    const hc = components(tone, vis, W, H), hArea = new Int32Array(hc.count);
+    for (let p = 0; p < N; p++) if (hc.rid[p] >= 0) hArea[hc.rid[p]]++;
+    for (let p = 0; p < N; p++) if (hc.rid[p] >= 0 && hArea[hc.rid[p]] <= sparkArea) sparkPix[p] = 1;
+  }
+
+  return buildLayers({
+    W, H, N, scale, rnd, opts, progress, t0, hasAlpha,
+    R, G: Gc, B, A, U, lineA, lineC, inMask, bgMask, tone, nT, bgTone, toneGroup, nG: nGroups, base, toneG, toneH, sparkPix, sparkR, sparkArea,
+    counts: { regions: nR, tones: nT }
+  });
+}
+/* ---------------- 레이어 분해 ----------------
+ * 합성 순서(아래→위):
+ *   채색 F → ×그림자 G → ×명암 M → 스크린 하이라이트 H → 스크린 반짝임 S1 → 스크린 효과 S2 → 선화(표준)
+ * 곱하기 레이어(색 K, 알파 a)는 x·(1-a+aK), 스크린 레이어는 1-(1-x)(1-aK)이므로
+ * 픽셀마다 역산하면 원본을 (8비트 반올림 오차 내에서) 그대로 재현할 수 있다. */
+function cropLayer(full, W, H) {
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) {
+    const o = y * W * 4;
+    for (let x = 0; x < W; x++) if (full[o + x * 4 + 3]) {
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y;
+    }
+  }
+  if (x1 < 0) return { x: 0, y: 0, w: 0, h: 0, data: new Uint8ClampedArray(0) };
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) data.set(full.subarray(((y + y0) * W + x0) * 4, ((y + y0) * W + x0 + w) * 4), y * w * 4);
+  return { x: x0, y: y0, w, h, data };
+}
+function layer(name, kind, blend, full, W, H, extra) {
+  return Object.assign({ name, kind, blend, opacity: 255, visible: true, clipping: false }, cropLayer(full, W, H), extra || {});
+}
+function hex(rgb) { return '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase(); }
+
+// 곱하기/스크린 값 v(0..1, 채널별)를 "색 K + 알파 a" 최소 알파 형태로 기록
+function putMinAlpha(buf, i, v0, v1, v2, a0) {
+  const am = Math.max(v0, v1, v2);
+  if (am * 255 < 0.5) return;
+  const aq = Math.max(1, Math.round(am * 255)) / 255;
+  buf[i] = Math.round(clamp01(v0 / aq) * 255);
+  buf[i + 1] = Math.round(clamp01(v1 / aq) * 255);
+  buf[i + 2] = Math.round(clamp01(v2 / aq) * 255);
+  buf[i + 3] = Math.round(aq * a0 * 255);
+}
+
+function buildLayers(ctx) {
+  const { W, H, N, scale, rnd, opts, progress, t0, R, G, B, A, U, lineA, lineC, bgMask, tone, nT, bgTone, toneGroup, nG, base, toneG, toneH, sparkPix, sparkR, sparkArea } = ctx;
+  const O = [R, G, B];
+  const isBg = p => bgTone >= 0 && tone[p] === bgTone;
+
+  /* 팔레트: 거의 같은 밑색(ΔE<2.5)은 한 레이어로 */
+  progress(0.62, '팔레트 구성');
+  const gArea = new Float64Array(nG);
+  for (let p = 0; p < N; p++) { const t = tone[p]; if (t >= 0 && t < nT && A[p] > 0.02) gArea[toneGroup[t]]++; }
+  const pal = [], palOf = new Int32Array(nG);
+  const gOrder = Array.from({ length: nG }, (_, i) => i).sort((a, b) => gArea[b] - gArea[a]);
+  for (const g of gOrder) {
+    const rgb = [0, 1, 2].map(c => Math.round(clamp01(base[g * 3 + c]) * 255));
+    const lab = labOf(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255);
+    let hit = pal.findIndex(e => Math.hypot(e.lab[0] - lab[0], e.lab[1] - lab[1], e.lab[2] - lab[2]) < 2.5);
+    if (hit < 0) { pal.push({ rgb, lab, area: 0 }); hit = pal.length - 1; }
+    palOf[g] = hit; pal[hit].area += gArea[g];
+  }
+  const Fg = new Float32Array(nG * 3);
+  for (let g = 0; g < nG; g++) for (let c = 0; c < 3; c++) Fg[g * 3 + c] = pal[palOf[g]].rgb[c] / 255;
+
+  /* 선화 레이어 */
+  const lineB = new Uint8ClampedArray(N * 4), black = opts.lineColor === 'black';
+  for (let p = 0; p < N; p++) {
+    const a = lineA[p]; if (a <= 0) continue;
+    const i = p * 4;
+    if (!black) { lineB[i] = Math.round(lineC[0][p] * 255); lineB[i + 1] = Math.round(lineC[1][p] * 255); lineB[i + 2] = Math.round(lineC[2][p] * 255); }
+    lineB[i + 3] = Math.round(a * A[p] * 255);
+  }
+
+  /* 1차: 그림자 / 명암 / 하이라이트 확정, 남는 밝아짐 S 계산 */
+  progress(0.66, '명암 분해');
+  const shadowB = new Uint8ClampedArray(N * 4), shadeB = new Uint8ClampedArray(N * 4), hiB = new Uint8ClampedArray(N * 4);
+  const S = [new Float32Array(N), new Float32Array(N), new Float32Array(N)], sMax = new Float32Array(N);
+  const Mv = [0, 0, 0], Hv = [0, 0, 0];
+  for (let p = 0; p < N; p++) {
+    const a0 = A[p]; if (a0 <= 0.02 || isBg(p)) continue;
+    const t = tone[p], g = toneGroup[t], spark = sparkPix[p], i = p * 4;
+    let shadowOn = false, sm = 0;
+    for (let c = 0; c < 3; c++) {
+      const F = Fg[g * 3 + c], gv = toneG[t * 3 + c], hv = spark ? 0 : toneH[t * 3 + c], u = U[c][p];
+      const gq = Math.round(gv * 255) / 255;
+      if (gv < 0.998) shadowOn = true;
+      const x1 = F * gq, y = 1 - (1 - x1) * (1 - hv);
+      let M = 1, h = hv, s = 0;
+      if (u <= y + 1.2 / 255) {                      // 1단계 이하 밝아짐은 노이즈로 보고 무시
+        h = Math.min(hv, u);
+        M = h >= 0.999 || x1 <= 0.002 ? 1 : clamp01((1 - (1 - u) / (1 - h)) / x1);
+      } else {
+        const den = (1 - x1) * (1 - hv);
+        s = den > 1e-6 ? clamp01(1 - (1 - u) / den) : 0;
+      }
+      Mv[c] = 1 - M; Hv[c] = h; S[c][p] = s; if (s > sm) sm = s;
+    }
+    sMax[p] = sm;
+    if (shadowOn) {
+      for (let c = 0; c < 3; c++) shadowB[i + c] = Math.round(toneG[t * 3 + c] * 255);
+      shadowB[i + 3] = Math.round(a0 * 255);
+    }
+    // 곱하기는 1-a(1-K) 이므로 (1-M)을 최소 알파로 기록한 뒤 색을 뒤집는다
+    putMinAlpha(shadeB, i, Mv[0], Mv[1], Mv[2], a0);
+    if (shadeB[i + 3]) for (let c = 0; c < 3; c++) shadeB[i + c] = 255 - shadeB[i + c];
+    putMinAlpha(hiB, i, Hv[0], Hv[1], Hv[2], a0);
+  }
+
+  /* 2차: 밝아짐을 "작은 반짝임"(화이트 탑햇)과 "넓은 효과광"으로 분리 + 재현 오차 측정 */
+  progress(0.76, '반짝임 · 효과 분리');
+  const open = blur(dilate(erode(sMax, W, H, sparkR), W, H, sparkR), W, H, sparkR * 0.5);
+  // 주변과 떨어진 작은 밝은 조각은 통째로 반짝임
+  const smallS = new Uint8Array(N);
+  {
+    const on = new Uint8Array(N);
+    for (let p = 0; p < N; p++) on[p] = sMax[p] > 3 / 255 ? 1 : 0;
+    const sc = components(new Int32Array(N), on, W, H), sa = new Int32Array(sc.count), sm = new Float32Array(sc.count);
+    for (let p = 0; p < N; p++) { const r = sc.rid[p]; if (r >= 0) { sa[r]++; if (sMax[p] > sm[r]) sm[r] = sMax[p]; } }
+    for (let p = 0; p < N; p++) { const r = sc.rid[p]; if (r >= 0 && sa[r] <= sparkArea && sm[r] > 0.15) smallS[p] = 1; }
+  }
+  const sparkB = new Uint8ClampedArray(N * 4), fxB = new Uint8ClampedArray(N * 4), bgB = bgMask ? new Uint8ClampedArray(N * 4) : null;
+  let err = 0, errN = 0;
+  const x = [0, 0, 0], sa3 = [0, 0, 0], se3 = [0, 0, 0], scr = [hiB, sparkB, fxB];
+  for (let p = 0; p < N; p++) {
+    const a0 = A[p]; if (a0 <= 0.02) continue;
+    const i = p * 4;
+    if (isBg(p)) {
+      for (let c = 0; c < 3; c++) { bgB[i + c] = Math.round(U[c][p] * 255); x[c] = bgB[i + c] / 255; }
+      bgB[i + 3] = 255;
+    } else {
+      const t = tone[p], g = toneGroup[t], sm = sMax[p];
+      let w = 0;
+      if (sm > 1e-4) {
+        w = sparkPix[p] || smallS[p] ? 1 : clamp01((sm - open[p]) / sm) * smoothstep(0.45, 0.8, Math.max(U[0][p], U[1][p], U[2][p]));
+        for (let c = 0; c < 3; c++) {
+          const s = S[c][p], a = s * w;
+          sa3[c] = a; se3[c] = a < 0.9999 ? clamp01(1 - (1 - s) / (1 - a)) : 0;
+        }
+        putMinAlpha(sparkB, i, sa3[0], sa3[1], sa3[2], a0);
+        putMinAlpha(fxB, i, se3[0], se3[1], se3[2], a0);
+      }
+      // 저장된 8비트 값으로 다시 합성해서 검증
+      for (let c = 0; c < 3; c++) {
+        let v = Fg[g * 3 + c];
+        if (shadowB[i + 3]) { const sa = shadowB[i + 3] / 255; v *= 1 - sa + sa * shadowB[i + c] / 255; }
+        if (shadeB[i + 3]) { const sa = shadeB[i + 3] / 255; v *= 1 - sa + sa * shadeB[i + c] / 255; }
+        for (let k = 0; k < 3; k++) { const L = scr[k]; if (L[i + 3]) v = 1 - (1 - v) * (1 - L[i + 3] / 255 * L[i + c] / 255); }
+        x[c] = v;
+      }
+    }
+    if (lineB[i + 3]) { const la = lineB[i + 3] / 255; for (let c = 0; c < 3; c++) x[c] = x[c] * (1 - la) + la * lineB[i + c] / 255; }
+    if (a0 > 0.98) { for (let c = 0; c < 3; c++) { const d = (x[c] - O[c][p]) * 255; err += d * d; } errN += 3; }
+  }
+  const mse = errN ? err / errN : 0;
+  const psnr = mse > 1e-9 ? 10 * Math.log10(255 * 255 / mse) : 99;
+
+  /* 채색(밑색) 레이어 */
+  progress(0.84, '채색 레이어');
+  const flatLayers = [];
+  const palBox = pal.map(() => [W, H, -1, -1]);
+  for (let p = 0; p < N; p++) {
+    if (A[p] <= 0.02 || isBg(p)) continue;
+    const b = palBox[palOf[toneGroup[tone[p]]]], x0 = p % W, y0 = (p / W) | 0;
+    if (x0 < b[0]) b[0] = x0; if (x0 > b[2]) b[2] = x0; if (y0 < b[1]) b[1] = y0; if (y0 > b[3]) b[3] = y0;
+  }
+  const palIdx = pal.map((_, i) => i).filter(i => palBox[i][2] >= 0).sort((a, b) => pal[a].area - pal[b].area);
+  if (opts.splitColors) {
+    const bufs = pal.map((_, i) => palBox[i][2] >= 0 ? new Uint8ClampedArray((palBox[i][2] - palBox[i][0] + 1) * (palBox[i][3] - palBox[i][1] + 1) * 4) : null);
+    for (let p = 0; p < N; p++) {
+      if (A[p] <= 0.02 || isBg(p)) continue;
+      const k = palOf[toneGroup[tone[p]]], b = palBox[k], bw = b[2] - b[0] + 1, j = (((p / W) | 0) - b[1]) * bw + (p % W) - b[0], rgb = pal[k].rgb;
+      bufs[k][j * 4] = rgb[0]; bufs[k][j * 4 + 1] = rgb[1]; bufs[k][j * 4 + 2] = rgb[2]; bufs[k][j * 4 + 3] = Math.round(A[p] * 255);
+    }
+    // 넓은 색이 아래로 가도록(겹치지 않으므로 순서는 보기 편의용)
+    palIdx.slice().reverse().forEach((k, n) => {
+      const b = palBox[k];
+      flatLayers.push({
+        name: `채색 ${String(n + 1).padStart(2, '0')} ${hex(pal[k].rgb)}`, kind: 'flat', blend: 'norm', opacity: 255, visible: true, clipping: false,
+        x: b[0], y: b[1], w: b[2] - b[0] + 1, h: b[3] - b[1] + 1, data: bufs[k], color: hex(pal[k].rgb)
+      });
+    });
+  } else {
+    const flatB = new Uint8ClampedArray(N * 4);
+    for (let p = 0; p < N; p++) {
+      if (A[p] <= 0.02 || isBg(p)) continue;
+      const rgb = pal[palOf[toneGroup[tone[p]]]].rgb, i = p * 4;
+      flatB[i] = rgb[0]; flatB[i + 1] = rgb[1]; flatB[i + 2] = rgb[2]; flatB[i + 3] = Math.round(A[p] * 255);
+    }
+    flatLayers.push(layer('채색', 'flat', 'norm', flatB, W, H));
+  }
+
+  /* 러프: 완성본에서 역으로 만든 추정 스케치 */
+  let roughL = null;
+  if (opts.rough) {
+    progress(0.9, '러프 스케치 생성');
+    roughL = makeRough(ctx);
+  }
+
+  progress(0.96, '레이어 정리');
+  const clip = !!opts.clip, out = [];
+  if (bgB) out.push(layer('배경', 'bg', 'norm', bgB, W, H));
+  if (opts.splitColors) {
+    // PSD 레이어 순서는 아래→위. 그룹 안의 children도 아래→위
+    out.push({ name: '채색', kind: 'group', group: true, blend: 'pass', opacity: 255, visible: true, open: true, children: flatLayers.slice().reverse() });
+  } else out.push(flatLayers[0]);
+  out.push(layer('그림자', 'shadow', 'mul ', shadowB, W, H, { clipping: clip }));
+  out.push(layer('명암', 'shade', 'mul ', shadeB, W, H, { clipping: clip }));
+  out.push(layer('하이라이트', 'highlight', 'scrn', hiB, W, H, { clipping: clip }));
+  out.push(layer('반짝임', 'sparkle', 'scrn', sparkB, W, H, { clipping: clip }));
+  out.push(layer('효과', 'effect', 'scrn', fxB, W, H, { clipping: clip }));
+  out.push(layer('선화', 'line', 'norm', lineB, W, H));
+  if (roughL) out.push(roughL);
+  progress(1, '완료');
+  return {
+    width: W, height: H, layers: out,
+    stats: {
+      ms: Date.now() - t0, psnr, regions: ctx.counts.regions, tones: ctx.counts.tones, materials: nG, colors: pal.length, hasAlpha: ctx.hasAlpha,
+      background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR
+    }
+  };
+}
+
+function makeRough(ctx) {
+  const { W, H, N, scale, rnd, opts, U, A, lineA } = ctx;
+  const lu = new Float32Array(N);
+  for (let p = 0; p < N; p++) { const a = A[p]; lu[p] = lumOf(U[0][p], U[1][p], U[2][p]) * a + 1 - a; }
+  const sc1 = Math.max(1, scale), sig = 2.2 * sc1, bl = blur(lu, W, H, sig), lb = blur(lineA, W, H, 1.2 * sc1);
+  // 큰 그림은 절반 해상도에서 흔들린 선을 만들고 다시 키운다(러프는 어차피 흐릿함)
+  const f = N > 1.5e6 ? 2 : 1, w = Math.ceil(W / f), h = Math.ceil(H / f);
+  const basis = new Float32Array(w * h), bc = new Float32Array(w * h);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x;
+    const gx = bl[x < W - 1 ? p + 1 : p] - bl[x > 0 ? p - 1 : p], gy = bl[y < H - 1 ? p + W : p] - bl[y > 0 ? p - W : p];
+    const e = clamp01(Math.sqrt(gx * gx + gy * gy) * sig / 0.3), q = ((y / f) | 0) * w + ((x / f) | 0);
+    basis[q] += Math.max(clamp01(lb[p] * 1.4), e * e * 0.8); bc[q]++;
+  }
+  for (let q = 0; q < w * h; q++) basis[q] /= bc[q];
+  const bilerp = (arr, fx, fy, ww, hh) => {
+    if (fx < 0 || fy < 0 || fx > ww - 1 || fy > hh - 1) return 0;
+    const x0 = fx | 0, y0 = fy | 0, x1 = Math.min(ww - 1, x0 + 1), y1 = Math.min(hh - 1, y0 + 1), tx = fx - x0, ty = fy - y0;
+    const a = arr[y0 * ww + x0], b = arr[y0 * ww + x1], c = arr[y1 * ww + x0], d = arr[y1 * ww + x1];
+    return (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+  };
+  const acc = new Float32Array(w * h), weights = [0.85, 0.55, 0.4];
+  for (let k = 0; k < 3; k++) {
+    const cell = (35 + 25 * k) * sc1 / f, amp = (2 + 1.6 * k) * sc1 / f;
+    const nx = noiseField(w, h, cell, rnd), ny = noiseField(w, h, cell, rnd);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const p = y * w + x, v = bilerp(basis, x + nx[p] * amp, y + ny[p] * amp, w, h) * weights[k];
+      acc[p] = 1 - (1 - acc[p]) * (1 - v);
+    }
+  }
+  const col = opts.roughColor || '#2f6fe0';
+  const cr = parseInt(col.slice(1, 3), 16), cg = parseInt(col.slice(3, 5), 16), cb = parseInt(col.slice(5, 7), 16);
+  const buf = new Uint8ClampedArray(N * 4);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = f === 1 ? acc[y * w + x] : bilerp(acc, (x + 0.5) / f - 0.5, (y + 0.5) / f - 0.5, w, h);
+    const a = smoothstep(0.1, 0.65, v * (0.7 + 0.3 * rnd()));
+    if (a < 0.02) continue;
+    const i = (y * W + x) * 4; buf[i] = cr; buf[i + 1] = cg; buf[i + 2] = cb; buf[i + 3] = Math.round(a * 255);
+  }
+  return layer('러프 (추정)', 'rough', 'norm', buf, W, H, { opacity: 115, visible: false });
+}
+return { process };
+}
+</script>
+<script>
+/* ============================================================
+ * 최소 PSD 작성기 (RGB 8bit, 레이어/그룹/클리핑/혼합 모드/유니코드 이름, RLE 압축)
+ * ============================================================ */
+const PSD = (() => {
+  class ByteWriter {
+    constructor(n = 4096) { this.buf = new Uint8Array(n); this.pos = 0; }
+    ensure(n) {
+      if (this.pos + n <= this.buf.length) return;
+      let len = this.buf.length * 2; while (len < this.pos + n) len *= 2;
+      const b = new Uint8Array(len); b.set(this.buf.subarray(0, this.pos)); this.buf = b;
+    }
+    u8(v) { this.ensure(1); this.buf[this.pos++] = v & 255; }
+    u16(v) { this.ensure(2); this.buf[this.pos++] = (v >>> 8) & 255; this.buf[this.pos++] = v & 255; }
+    u32(v) { this.ensure(4); for (let s = 24; s >= 0; s -= 8) this.buf[this.pos++] = (v >>> s) & 255; }
+    i32(v) { this.u32(v >>> 0); }
+    ascii(s) { for (let i = 0; i < s.length; i++) this.u8(s.charCodeAt(i)); }
+    bytes(a) { this.ensure(a.length); this.buf.set(a, this.pos); this.pos += a.length; }
+    pad(m) { while (this.pos % m) this.u8(0); }
+    patch32(at, v) { for (let k = 0; k < 4; k++) this.buf[at + k] = (v >>> (24 - 8 * k)) & 255; }
+    out() { return this.buf.subarray(0, this.pos); }
+  }
+
+  // PackBits 한 줄 압축: src[off + i*4] (RGBA 인터리브에서 한 채널)
+  function packRow(src, off, n, out, o) {
+    let i = 0;
+    while (i < n) {
+      const v = src[off + i * 4];
+      let j = i + 1;
+      while (j < n && j - i < 128 && src[off + j * 4] === v) j++;
+      if (j - i >= 3) { out[o++] = 257 - (j - i); out[o++] = v; i = j; continue; }
+      let k = i;
+      while (k < n && k - i < 128) {
+        if (k + 2 < n && src[off + k * 4] === src[off + (k + 1) * 4] && src[off + k * 4] === src[off + (k + 2) * 4]) break;
+        k++;
+      }
+      out[o++] = k - i - 1;
+      for (let t = i; t < k; t++) out[o++] = src[off + t * 4];
+      i = k;
+    }
+    return o;
+  }
+
+  // RLE 채널 여러 개를 [줄 길이 표][데이터] 형태로 (compression 헤더 포함)
+  function rleChannels(rgba, w, h, chans) {
+    const maxRow = w + Math.ceil(w / 128) + 2;
+    const counts = new Uint8Array(2 + chans.length * h * 2), data = new Uint8Array(chans.length * h * maxRow);
+    counts[1] = 1; // compression = 1 (RLE)
+    let o = 0, ci = 2;
+    for (const c of chans) for (let y = 0; y < h; y++) {
+      const start = o;
+      o = packRow(rgba, y * w * 4 + c, w, data, o);
+      const len = o - start;
+      counts[ci++] = len >>> 8; counts[ci++] = len & 255;
+    }
+    return [counts, data.subarray(0, o)];
+  }
+
+  function asciiName(s, fallback) {
+    const a = (s || '').replace(/[^\x20-\x7e]/g, '').trim();
+    return (a || fallback).slice(0, 250);
+  }
+
+  // 트리를 PSD 레코드 목록(아래→위)으로
+  function flatten(layers, list) {
+    for (const L of layers) {
+      if (L.group) {
+        list.push({ name: '</Layer group>', section: 3, blend: 'norm', opacity: 255, visible: true, w: 0, h: 0 });
+        flatten(L.children, list);
+        list.push({ name: L.name, section: L.open === false ? 2 : 1, blend: L.blend || 'pass', opacity: L.opacity, visible: L.visible, clipping: L.clipping, w: 0, h: 0 });
+      } else list.push(L);
+    }
+    return list;
+  }
+
+  const ASCII_KIND = { bg: 'Background', flat: 'Flat', shadow: 'Shadow', shade: 'Shading', highlight: 'Highlight', sparkle: 'Sparkle', effect: 'Effect', line: 'Lineart', rough: 'Rough', group: 'Flat colors' };
+
+  async function write(doc, onProgress) {
+    const { width, height, composite, hasAlpha } = doc;
+    const recs = flatten(doc.layers, []);
+    const parts = [];
+    const yieldUI = () => new Promise(r => setTimeout(r, 0));
+
+    // 1) 채널 데이터 압축
+    const chanData = [];
+    for (let n = 0; n < recs.length; n++) {
+      const L = recs[n];
+      if (!L.w || !L.h) { chanData.push([[new Uint8Array(2)], [new Uint8Array(2)], [new Uint8Array(2)], [new Uint8Array(2)]]); continue; }
+      const per = [3, 0, 1, 2].map(c => rleChannels(L.data, L.w, L.h, [c]));
+      chanData.push(per);
+      if (onProgress) onProgress(n / recs.length * 0.85);
+      await yieldUI();
+    }
+
+    // 2) 레이어 레코드
+    const rw = new ByteWriter(1 << 16);
+    rw.u32(0); // layer info length (나중에 채움)
+    rw.u16((hasAlpha ? -recs.length : recs.length) & 0xffff);
+    recs.forEach((L, n) => {
+      const top = L.w ? L.y : 0, left = L.w ? L.x : 0;
+      rw.i32(top); rw.i32(left); rw.i32(top + (L.h || 0)); rw.i32(left + (L.w || 0));
+      rw.u16(4);
+      const ids = [-1, 0, 1, 2];
+      ids.forEach((id, k) => { rw.u16(id & 0xffff); rw.u32(chanData[n][k].reduce((s, a) => s + a.length, 0)); });
+      rw.ascii('8BIM'); rw.ascii((L.blend || 'norm').padEnd(4, ' ').slice(0, 4));
+      rw.u8(L.opacity ?? 255);
+      rw.u8(L.clipping ? 1 : 0);
+      rw.u8((L.visible === false ? 2 : 0) | (L.section ? 0x18 : 0));
+      rw.u8(0);
+      const extraAt = rw.pos; rw.u32(0);
+      rw.u32(0); // layer mask
+      rw.u32(40); for (let k = 0; k < 10; k++) rw.u32(0x0000ffff); // blending ranges(회색+4채널, 전체 범위)
+      const nm = asciiName(L.name, L.section === 3 ? '</Layer group>' : (ASCII_KIND[L.kind] || 'Layer') + ' ' + (n + 1));
+      rw.u8(nm.length); rw.ascii(nm);
+      while ((rw.pos - extraAt - 12) % 4) rw.u8(0); // 파스칼 문자열은 4바이트 단위로 패딩
+      // luni (유니코드 레이어 이름)
+      rw.ascii('8BIM'); rw.ascii('luni');
+      const name = L.name || nm;
+      const luniLen = 4 + name.length * 2, luniPad = (4 - luniLen % 4) % 4;
+      rw.u32(luniLen + luniPad); rw.u32(name.length);
+      for (let i = 0; i < name.length; i++) rw.u16(name.charCodeAt(i));
+      for (let i = 0; i < luniPad; i++) rw.u8(0);
+      if (L.section) {
+        rw.ascii('8BIM'); rw.ascii('lsct');
+        if (L.section === 3) { rw.u32(4); rw.u32(3); }
+        else { rw.u32(12); rw.u32(L.section); rw.ascii('8BIM'); rw.ascii((L.blend || 'pass').padEnd(4, ' ')); }
+      }
+      rw.patch32(extraAt, rw.pos - extraAt - 4);
+    });
+    let layerInfoLen = rw.pos - 4;
+    for (const per of chanData) for (const ch of per) for (const a of ch) layerInfoLen += a.length;
+    const layerPad = (4 - layerInfoLen % 4) % 4;
+    layerInfoLen += layerPad;
+    rw.patch32(0, layerInfoLen);
+
+    // 3) 헤더 / 컬러 모드 / 이미지 리소스
+    const hw = new ByteWriter(256);
+    hw.ascii('8BPS'); hw.u16(1); for (let i = 0; i < 6; i++) hw.u8(0);
+    hw.u16(hasAlpha ? 4 : 3); hw.u32(height); hw.u32(width); hw.u16(8); hw.u16(3);
+    hw.u32(0); // color mode data
+    const res = new ByteWriter(64);
+    res.ascii('8BIM'); res.u16(0x03ED); res.u16(0); res.u32(16);
+    res.u32(72 << 16); res.u16(1); res.u16(1); res.u32(72 << 16); res.u16(1); res.u16(1);
+    hw.u32(res.pos); hw.bytes(res.out());
+    hw.u32(4 + layerInfoLen + 4); // layer & mask info 전체 길이
+    parts.push(hw.out(), rw.out());
+    for (const per of chanData) for (const ch of per) for (const a of ch) parts.push(a);
+    parts.push(new Uint8Array(layerPad + 4)); // 패딩 + global layer mask info(길이 0)
+
+    // 4) 병합 이미지
+    if (onProgress) onProgress(0.9);
+    await yieldUI();
+    const merged = rleChannels(composite, width, height, hasAlpha ? [0, 1, 2, 3] : [0, 1, 2]);
+    parts.push(merged[0], merged[1]);
+    if (onProgress) onProgress(1);
+    return new Blob(parts, { type: 'image/vnd.adobe.photoshop' });
+  }
+  return { write };
+})();
+</script>
+<script>
+/* ============================================================
+ * UI
+ * ============================================================ */
+const $ = id => document.getElementById(id);
+const BLENDS = [
+  ['norm', '표준', 'source-over'], ['mul ', '곱하기', 'multiply'], ['scrn', '스크린', 'screen'],
+  ['over', '오버레이', 'overlay'], ['lddg', '선형 닷지(추가)', 'lighter'], ['sLit', '소프트 라이트', 'soft-light'],
+  ['hLit', '하드 라이트', 'hard-light'], ['dark', '어둡게 하기', 'darken'], ['lite', '밝게 하기', 'lighten'],
+  ['colr', '색상', 'color'], ['lum ', '광도', 'luminosity'], ['pass', '통과', 'source-over']
+];
+const BLEND_OP = Object.fromEntries(BLENDS.map(b => [b[0], b[2]]));
+const BLEND_KO = Object.fromEntries(BLENDS.map(b => [b[0], b[1]]));
+
+const state = { src: null, name: 'illustration', result: null, selected: null, view: 'comp', zoom: 1, tx: 0, ty: 0, busy: false, jobId: 0 };
+let worker = null;
+
+function toast(msg, ms = 2600) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms);
+}
+
+/* ---------- 옵션 ---------- */
+const OPT_LABELS = {
+  lineSens: v => v, lineWidth: v => v == 0 ? '자동' : v + ' px', colors: v => v, merge: v => v, shadow: v => v, sparkle: v => v == 0 ? '자동' : v + ' px'
+};
+for (const k of Object.keys(OPT_LABELS)) {
+  const el = $('o_' + k), upd = () => { $('v_' + k).textContent = OPT_LABELS[k](el.value); };
+  el.addEventListener('input', () => { upd(); markDirty(); }); upd();
+}
+for (const k of ['maxSize', 'lineColor', 'splitColors', 'clip', 'bg', 'rough', 'roughColor']) $('o_' + k).addEventListener('change', markDirty);
+function markDirty() { if (state.result) $('runBtn').textContent = '다시 분리'; }
+function readOpts() {
+  return {
+    lineSens: +$('o_lineSens').value / 100, lineWidth: +$('o_lineWidth').value, lineColor: $('o_lineColor').value,
+    colors: +$('o_colors').value, merge: +$('o_merge').value / 100, shadow: +$('o_shadow').value / 100, sparkle: +$('o_sparkle').value,
+    splitColors: $('o_splitColors').checked, clip: $('o_clip').checked, bg: $('o_bg').checked,
+    rough: $('o_rough').checked, roughColor: $('o_roughColor').value
+  };
+}
+
+/* ---------- 입력 ---------- */
+const drop = $('drop');
+drop.addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ''; });
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) drop.classList.remove('over'); });
+document.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); });
+document.addEventListener('drop', e => { const f = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith('image/')); if (f) loadFile(f); });
+document.addEventListener('paste', e => {
+  const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+  if (it) loadFile(it.getAsFile());
+});
+$('sampleBtn').addEventListener('click', () => setSource(drawSample(), 'sample'));
+$('runBtn').addEventListener('click', run);
+
+function loadFile(file) {
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => { URL.revokeObjectURL(url); setSource(im, (file.name || 'illustration').replace(/\.[^.]+$/, '')); };
+  im.onerror = () => { URL.revokeObjectURL(url); toast('이미지를 읽을 수 없습니다.'); };
+  im.src = url;
+}
+
+function setSource(imgOrCanvas, name) {
+  const w0 = imgOrCanvas.naturalWidth || imgOrCanvas.width, h0 = imgOrCanvas.naturalHeight || imgOrCanvas.height;
+  state.original = imgOrCanvas; state.name = name;
+  prepareSource();
+  if (w0 * h0 > 16e6 && +$('o_maxSize').value === 0) toast('큰 이미지입니다. 처리에 시간이 걸리거나 메모리가 부족할 수 있어요.', 4000);
+  $('runBtn').disabled = false;
+  run();
+}
+function prepareSource() {
+  const im = state.original, w0 = im.naturalWidth || im.width, h0 = im.naturalHeight || im.height;
+  const max = +$('o_maxSize').value, s = max > 0 && Math.max(w0, h0) > max ? max / Math.max(w0, h0) : 1;
+  const w = Math.max(1, Math.round(w0 * s)), h = Math.max(1, Math.round(h0 * s));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const cx = c.getContext('2d', { willReadFrequently: true });
+  cx.imageSmoothingQuality = 'high'; cx.drawImage(im, 0, 0, w, h);
+  state.src = { canvas: c, data: cx.getImageData(0, 0, w, h) };
+}
+
+/* ---------- 처리 (Web Worker, 실패 시 메인 스레드) ---------- */
+function getWorker() {
+  if (worker !== null) return worker;
+  try {
+    const src = `const Core = (${IllustracyCore.toString()})();
+function collect(ls, t) { for (const l of ls) { if (l.children) collect(l.children, t); else if (l.data && l.data.byteLength) t.push(l.data.buffer); } }
+self.onmessage = e => {
+  const { id, img, opts } = e.data;
+  try {
+    const res = Core.process(img, opts, (p, label) => self.postMessage({ id, type: 'progress', p, label }));
+    const t = []; collect(res.layers, t);
+    self.postMessage({ id, type: 'done', res }, t);
+  } catch (err) { self.postMessage({ id, type: 'error', message: String((err && err.message) || err) }); }
+};`;
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  } catch (e) { worker = false; }
+  return worker;
+}
+function runCore(img, opts, onProgress) {
+  return new Promise((resolve, reject) => {
+    const mainThread = async () => {
+      worker = false;
+      try {
+        onProgress(0.01, '메인 스레드에서 처리 중…');
+        await new Promise(r => setTimeout(r, 40));
+        resolve(IllustracyCore().process(img, opts, () => {}));
+      } catch (e) { reject(e); }
+    };
+    const w = getWorker();
+    if (!w) return mainThread();
+    const id = ++state.jobId;
+    w.onmessage = e => {
+      const d = e.data; if (d.id !== id) return;
+      if (d.type === 'progress') onProgress(d.p, d.label);
+      else if (d.type === 'done') resolve(d.res);
+      else reject(new Error(d.message));
+    };
+    w.onerror = ev => { if (ev.preventDefault) ev.preventDefault(); w.terminate(); mainThread(); };
+    w.postMessage({ id, img: { width: img.width, height: img.height, data: img.data }, opts });
+  });
+}
+
+function setProgress(p, label) {
+  $('progress').classList.add('on');
+  $('progBar').style.width = Math.round(p * 100) + '%';
+  if (label) $('progLabel').textContent = label;
+}
+
+async function run() {
+  if (!state.original || state.busy) return;
+  state.busy = true;
+  $('runBtn').disabled = $('psdBtn').disabled = $('pngBtn').disabled = true;
+  prepareSource();
+  showCanvas(state.src.canvas.width, state.src.canvas.height);
+  drawOriginal();
+  setProgress(0, '분석 준비');
+  try {
+    const res = await runCore(state.src.data, readOpts(), setProgress);
+    installResult(res);
+    const s = res.stats;
+    $('stat').textContent = `${res.width}×${res.height} · ${(s.ms / 1000).toFixed(1)}초 · 밑색 ${s.colors}색 · 재현 PSNR ${s.psnr >= 99 ? '∞' : s.psnr.toFixed(1)} dB`;
+    toast(`분리 완료 — 레이어 ${countLayers(res.layers)}개`);
+  } catch (e) {
+    console.error(e);
+    toast('처리 실패: ' + (e.message || e), 5000);
+  } finally {
+    $('progress').classList.remove('on');
+    state.busy = false;
+    $('runBtn').disabled = false; $('runBtn').textContent = '레이어 분리';
+  }
+}
+const countLayers = ls => ls.reduce((n, l) => n + (l.group ? countLayers(l.children) : 1), 0);
+
+function installResult(res) {
+  const walk = ls => ls.forEach(L => {
+    if (L.group) return walk(L.children);
+    if (L.w && L.h) {
+      const c = document.createElement('canvas'); c.width = L.w; c.height = L.h;
+      c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(L.data.buffer, L.data.byteOffset, L.w * L.h * 4), L.w, L.h), 0, 0);
+      L._canvas = c;
+    }
+  });
+  walk(res.layers);
+  state.result = res;
+  state.selected = null;
+  renderLayerList();
+  render();
+  $('psdBtn').disabled = $('pngBtn').disabled = false;
+}
+
+/* ---------- 합성 ---------- */
+function compositeInto(ctx, layers) {
+  let baseVisible = true;
+  for (const L of layers) {
+    if (!L.clipping) baseVisible = L.visible;
+    if (!L.visible || (L.clipping && !baseVisible)) continue;
+    if (L.group) {
+      if (L.opacity < 255 || (L.blend !== 'pass' && L.blend !== 'norm')) {
+        const off = document.createElement('canvas'); off.width = ctx.canvas.width; off.height = ctx.canvas.height;
+        compositeInto(off.getContext('2d'), L.children);
+        ctx.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over'; ctx.globalAlpha = L.opacity / 255;
+        ctx.drawImage(off, 0, 0);
+      } else compositeInto(ctx, L.children);
+      continue;
+    }
+    if (!L._canvas) continue;
+    ctx.globalCompositeOperation = BLEND_OP[L.blend] || 'source-over';
+    ctx.globalAlpha = L.opacity / 255;
+    ctx.drawImage(L._canvas, L.x, L.y);
+  }
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+}
+function compositeCanvas(opaque) {
+  const r = state.result, c = document.createElement('canvas'); c.width = r.width; c.height = r.height;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  if (opaque) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+  compositeInto(ctx, r.layers);
+  return c;
+}
+
+function showCanvas(w, h) {
+  const v = $('view');
+  if (v.width !== w || v.height !== h) { v.width = w; v.height = h; $('wrap').hidden = false; $('empty').hidden = true; fit(); }
+}
+function drawOriginal() {
+  const ctx = $('view').getContext('2d');
+  ctx.clearRect(0, 0, $('view').width, $('view').height);
+  ctx.drawImage(state.src.canvas, 0, 0);
+}
+function render() {
+  const r = state.result; if (!r) return;
+  const v = $('view'), ctx = v.getContext('2d', { willReadFrequently: true });
+  showCanvas(r.width, r.height);
+  ctx.clearRect(0, 0, v.width, v.height);
+  if (state.view === 'orig') return drawOriginal();
+  if (state.view === 'solo') {
+    const L = state.selected;
+    if (!L) { ctx.fillStyle = '#888'; ctx.font = '20px sans-serif'; ctx.fillText('레이어를 선택하세요', 20, 40); return; }
+    if (L.group) compositeInto(ctx, L.children);
+    else if (L._canvas) ctx.drawImage(L._canvas, L.x, L.y);
+    return;
+  }
+  if (state.view === 'diff') {
+    const a = compositeCanvas(!r.stats.hasAlpha).getContext('2d').getImageData(0, 0, v.width, v.height).data;
+    const b = state.src.data.data, out = ctx.createImageData(v.width, v.height), o = out.data;
+    for (let i = 0; i < a.length; i += 4) {
+      for (let c = 0; c < 3; c++) o[i + c] = Math.min(255, Math.abs(a[i + c] - b[i + c]) * 8);
+      o[i + 3] = 255;
+    }
+    ctx.putImageData(out, 0, 0);
+    return;
+  }
+  compositeInto(ctx, r.layers);
+}
+
+document.querySelectorAll('#viewSeg button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#viewSeg button').forEach(x => x.classList.toggle('on', x === b));
+  state.view = b.dataset.view;
+  if (state.result) render(); else if (state.src) drawOriginal();
+}));
+
+/* ---------- 확대/이동 ---------- */
+const stage = $('stage'), wrap = $('wrap');
+function applyTransform() {
+  wrap.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.zoom})`;
+  $('view').style.imageRendering = state.zoom >= 2 ? 'pixelated' : 'auto';
+  $('zoomLbl').textContent = Math.round(state.zoom * 100) + '%';
+}
+function fit() {
+  const v = $('view'), sw = stage.clientWidth, sh = stage.clientHeight;
+  if (!v.width || !sw) return;
+  state.zoom = Math.min((sw - 32) / v.width, (sh - 32) / v.height, 4);
+  state.tx = (sw - v.width * state.zoom) / 2; state.ty = (sh - v.height * state.zoom) / 2;
+  applyTransform();
+}
+function zoomAt(z, cx, cy) {
+  z = Math.min(32, Math.max(0.05, z));
+  state.tx = cx - (cx - state.tx) * z / state.zoom; state.ty = cy - (cy - state.ty) * z / state.zoom; state.zoom = z;
+  applyTransform();
+}
+$('fitBtn').addEventListener('click', fit);
+$('oneBtn').addEventListener('click', () => zoomAt(1, stage.clientWidth / 2, stage.clientHeight / 2));
+stage.addEventListener('wheel', e => {
+  if (wrap.hidden) return; e.preventDefault();
+  const r = stage.getBoundingClientRect();
+  zoomAt(state.zoom * Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+let drag = null;
+stage.addEventListener('pointerdown', e => { if (wrap.hidden) return; drag = { x: e.clientX, y: e.clientY, tx: state.tx, ty: state.ty }; stage.setPointerCapture(e.pointerId); stage.classList.add('dragging'); });
+stage.addEventListener('pointermove', e => { if (!drag) return; state.tx = drag.tx + e.clientX - drag.x; state.ty = drag.ty + e.clientY - drag.y; applyTransform(); });
+stage.addEventListener('pointerup', () => { drag = null; stage.classList.remove('dragging'); });
+window.addEventListener('resize', () => { if (!wrap.hidden) fit(); });
+
+/* ---------- 레이어 패널 ---------- */
+function thumbFor(L) {
+  const r = state.result, s = 44 / Math.max(r.width, r.height);
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(r.width * s)); c.height = Math.max(1, Math.round(r.height * s));
+  const ctx = c.getContext('2d');
+  if (L._canvas) ctx.drawImage(L._canvas, L.x * s, L.y * s, L.w * s, L.h * s);
+  return c;
+}
+function renderLayerList() {
+  const box = $('layers'); box.innerHTML = '';
+  const addRows = (layers, child) => {
+    for (let i = layers.length - 1; i >= 0; i--) {
+      const L = layers[i];
+      box.appendChild(layerRow(L, child));
+      if (L.group && L.open) addRows(L.children, true);
+    }
+  };
+  addRows(state.result.layers, false);
+}
+function layerRow(L, child) {
+  const row = document.createElement('div');
+  row.className = 'layer' + (child ? ' child' : '') + (L.group ? ' group' : '') + (state.selected === L ? ' sel' : '');
+  const eye = document.createElement('button');
+  eye.className = 'eye' + (L.visible ? ' on' : ''); eye.title = '표시/숨김';
+  eye.addEventListener('click', e => { e.stopPropagation(); L.visible = !L.visible; eye.classList.toggle('on', L.visible); render(); });
+  const th = document.createElement('div'); th.className = 'thumb' + (L.group ? ' folder' : '');
+  if (L.group) {
+    th.textContent = L.open ? '▾' : '▸'; th.title = '펼치기/접기';
+    th.addEventListener('click', e => { e.stopPropagation(); L.open = !L.open; renderLayerList(); });
+  } else th.appendChild(thumbFor(L));
+  const meta = document.createElement('div'); meta.className = 'meta';
+  const nm = document.createElement('div'); nm.className = 'name'; nm.textContent = L.name;
+  nm.addEventListener('dblclick', e => {
+    e.stopPropagation(); nm.contentEditable = 'true'; nm.focus();
+    document.getSelection().selectAllChildren(nm);
+  });
+  nm.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); nm.blur(); } });
+  nm.addEventListener('blur', () => { nm.contentEditable = 'false'; L.name = nm.textContent.trim() || L.name; nm.textContent = L.name; });
+  const sub = document.createElement('div'); sub.className = 'sub';
+  const info = L.group ? `그룹 · ${L.children.length}개` : `${BLEND_KO[L.blend] || L.blend} · ${Math.round(L.opacity / 2.55)}%` + (L.w ? '' : ' · 비어 있음');
+  sub.innerHTML = (L.clipping ? '<span class="clip" title="아래 레이어에 클리핑">↳</span>' : '') + `<span>${info}</span>`;
+  meta.append(nm, sub);
+  row.append(eye, th, meta);
+
+  const ctrl = document.createElement('div'); ctrl.className = 'ctrl';
+  const sel = document.createElement('select');
+  for (const [k, ko] of BLENDS) { if (k === 'pass' && !L.group) continue; const o = new Option(ko, k); o.selected = k === L.blend; sel.appendChild(o); }
+  sel.addEventListener('click', e => e.stopPropagation());
+  sel.addEventListener('change', () => { L.blend = sel.value; render(); updateSub(); });
+  const op = document.createElement('input'); op.type = 'range'; op.min = 0; op.max = 100; op.value = Math.round(L.opacity / 2.55);
+  const opv = document.createElement('span'); opv.className = 'op'; opv.textContent = op.value + '%';
+  op.addEventListener('click', e => e.stopPropagation());
+  op.addEventListener('input', () => { L.opacity = Math.round(op.value * 2.55); opv.textContent = op.value + '%'; render(); updateSub(); });
+  ctrl.append(sel, op, opv);
+  if (!L.group && L.w) {
+    const dl = document.createElement('button'); dl.textContent = 'PNG'; dl.title = '이 레이어만 PNG로 저장';
+    dl.addEventListener('click', e => { e.stopPropagation(); saveLayerPNG(L); });
+    ctrl.appendChild(dl);
+  }
+  row.appendChild(ctrl);
+  function updateSub() { sub.querySelector('span:last-child').textContent = L.group ? `그룹 · ${L.children.length}개` : `${BLEND_KO[L.blend] || L.blend} · ${Math.round(L.opacity / 2.55)}%` + (L.w ? '' : ' · 비어 있음'); }
+
+  row.addEventListener('click', () => {
+    state.selected = state.selected === L ? null : L;
+    document.querySelectorAll('.layer.sel').forEach(x => x.classList.remove('sel'));
+    if (state.selected) row.classList.add('sel');
+    if (state.view === 'solo') render();
+  });
+  return row;
+}
+
+/* ---------- 저장 ---------- */
+function download(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function saveLayerPNG(L) {
+  const r = state.result, c = document.createElement('canvas'); c.width = r.width; c.height = r.height;
+  c.getContext('2d').drawImage(L._canvas, L.x, L.y);
+  c.toBlob(b => download(b, `${state.name}_${L.name.replace(/[\\/:*?"<>|#\s]+/g, '_')}.png`), 'image/png');
+}
+$('pngBtn').addEventListener('click', () => {
+  compositeCanvas(!state.result.stats.hasAlpha).toBlob(b => download(b, `${state.name}_composite.png`), 'image/png');
+});
+$('psdBtn').addEventListener('click', async () => {
+  const r = state.result; if (!r) return;
+  $('psdBtn').disabled = true;
+  setProgress(0, 'PSD 작성 중');
+  try {
+    const comp = compositeCanvas(!r.stats.hasAlpha).getContext('2d').getImageData(0, 0, r.width, r.height).data;
+    const blob = await PSD.write({ width: r.width, height: r.height, layers: r.layers, composite: comp, hasAlpha: r.stats.hasAlpha },
+      p => setProgress(p, 'PSD 작성 중'));
+    download(blob, `${state.name}_layers.psd`);
+    toast(`PSD 저장 (${(blob.size / 1048576).toFixed(1)} MB)`);
+  } catch (e) {
+    console.error(e); toast('PSD 작성 실패: ' + (e.message || e), 5000);
+  } finally {
+    $('progress').classList.remove('on'); $('psdBtn').disabled = false;
+  }
+});
+
+/* ---------- 예제 그림 (셀 채색 + 선화 + 하이라이트 + 반짝임 + 빛 효과) ---------- */
+function drawSample() {
+  const S = 800, c = document.createElement('canvas'); c.width = c.height = S;
+  const x = c.getContext('2d');
+  const LINE = '#2b2233', lw = 5;
+  x.lineJoin = x.lineCap = 'round';
+  x.fillStyle = '#eef0fb'; x.fillRect(0, 0, S, S);
+  const shape = (path, base, shade, extra) => {
+    x.save(); path(); x.fillStyle = base; x.fill();
+    x.clip(); if (shade) shade(); if (extra) extra(); x.restore();
+    x.save(); path(); x.strokeStyle = LINE; x.lineWidth = lw; x.stroke(); x.restore();
+  };
+  const ell = (cx, cy, rx, ry) => () => { x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); };
+  const fillE = (cx, cy, rx, ry, col) => { x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); x.fillStyle = col; x.fill(); };
+  // 뒷머리
+  shape(() => { x.beginPath(); x.moveTo(215, 330); x.bezierCurveTo(190, 520, 230, 640, 260, 660); x.lineTo(540, 660); x.bezierCurveTo(575, 620, 610, 520, 585, 330); x.closePath(); },
+    '#7a55b5', () => { x.fillStyle = '#563a8a'; x.fillRect(200, 470, 420, 220); });
+  // 몸통(셔츠)
+  shape(() => { x.beginPath(); x.moveTo(290, 590); x.quadraticCurveTo(400, 560, 510, 590); x.lineTo(610, 800); x.lineTo(190, 800); x.closePath(); },
+    '#f28c8c', () => { fillE(250, 760, 120, 170, '#c9646e'); },
+    () => { x.fillStyle = '#ffffff'; x.strokeStyle = LINE; x.lineWidth = lw; x.beginPath(); x.moveTo(360, 580); x.lineTo(400, 650); x.lineTo(440, 580); x.closePath(); x.fill(); x.stroke(); });
+  // 목
+  shape(() => { x.beginPath(); x.rect(365, 470, 70, 120); }, '#ffe0cc', () => { fillE(400, 490, 60, 45, '#f0b9a5'); });
+  // 얼굴
+  shape(ell(400, 340, 165, 175), '#ffe0cc', () => {
+    x.fillStyle = '#f0b9a5'; x.fillRect(200, 150, 420, 400);
+    fillE(425, 318, 160, 170, '#ffe0cc');
+    fillE(310, 405, 30, 16, '#ffc4c0'); fillE(492, 405, 30, 16, '#ffc4c0');
+  });
+  // 눈
+  for (const ex of [330, 470]) {
+    shape(ell(ex, 350, 38, 46), '#ffffff', () => { fillE(ex, 318, 44, 22, '#dcd8ee'); });
+    shape(ell(ex, 358, 27, 36), '#3a7bd5', () => { fillE(ex, 330, 34, 20, '#24508f'); fillE(ex, 360, 12, 16, '#1b2a4a'); fillE(ex, 385, 18, 8, '#7fb0f0'); });
+    fillE(ex - 10, 340, 9, 11, '#ffffff'); fillE(ex + 11, 372, 4.5, 4.5, '#ffffff');
+  }
+  // 입
+  x.beginPath(); x.arc(400, 440, 18, 0.15 * Math.PI, 0.85 * Math.PI); x.strokeStyle = LINE; x.lineWidth = 4; x.stroke();
+  // 앞머리
+  shape(() => {
+    x.beginPath(); x.moveTo(225, 330); x.bezierCurveTo(215, 190, 300, 135, 400, 135); x.bezierCurveTo(505, 135, 590, 190, 578, 330);
+    x.lineTo(545, 270); x.lineTo(515, 320); x.lineTo(470, 240); x.lineTo(430, 300); x.lineTo(395, 230); x.lineTo(350, 300);
+    x.lineTo(320, 245); x.lineTo(280, 320); x.lineTo(255, 270); x.closePath();
+  }, '#7a55b5', () => {
+    x.fillStyle = '#563a8a'; x.beginPath(); x.moveTo(200, 250); x.lineTo(300, 250); x.lineTo(270, 340); x.lineTo(200, 340); x.fill();
+    x.beginPath(); x.moveTo(600, 240); x.lineTo(520, 250); x.lineTo(560, 340); x.lineTo(600, 340); x.fill();
+  }, () => {
+    x.strokeStyle = '#b39ae0'; x.lineWidth = 16; x.beginPath(); x.arc(400, 330, 150, 1.22 * Math.PI, 1.42 * Math.PI); x.stroke();
+    x.beginPath(); x.arc(400, 330, 150, 1.55 * Math.PI, 1.75 * Math.PI); x.stroke();
+  });
+  // 반짝임(별)
+  const star = (cx, cy, r) => {
+    x.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * 0.22 : r; x.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+    x.closePath(); x.fillStyle = '#ffffff'; x.fill();
+  };
+  star(520, 200, 13); star(270, 700, 10); star(455, 690, 8); star(335, 185, 7);
+  // 빛 효과
+  x.globalCompositeOperation = 'screen';
+  const g = x.createRadialGradient(740, 70, 10, 740, 70, 330);
+  g.addColorStop(0, 'rgba(255,214,120,0.55)'); g.addColorStop(1, 'rgba(255,214,120,0)');
+  x.fillStyle = g; x.fillRect(0, 0, S, S);
+  x.globalCompositeOperation = 'source-over';
+  return c;
+}
+</script>
+</body>
+</html>
