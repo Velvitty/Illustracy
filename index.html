@@ -635,34 +635,23 @@ function detectBackground(U, known, W, H) {
   return bg;
 }
 
-/* 장면 배경: 캐릭터·소품은 선으로 그려지고 배경은 선 없이 칠해지는 경우가 많다.
- * 선이 드문 곳 중 이미지 테두리와 이어진 영역을 배경으로 본다(좁은 틈으로는 새지 않게 침식 후 복원). */
-function detectSceneBg(U, known, lineMask, W, H, scale) {
-  const N = W * H, lm = new Float32Array(N);
-  let nl = 0;
-  for (let p = 0; p < N; p++) if (lineMask[p]) { lm[p] = 1; nl++; }
-  if (nl < N * 0.002) return null;
-  const D = blur(lm, W, H, Math.max(W, H) * 0.02);
-  const hist = new Int32Array(1001);                  // 선이 있는 곳의 전형적인 선 밀도(중앙값)
-  for (let p = 0; p < N; p++) if (lineMask[p]) hist[Math.min(1000, Math.round(D[p] * 1000))]++;
-  let acc = 0, med = 0;
-  for (let i = 0; i <= 1000; i++) { acc += hist[i]; if (acc * 2 >= nl) { med = i / 1000; break; } }
-  const tau = med * 0.25, cand = new Float32Array(N);
-  for (let p = 0; p < N; p++) cand[p] = known[p] && D[p] < tau ? 1 : 0;
-  const r = Math.max(2, Math.round(3 * scale));
-  const core = erode(cand, W, H, r), bg = new Uint8Array(N), dist = new Int32Array(N).fill(-1);
+/* 장면 배경
+ * 1단계: 캐릭터·소품은 선으로 그리고 배경은 선 없이 칠하는 경우 — 선이 드문 곳 중 테두리와 이어진 영역.
+ *        선 밀도를 흐려서 쓰므로 모든 선 둘레에 두꺼운 띠가 생겨, 윤곽선의 작은 틈으로는 새지 않는다.
+ * 2단계: 배경을 흐리게(피사계 심도) 또는 잔 결로 그린 경우 — 1단계 배경(또는 위·왼쪽·오른쪽 테두리)에서 출발해,
+ *        "진하고 선명한 선"은 없고 흐린 자국만 빽빽한 곳(선반, 글씨, 무늬)으로만 넓힌다.
+ *        아래 테두리는 캐릭터가 잘려 있는 경우가 많아 씨앗으로 쓰지 않는다.
+ * 두 단계 모두 좁은 틈으로 새지 않게 후보를 침식한 뒤 채우고 다시 복원한다. */
+function floodCand(cand, seeds, W, H, r) {
+  const N = W * H, core = erode(cand, W, H, r), bg = new Uint8Array(N);
   let front = [];
-  const border = [];
-  for (let x = 0; x < W; x++) border.push(x, (H - 1) * W + x);
-  for (let y = 1; y < H - 1; y++) border.push(y * W, y * W + W - 1);
-  for (const p of border) if (core[p] > 0.5 && dist[p] < 0) { dist[p] = 0; front.push(p); }
-  while (front.length) {                               // 침식된 후보 안에서 테두리부터 채우기
+  for (const p of seeds) if (core[p] > 0.5 && !bg[p]) { bg[p] = 1; front.push(p); }
+  while (front.length) {
     const next = [];
     for (const p of front) {
-      bg[p] = 1;
       const x = p % W;
       for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
-        if (q >= 0 && dist[q] < 0 && core[q] > 0.5) { dist[q] = 0; next.push(q); }
+        if (q >= 0 && !bg[q] && core[q] > 0.5) { bg[q] = 1; next.push(q); }
       }
     }
     front = next;
@@ -679,10 +668,53 @@ function detectSceneBg(U, known, lineMask, W, H, scale) {
     }
     front = next;
   }
+  return bg;
+}
+
+function detectSceneBg(U, known, lineMask, crisp, W, H, scale) {
+  const N = W * H, sig = Math.max(W, H) * 0.02;
+  const all = new Float32Array(N), cr = new Float32Array(N), soft = new Float32Array(N);
+  let nl = 0, nc = 0;
+  for (let p = 0; p < N; p++) {
+    if (!lineMask[p]) continue;
+    all[p] = 1; nl++;
+    if (crisp[p]) { cr[p] = 1; nc++; } else soft[p] = 1;
+  }
+  if (nl < N * 0.002) return null;
+  const Da = blur(all, W, H, sig), Dc = blur(cr, W, H, sig), Ds = blur(soft, W, H, sig);
+  const median = (D, mask, n) => {                     // 선이 있는 곳의 전형적인 밀도
+    const hist = new Int32Array(1001);
+    for (let p = 0; p < N; p++) if (mask[p]) hist[Math.min(1000, Math.round(D[p] * 1000))]++;
+    let acc = 0;
+    for (let i = 0; i <= 1000; i++) { acc += hist[i]; if (acc * 2 >= n) return i / 1000; }
+    return 0;
+  };
+  const tauA = median(Da, lineMask, nl) * 0.25, tauC = nc ? median(Dc, crisp, nc) * 0.25 : 0;
+  const r = Math.max(2, Math.round(3 * scale));
+  const upper = [], bottom = [];                      // upper = 위 · 왼쪽 · 오른쪽 테두리
+  for (let x = 0; x < W; x++) { upper.push(x); bottom.push((H - 1) * W + x); }
+  for (let y = 1; y < H - 1; y++) { upper.push(y * W, y * W + W - 1); }
+  // 1단계
+  const cand1 = new Float32Array(N);
+  for (let p = 0; p < N; p++) cand1[p] = known[p] && Da[p] < tauA ? 1 : 0;
+  const bg = floodCand(cand1, upper.concat(bottom), W, H, r);
+  // 2단계
+  if (nc) {
+    const cand2 = new Float32Array(N);
+    for (let p = 0; p < N; p++) {
+      if (cand1[p]) { cand2[p] = 1; continue; }
+      if (Dc[p] < tauC && Ds[p] >= 0.085 && (known[p] || (lineMask[p] && !crisp[p]))) cand2[p] = 1;
+    }
+    const seeds = [];
+    for (let p = 0; p < N; p++) if (bg[p]) seeds.push(p);
+    for (const p of upper) seeds.push(p);              // 아래 테두리는 제외
+    const bg2 = floodCand(cand2, seeds, W, H, r);
+    for (let p = 0; p < N; p++) if (bg2[p]) bg[p] = 1;
+  }
   // 캐릭터 둘레 여백: 선을 넘지 않고, 배경과 색이 매끄럽게 이어지는 곳까지 넓힌다
   // (여백 폭 정도까지만: 배경과 같은 색의 가는 소품을 따라 멀리 새지 않게)
   const rf = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
-  front = [];
+  let front = [];
   for (let p = 0; p < N; p++) if (bg[p]) { for (let c = 0; c < 3; c++) rf[c][p] = U[c][p]; front.push(p); }
   const maxGrow = Math.round(Math.max(W, H) * 0.05);
   for (let d = 0; d < maxGrow && front.length; d++) {
@@ -820,6 +852,16 @@ function process(img, opts, progress) {
     for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && dist[p] >= lim) far[cc.rid[p]] = 1;
     for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && !far[cc.rid[p]]) lineMask[p] = 1;
   }
+  // 선명한 선: 진하고(알파 0.45+) 얇고 또렷한(살짝 흐리면 깊이의 25% 이상이 사라지는) 선. 흐린 배경 자국과 구분
+  const crisp = new Uint8Array(N);
+  {
+    const bl = blur(Lw, W, H, 1.5);
+    for (let p = 0; p < N; p++) {
+      if (!lineMask[p]) continue;
+      const d = closeL[p] - Lw[p];
+      if (d > 0.02 && strength[p] >= 0.45 && (bl[p] - Lw[p]) / d >= 0.25) crisp[p] = 1;
+    }
+  }
   const inMask = new Uint8Array(N);                  // 선 + 안티에일리어싱 가장자리 1px
   for (let p = 0; p < N; p++) {
     if (!lineMask[p]) continue;
@@ -929,7 +971,7 @@ function process(img, opts, progress) {
   progress(0.24, '배경 판별');
   let bgMask = opts.bg && !hasAlpha ? detectBackground(U, known, W, H) : null;
   if (opts.bg && !hasAlpha) {                          // 선 없이 칠한 장면 배경도 배경으로
-    const scene = detectSceneBg(U, known, lineMask, W, H, scale);
+    const scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale);
     if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
   }
   // 배경 위에 떠 있는 작은 조각(입자, 빛줄기 조각)은 캐릭터 파츠가 아니라 "배경 + 효과"로 본다
@@ -954,9 +996,11 @@ function process(img, opts, progress) {
   if (bgMask) {
     const lc = components(new Int32Array(N), lineMask, W, H), n = lc.count;
     const nbBg = new Int32Array(n), nbAll = new Int32Array(n), cs = new Float64Array(n * 3), cn = new Int32Array(n), bs = new Float64Array(n * 3);
+    const inBg = new Int32Array(n);
     for (let p = 0; p < N; p++) {
       const r = lc.rid[p]; if (r < 0) continue;
       cn[r]++; for (let c = 0; c < 3; c++) cs[r * 3 + c] += O[c][p];
+      if (bgMask[p]) inBg[r]++;
       const x = p % W;
       for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
         if (q < 0 || inMask[q]) continue;
@@ -984,6 +1028,7 @@ function process(img, opts, progress) {
     let anyDrop = false, totalLine = 0;
     for (let r = 0; r < n; r++) totalLine += cn[r];
     for (let r = 0; r < n; r++) {
+      if (inBg[r] >= cn[r] * 0.5) { drop[r] = 1; anyDrop = true; continue; } // 배경 판정에 흡수된 흐린 자국
       if (!nbAll[r] || nbBg[r] < nbAll[r] * 0.85) continue;
       if (!nearChar[r]) { drop[r] = 1; anyDrop = true; continue; }
       // 배경 안에 떠 있는 작은 선 조각(배경 그림의 선: 창틀, 구름, 크레이터 …)은 배경 그림에 남긴다
@@ -992,6 +1037,8 @@ function process(img, opts, progress) {
       const l2 = labOf(bs[r * 3] / nbBg[r], bs[r * 3 + 1] / nbBg[r], bs[r * 3 + 2] / nbBg[r]);
       if (Math.hypot(l1[0] - l2[0], l1[1] - l2[1], l1[2] - l2[2]) < 15) { drop[r] = 1; anyDrop = true; }
     }
+    // 배경 판정이 흡수한 흐린 자국은(선명한 선이 아니면) 조각 단위가 아니라 픽셀 단위로도 배경 그림에 돌려준다
+    for (let p = 0; p < N && !anyDrop; p++) if (lineMask[p] && bgMask[p] && !crisp[p]) anyDrop = true;
     if (anyDrop) {
       const clear = (p, asBg) => {
         lineA[p] = 0; inMask[p] = 0; known[p] = A[p] > 0.02 ? 1 : 0;
@@ -999,7 +1046,10 @@ function process(img, opts, progress) {
         U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p];
         if (asBg) { bgMask[p] = 1; if (bgFx) bgFx[p] = 0; }
       };
-      for (let p = 0; p < N; p++) if (lc.rid[p] >= 0 && drop[lc.rid[p]]) { lineMask[p] = 0; clear(p, true); }
+      for (let p = 0; p < N; p++) {
+        if (!lineMask[p]) continue;
+        if ((lc.rid[p] >= 0 && drop[lc.rid[p]]) || (bgMask[p] && !crisp[p])) { lineMask[p] = 0; clear(p, true); }
+      }
       // 지운 선의 가장자리 픽셀: 남은 선과 닿아 있지 않으면 선 영역에서 빼고, 배경과 닿아 있으면 배경으로
       for (let p = 0; p < N; p++) {
         if (!inMask[p] || lineMask[p]) continue;
