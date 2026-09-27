@@ -573,34 +573,63 @@ function shadeRelated(c1, c2, hueTol, simTol) {
 }
 
 function detectBackground(U, known, W, H) {
-  const N = W * H, hist = new Int32Array(4096), border = [];
-  for (let x = 0; x < W; x++) { border.push(x, (H - 1) * W + x); }
-  for (let y = 1; y < H - 1; y++) { border.push(y * W, y * W + W - 1); }
+  const N = W * H, hist = new Int32Array(4096), path = [];
+  // 테두리를 한 바퀴 도는 순서(위 → 오른쪽 → 아래 → 왼쪽)
+  for (let x = 0; x < W; x++) path.push(x);
+  for (let y = 1; y < H; y++) path.push(y * W + W - 1);
+  for (let x = W - 2; x >= 0; x--) path.push((H - 1) * W + x);
+  for (let y = H - 2; y > 0; y--) path.push(y * W);
   const q4 = p => ((U[0][p] * 15.99) | 0) << 8 | ((U[1][p] * 15.99) | 0) << 4 | ((U[2][p] * 15.99) | 0);
   let nb = 0;
-  for (const p of border) if (known[p]) { hist[q4(p)]++; nb++; }
+  for (const p of path) if (known[p]) { hist[q4(p)]++; nb++; }
   if (nb < 16) return null;
   let mode = 0;
   for (let i = 1; i < 4096; i++) if (hist[i] > hist[mode]) mode = i;
   const ref = [0, 0, 0]; let rc = 0;
-  for (const p of border) if (known[p] && q4(p) === mode) { ref[0] += U[0][p]; ref[1] += U[1][p]; ref[2] += U[2][p]; rc++; }
+  for (const p of path) if (known[p] && q4(p) === mode) { ref[0] += U[0][p]; ref[1] += U[1][p]; ref[2] += U[2][p]; rc++; }
   ref[0] /= rc; ref[1] /= rc; ref[2] /= rc;
-  const dRef = p => Math.max(Math.abs(U[0][p] - ref[0]), Math.abs(U[1][p] - ref[1]), Math.abs(U[2][p] - ref[2]));
+  const diff = (p, r0, r1, r2) => Math.max(Math.abs(U[0][p] - r0), Math.abs(U[1][p] - r1), Math.abs(U[2][p] - r2));
+  const step = (p, q) => Math.max(Math.abs(U[0][q] - U[0][p]), Math.abs(U[1][q] - U[1][p]), Math.abs(U[2][q] - U[2][p]));
   let match = 0;
-  for (const p of border) if (known[p] && dRef(p) < 0.1) match++;
+  for (const p of path) if (known[p] && diff(p, ref[0], ref[1], ref[2]) < 0.1) match++;
   if (match < nb * 0.45) return null;
-  const bg = new Uint8Array(N), stack = new Int32Array(N);
-  let sp = 0, area = 0;
-  for (const p of border) if (known[p] && !bg[p] && dRef(p) < 0.12) { bg[p] = 1; stack[sp++] = p; }
-  while (sp) {
-    const p = stack[--sp], x = p % W; area++;
-    const nb4 = [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1];
-    for (const q of nb4) {
-      if (q < 0 || bg[q] || !known[q]) continue;
-      const step = Math.max(Math.abs(U[0][q] - U[0][p]), Math.abs(U[1][q] - U[1][p]), Math.abs(U[2][q] - U[2][p]));
-      if (step < 0.035 && dRef(q) < 0.22) { bg[q] = 1; stack[sp++] = q; }
+  // 픽셀마다 기준색을 들고 퍼진다(그라데이션 배경은 씨앗마다 기준색이 다름)
+  const bg = new Uint8Array(N), stack = new Int32Array(N), rf = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+  let sp = 0;
+  const seed = (p, r0, r1, r2) => { bg[p] = 1; rf[0][p] = r0; rf[1][p] = r1; rf[2][p] = r2; stack[sp++] = p; };
+  const flood = tol => {
+    while (sp) {
+      const p = stack[--sp], x = p % W;
+      const nb4 = [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1];
+      for (const q of nb4) {
+        if (q < 0 || bg[q] || !known[q]) continue;
+        if (step(p, q) < 0.035 && diff(q, rf[0][p], rf[1][p], rf[2][p]) < tol) seed(q, rf[0][p], rf[1][p], rf[2][p]);
+      }
     }
+  };
+  for (const p of path) if (known[p] && !bg[p] && diff(p, ref[0], ref[1], ref[2]) < 0.12) seed(p, ref[0], ref[1], ref[2]);
+  flood(0.3);
+  // 테두리를 따라 색이 이어지는 곳은 같은 배경(아래로 밝아지는 그라데이션 등).
+  // 선 없이 테두리를 가로지르는 짧은 끊김(빛줄기 등, 64px 이하)은 건너뛴다
+  const L = path.length, last = [0, 0, 0];
+  for (let pass = 0; pass < 3; pass++) {
+    let added = false;
+    for (const dir of [1, -1]) {
+      let lastK = -1;
+      for (let k = 0; k < 2 * L; k++) {
+        const i = dir > 0 ? k % L : (2 * L - 1 - k) % L, p = path[i];
+        if (bg[p]) { lastK = k; last[0] = U[0][p]; last[1] = U[1][p]; last[2] = U[2][p]; continue; }
+        if (!known[p]) { lastK = -1; continue; }         // 선(윤곽)을 만나면 다른 물체의 경계이므로 끊는다
+        if (lastK < 0 || k - lastK > 64 || diff(p, last[0], last[1], last[2]) >= 0.05) continue;
+        seed(p, U[0][p], U[1][p], U[2][p]); added = true;
+        lastK = k; last[0] = U[0][p]; last[1] = U[1][p]; last[2] = U[2][p];
+      }
+    }
+    if (!added) break;
+    flood(0.12);                                       // 새 씨앗은 자기 색 주변만(옷 같은 어두운 면으로 새지 않게)
   }
+  let area = 0;
+  for (let p = 0; p < N; p++) area += bg[p];
   if (area < N * 0.03 || area > N * 0.97) return null;
   return bg;
 }
@@ -696,12 +725,13 @@ function process(img, opts, progress) {
       if (cn >= minLine) for (let i = 0; i < cn; i++) lineMask[comp[i]] = 1;
     }
   }
-  // 선이 모이는 교차점처럼 closing 창보다 넓은 어두운 덩어리는 선에서 이어서 채움
+  // 선이 모이는 교차점처럼 closing 창보다 넓은 어두운 덩어리는 선에서 이어서 채움.
+  // 단, 선 굵기 범위를 넘어 계속 이어지는 어두운 면(검은 옷, 어두운 배경)은 채우지 않는다.
   {
-    const ref = new Float32Array(N), dist = new Int32Array(N).fill(-1);
-    let front = [], lvl = 0;
+    const lim = lw + 1, ref = new Float32Array(N), dist = new Int32Array(N).fill(-1);
+    let front = [];
     for (let p = 0; p < N; p++) if (lineMask[p]) { dist[p] = 0; ref[p] = Lw[p]; front.push(p); }
-    while (front.length && lvl < lw) {
+    for (let lvl = 0; front.length && lvl < lim; lvl++) {
       const next = [];
       for (const p of front) {
         const x = p % W, y = (p / W) | 0;
@@ -710,11 +740,16 @@ function process(img, opts, progress) {
           if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
           const q = yy * W + xx;
           if (dist[q] >= 0 || Lw[q] > ref[p] + 0.05 || Lw[q] > 0.5) continue;
-          dist[q] = lvl + 1; ref[q] = ref[p]; lineMask[q] = 1; next.push(q);
+          dist[q] = lvl + 1; ref[q] = ref[p]; next.push(q);
         }
       }
-      front = next; lvl++;
+      front = next;
     }
+    const cand = new Uint8Array(N);
+    for (let p = 0; p < N; p++) cand[p] = dist[p] > 0 ? 1 : 0;
+    const cc = components(new Int32Array(N), cand, W, H), far = new Uint8Array(cc.count);
+    for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && dist[p] >= lim) far[cc.rid[p]] = 1;
+    for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && !far[cc.rid[p]]) lineMask[p] = 1;
   }
   const inMask = new Uint8Array(N);                  // 선 + 안티에일리어싱 가장자리 1px
   for (let p = 0; p < N; p++) {
@@ -770,7 +805,11 @@ function process(img, opts, progress) {
       const core = new Uint8Array(N), skip = new Uint8Array(N);
       for (let p = 0; p < N; p++) {
         skip[p] = inMask[p] ? 0 : 1;
-        if (inMask[p] && A[p] > 0.02 && lineA[p] > 0 && solve(p, lineK0) >= 0.9) { core[p] = 1; for (let c = 0; c < 3; c++) Cs[c][p] = O[c][p]; }
+        if (!inMask[p] || A[p] <= 0.02 || lineA[p] <= 0) continue;
+        const ak = solve(p, lineK0);
+        if (ak < 0.5) continue;                        // 절반 이상 덮인 픽셀은 아래색을 빼서 선 색을 추정
+        core[p] = 1;
+        for (let c = 0; c < 3; c++) Cs[c][p] = clamp01((O[c][p] - (1 - ak) * U[c][p]) / ak);
       }
       inpaint(Cs, core, W, H, skip);
       traceMask = new Uint8Array(N);
@@ -779,7 +818,7 @@ function process(img, opts, progress) {
       for (let p = 0; p < N; p++) {
         if (!inMask[p] || A[p] <= 0.02) continue;
         const cl = labOf(Cs[0][p], Cs[1][p], Cs[2][p]);
-        const tr = Math.hypot(cl[0] - k0[0], cl[1] - k0[1], cl[2] - k0[2]) > 10;
+        const tr = Math.hypot(cl[0] - k0[0], cl[1] - k0[1], cl[2] - k0[2]) > 6;
         for (let c = 0; c < 3; c++) col[c] = tr ? Cs[c][p] : lineK0[c];
         let a = solve(p, col);
         if (a <= 0.02) { a = 0; U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p]; }
@@ -800,6 +839,70 @@ function process(img, opts, progress) {
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
   const bgMask = opts.bg && !hasAlpha ? detectBackground(U, known, W, H) : null;
+  // 배경 위에 떠 있는 작은 조각(입자, 빛줄기 조각)은 캐릭터 파츠가 아니라 "배경 + 효과"로 본다
+  let bgFx = null, bgBase = null;
+  if (bgMask) {
+    const notBg = new Uint8Array(N);
+    for (let p = 0; p < N; p++) notBg[p] = !bgMask[p] && A[p] > 0.02 ? 1 : 0;
+    const cc = components(new Int32Array(N), notBg, W, H), area = new Int32Array(cc.count);
+    for (let p = 0; p < N; p++) if (cc.rid[p] >= 0) area[cc.rid[p]]++;
+    let any = false;
+    bgFx = new Uint8Array(N);
+    for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && area[cc.rid[p]] < N * 0.015) { bgFx[p] = 1; any = true; }
+    if (any) {
+      const Ubg = [Float32Array.from(U[0]), Float32Array.from(U[1]), Float32Array.from(U[2])], skip = new Uint8Array(N);
+      for (let p = 0; p < N; p++) skip[p] = notBg[p] && !bgFx[p] ? 1 : 0;
+      inpaint(Ubg, bgMask, W, H, skip);                // 조각 아래의 배경색을 주변에서 추정
+      bgBase = Ubg;
+      for (let p = 0; p < N; p++) if (bgFx[p]) { bgMask[p] = 1; for (let c = 0; c < 3; c++) bgBase[c][p] = Math.min(U[c][p], Ubg[c][p]); }
+    } else bgFx = null;
+  }
+  // 배경으로 거의 둘러싸여 있고 색도 주변 배경과 같은 "선"은 선이 아니라 배경이 드러난 틈(빛줄기 사이 등)
+  if (bgMask) {
+    const lc = components(new Int32Array(N), lineMask, W, H), n = lc.count;
+    const nbBg = new Int32Array(n), nbAll = new Int32Array(n), cs = new Float64Array(n * 3), cn = new Int32Array(n), bs = new Float64Array(n * 3);
+    for (let p = 0; p < N; p++) {
+      const r = lc.rid[p]; if (r < 0) continue;
+      cn[r]++; for (let c = 0; c < 3; c++) cs[r * 3 + c] += O[c][p];
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q < 0 || inMask[q]) continue;
+        nbAll[r]++;
+        if (bgMask[q]) { nbBg[r]++; for (let c = 0; c < 3; c++) bs[r * 3 + c] += U[c][q]; }
+      }
+    }
+    const drop = new Uint8Array(n);
+    let anyDrop = false;
+    for (let r = 0; r < n; r++) {
+      if (!nbAll[r] || nbBg[r] < nbAll[r] * 0.85) continue;
+      const l1 = labOf(cs[r * 3] / cn[r], cs[r * 3 + 1] / cn[r], cs[r * 3 + 2] / cn[r]);
+      const l2 = labOf(bs[r * 3] / nbBg[r], bs[r * 3 + 1] / nbBg[r], bs[r * 3 + 2] / nbBg[r]);
+      if (Math.hypot(l1[0] - l2[0], l1[1] - l2[1], l1[2] - l2[2]) < 15) { drop[r] = 1; anyDrop = true; }
+    }
+    if (anyDrop) {
+      const clear = (p, asBg) => {
+        lineA[p] = 0; inMask[p] = 0; known[p] = A[p] > 0.02 ? 1 : 0;
+        if (traceMask) traceMask[p] = 0;
+        U[0][p] = R[p]; U[1][p] = Gc[p]; U[2][p] = B[p];
+        if (asBg) { bgMask[p] = 1; if (bgFx) bgFx[p] = 0; }
+      };
+      for (let p = 0; p < N; p++) if (lc.rid[p] >= 0 && drop[lc.rid[p]]) { lineMask[p] = 0; clear(p, true); }
+      // 지운 선의 가장자리 픽셀: 남은 선과 닿아 있지 않으면 선 영역에서 빼고, 배경과 닿아 있으면 배경으로
+      for (let p = 0; p < N; p++) {
+        if (!inMask[p] || lineMask[p]) continue;
+        const x = p % W, y = (p / W) | 0;
+        let nearLine = false, nearBg = false;
+        for (let k = 0; k < 8; k++) {
+          const xx = x + NB8X[k], yy = y + NB8Y[k];
+          if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+          const q = yy * W + xx;
+          if (lineMask[q]) nearLine = true;
+          if (bgMask[q]) nearBg = true;
+        }
+        if (!nearLine) clear(p, nearBg);
+      }
+    }
+  }
 
   /* 4) 색 군집화(Lab k-means) → 연결 성분 → 잔조각 제거 */
   progress(0.3, '색 군집화');
@@ -954,7 +1057,8 @@ function process(img, opts, progress) {
     }
   }
   if (!toneGroup.length) { toneGroup.push(0); toneLab.push([100, 0, 0]); }
-  const nT = toneGroup.length, nGroups = Math.max(1, nG), bgTone = bgMask ? nT : -1;
+  const nT = toneGroup.length, bgTone = bgMask ? nT : -1;
+  let nGroups = Math.max(1, nG);
   // 잔조각 톤 제거 후 선/빈 곳 채우기
   const tc = components(toneOf, valid, W, H);
   const tArea = new Int32Array(tc.count), tPerim = new Int32Array(tc.count);
@@ -1004,7 +1108,8 @@ function process(img, opts, progress) {
     tLo[t * 3 + c] = tLoN[t] ? tLo[t * 3 + c] / tLoN[t] : tMean[t * 3 + c];
   }
   // 밑색 = 가장 넓은 톤(거의 비슷한 넓이의 더 밝은 톤이 있으면 그쪽)의 상위 평균
-  const gMax = new Float64Array(nGroups), baseTone = new Int32Array(nGroups).fill(-1), baseL = new Float64Array(nGroups).fill(-1);
+  const gMax = new Float64Array(nGroups), baseL = new Float64Array(nGroups).fill(-1);
+  let baseTone = new Int32Array(nGroups).fill(-1);
   for (let t = 0; t < nT; t++) if (tCnt[t] > gMax[toneGroup[t]]) gMax[toneGroup[t]] = tCnt[t];
   for (let t = 0; t < nT; t++) {
     const g = toneGroup[t];
@@ -1012,7 +1117,7 @@ function process(img, opts, progress) {
     const L = labOf(tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2])[0];
     if (L > baseL[g]) { baseL[g] = L; baseTone[g] = t; }
   }
-  const base = new Float64Array(nGroups * 3).fill(0.5);
+  let base = new Float64Array(nGroups * 3).fill(0.5);
   for (let t = 0; t < nT; t++) { const g = toneGroup[t]; if (baseTone[g] < 0) baseTone[g] = t; }
   // 선으로 나뉜 같은 재질(예: 앞머리/뒷머리): 더 넓은 재질의 밑색과 같은 톤이 있으면 그 톤을 밑색으로
   {
@@ -1043,6 +1148,106 @@ function process(img, opts, progress) {
   }
   for (let g = 0; g < nGroups; g++) if (baseTone[g] >= 0) for (let c = 0; c < 3; c++) base[g * 3 + c] = tUp[baseTone[g] * 3 + c];
 
+  /* 7-2) 파츠 정리: 실제 작업 파일처럼 파츠 수를 줄인다
+   *  ② 거의 같은 밑색은 한 파츠 → ① 선으로 나뉜 그림자 면(흰 머리카락 옆 연보라 가닥)은 밝은 재질에 합침 → ② 한 번 더   ③ 작은 조각은 이웃 파츠로   ④ 파츠 수 상한 */
+  {
+    const gPix = new Float64Array(nGroups);
+    for (let p = 0; p < N; p++) { const t = tone[p]; if (t >= 0 && t < nT && A[p] > 0.02) gPix[toneGroup[t]]++; }
+    const gCol = [], gLum = new Float64Array(nGroups);
+    for (let g = 0; g < nGroups; g++) {
+      gCol.push(lch([base[g * 3], base[g * 3 + 1], base[g * 3 + 2]]));
+      gLum[g] = lumOf(base[g * 3], base[g * 3 + 1], base[g * 3 + 2]);
+    }
+    const adj = new Map();
+    const addAdj = (a, b) => {
+      if (a === b) return;
+      if (a > b) { const t = a; a = b; b = t; }
+      const k = a * nGroups + b; adj.set(k, (adj.get(k) || 0) + 1);
+    };
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const p = y * W + x, t = tone[p]; if (t < 0 || t >= nT) continue;
+      const g = toneGroup[t];
+      if (x < W - 1) { const u = tone[p + 1]; if (u >= 0 && u < nT) addAdj(g, toneGroup[u]); }
+      if (y < H - 1) { const u = tone[p + W]; if (u >= 0 && u < nT) addAdj(g, toneGroup[u]); }
+    }
+    const edges = [...adj.entries()].map(([k, n]) => [Math.floor(k / nGroups), k % nGroups, n]).sort((a, b) => b[2] - a[2]);
+    const uf = makeUF(nGroups), rArea = Float64Array.from(gPix), rRep = Int32Array.from({ length: nGroups }, (_, g) => g);
+    const join = (a, b) => {
+      a = uf.find(a); b = uf.find(b); if (a === b) return;
+      const root = rArea[a] >= rArea[b] ? a : b, other = root === a ? b : a;
+      uf.parent[other] = root; rArea[root] += rArea[other];
+      if (gPix[rRep[other]] > gPix[rRep[root]]) rRep[root] = rRep[other];
+    };
+    const dE = (g1, g2) => { const a = gCol[g1], b = gCol[g2]; return Math.hypot(a.L - b.L, a.a - b.a, a.b - b.b); };
+    const shadowOf = (lit, dark) => {
+      const r = gLum[dark] / Math.max(gLum[lit], 1e-3);
+      if (r < 0.45 || r > 0.93) return false;
+      const a = gCol[lit], b = gCol[dark];
+      if (a.C < 22 && b.C < 22) return true;
+      return a.C >= 12 && b.C >= 12 && hueDiff(a.h, b.h) < 30 && b.C / a.C > 0.5 && b.C / a.C < 2;
+    };
+    const minPart = Math.max(64, N * 0.0015);
+    const roots = () => { const r = new Set(); for (let g = 0; g < nGroups; g++) r.add(uf.find(g)); return [...r]; };
+    const mergeSame = () => {                          // ② 거의 같은 밑색
+      const rs = roots().filter(r => rArea[r] >= minPart).sort((x, y) => rArea[y] - rArea[x]);
+      for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+        const a = uf.find(rs[i]), b = uf.find(rs[j]);
+        if (a !== b && dE(rRep[a], rRep[b]) < 6) join(a, b);
+      }
+    };
+    mergeSame();
+    const rootEdges = new Map();                       // ① (합쳐진 파츠끼리의 경계 길이로)
+    for (const [a, b, n] of edges) {
+      let ra = uf.find(a), rb = uf.find(b); if (ra === rb) continue;
+      if (ra > rb) { const t = ra; ra = rb; rb = t; }
+      const k = ra * nGroups + rb; rootEdges.set(k, (rootEdges.get(k) || 0) + n);
+    }
+    for (const [k, n] of [...rootEdges.entries()].sort((x, y) => y[1] - x[1])) {
+      const a = Math.floor(k / nGroups), b = k % nGroups;
+      if (n < 8) continue;
+      const ra = uf.find(a), rb = uf.find(b); if (ra === rb) continue;
+      const ga = rRep[ra], gb = rRep[rb];
+      const lit = gLum[ga] >= gLum[gb] ? ga : gb, dark = lit === ga ? gb : ga;
+      if (rArea[uf.find(dark)] > rArea[uf.find(lit)] * 1.5) continue;
+      if (shadowOf(lit, dark)) join(lit, dark);
+    }
+    mergeSame();
+    {                                                  // ③
+      const nb = Array.from({ length: nGroups }, () => []);
+      for (const [a, b, n] of edges) { nb[a].push([b, n]); nb[b].push([a, n]); }
+      const order = Array.from({ length: nGroups }, (_, g) => g).sort((x, y) => gPix[x] - gPix[y]);
+      for (const g of order) {
+        const r = uf.find(g); if (rArea[r] >= minPart) continue;
+        const score = new Map();
+        for (const [h, n] of nb[g]) { const q = uf.find(h); if (q !== r) score.set(q, (score.get(q) || 0) + n); }
+        let best = -1, bs = -1, any = -1, as = -1;
+        for (const [q, n] of score) {
+          if (n > as) { as = n; any = q; }
+          if (dE(rRep[r], rRep[q]) < 30 && n > bs) { bs = n; best = q; }
+        }
+        if (best < 0) {                                // 이웃 중 비슷한 색이 없으면 색이 가장 비슷한 큰 파츠
+          let bd = 20;
+          for (const q of roots()) if (q !== r && rArea[q] >= minPart) { const d = dE(rRep[r], rRep[q]); if (d < bd) { bd = d; best = q; } }
+        }
+        if (best < 0) best = any;
+        if (best >= 0) join(best, r);
+      }
+    }
+    let rs = roots();                                  // ④
+    while (rs.length > 24) {
+      rs.sort((x, y) => rArea[x] - rArea[y]);
+      const sm = rs[0]; let best = -1, bd = Infinity;
+      for (const r of rs) if (r !== sm) { const d = dE(rRep[sm], rRep[r]); if (d < bd) { bd = d; best = r; } }
+      join(best, sm); rs = roots();
+    }
+    const pid = new Int32Array(nGroups).fill(-1), partRep = [];
+    for (let g = 0; g < nGroups; g++) { const r = uf.find(g); if (pid[r] < 0) { pid[r] = partRep.length; partRep.push(rRep[r]); } }
+    for (let t = 0; t < nT; t++) toneGroup[t] = pid[uf.find(toneGroup[t])];
+    const nb2 = new Float64Array(partRep.length * 3), bt2 = new Int32Array(partRep.length);
+    partRep.forEach((g, k) => { for (let c = 0; c < 3; c++) nb2[k * 3 + c] = base[g * 3 + c]; bt2[k] = baseTone[g]; });
+    base = nb2; baseTone = bt2; nGroups = partRep.length;
+  }
+
   const shadowThr = 0.86 + 0.12 * opts.shadow;
   const sparkR = opts.sparkle > 0 ? opts.sparkle : Math.max(4, Math.round(7 * scale));
   const sparkArea = Math.PI * sparkR * sparkR * 3;
@@ -1071,7 +1276,7 @@ function process(img, opts, progress) {
 
   return buildLayers({
     W, H, N, scale, rnd, opts, progress, t0, hasAlpha,
-    R, G: Gc, B, A, U, lineA, lineC, lineK0, traceMask, inMask, bgMask, tone, nT, bgTone, toneGroup, nG: nGroups, base,
+    R, G: Gc, B, A, U, lineA, lineC, lineK0, traceMask, inMask, bgMask, bgFx, bgBase, tone, nT, bgTone, toneGroup, nG: nGroups, base,
     toneG, toneHi, toneCol: tMean, tCnt, sparkPix, sparkR, sparkArea,
     counts: { regions: nR, tones: nT }
   });
@@ -1135,7 +1340,7 @@ function colorName(rgb) {
  *   러프(숨김)
  * 곱하기(색 K, 알파 a)는 x·(1-a+aK), 스크린은 1-(1-x)(1-aK)이므로 픽셀마다 역산해 원본을 재현한다. */
 function buildLayers(ctx) {
-  const { W, H, N, scale, rnd, opts, progress, t0, R, G, B, A, U, lineA, lineC, lineK0, traceMask, bgMask, tone, nT, bgTone,
+  const { W, H, N, scale, rnd, opts, progress, t0, R, G, B, A, U, lineA, lineC, lineK0, traceMask, bgMask, bgFx, bgBase, tone, nT, bgTone,
     toneGroup, nG, base, toneG, toneHi, toneCol, tCnt, sparkPix, sparkR, sparkArea } = ctx;
   const O = [R, G, B];
   const isBg = p => bgTone >= 0 && tone[p] === bgTone;
@@ -1196,7 +1401,19 @@ function buildLayers(ctx) {
   const S = [new Float32Array(N), new Float32Array(N), new Float32Array(N)], sMax = new Float32Array(N);
   const Mv = [0, 0, 0];
   for (let p = 0; p < N; p++) {
-    const a0 = A[p]; if (a0 <= 0.02 || isBg(p)) continue;
+    const a0 = A[p]; if (a0 <= 0.02) continue;
+    if (isBg(p)) {                                     // 배경 위 효과 조각: 추정한 배경색 위의 밝아짐만 효과로
+      if (bgFx && bgFx[p]) {
+        let sm = 0;
+        for (let c = 0; c < 3; c++) {
+          const x = bgBase[c][p], u = U[c][p];
+          const s = u > x + 1.2 / 255 && x < 0.9999 ? clamp01(1 - (1 - u) / (1 - x)) : 0;
+          S[c][p] = s; if (s > sm) sm = s;
+        }
+        sMax[p] = sm;
+      }
+      continue;
+    }
     const t = tone[p], k = palOf[toneGroup[t]], lv = toneLevel[t], hi = toneHi[t] && !sparkPix[p], i = p * 4, al = Math.round(a0 * 255);
     part[p] = k;
     let sm = 0;
@@ -1241,7 +1458,12 @@ function buildLayers(ctx) {
   for (let p = 0; p < N; p++) {
     const a0 = A[p]; if (a0 <= 0.02) continue;
     const i = p * 4;
-    if (isBg(p)) { for (let c = 0; c < 3; c++) bgB[i + c] = Math.round(U[c][p] * 255); bgB[i + 3] = 255; continue; }
+    if (isBg(p)) {
+      const fx = bgFx && bgFx[p];
+      for (let c = 0; c < 3; c++) bgB[i + c] = Math.round((fx ? bgBase[c][p] : U[c][p]) * 255);
+      bgB[i + 3] = 255;
+      if (!fx) continue;
+    }
     const sm = sMax[p]; if (sm <= 1e-4) continue;
     const w = sparkPix[p] || smallS[p] ? 1 : clamp01((sm - open[p]) / sm) * smoothstep(0.45, 0.8, Math.max(U[0][p], U[1][p], U[2][p]));
     for (let c = 0; c < 3; c++) {
@@ -1283,8 +1505,8 @@ function buildLayers(ctx) {
         if (sh2B[i + 3]) v *= sh2B[i + c] / 255;
         if (hlB[i + 3]) v = hlB[i + c] / 255;
         if (shadeB[i + 3]) { const sa = shadeB[i + 3] / 255; v *= 1 - sa + sa * shadeB[i + c] / 255; }
-        for (let k = 0; k < 2; k++) { const L = scr[k]; if (L[i + 3]) v = 1 - (1 - v) * (1 - L[i + 3] / 255 * L[i + c] / 255); }
       }
+      for (let k = 0; k < 2; k++) { const L = scr[k]; if (L[i + 3]) v = 1 - (1 - v) * (1 - L[i + 3] / 255 * L[i + c] / 255); }
       if (lineB[i + 3]) {
         const la = lineB[i + 3] / 255, lc = traceB && traceB[i + 3] ? traceB[i + c] : lineB[i + c];
         v = v * (1 - la) + la * lc / 255;
