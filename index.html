@@ -1364,6 +1364,23 @@ function findFaces(R, G, B, A, W, H, opt) {
  *  - 이미 찾은 배경에서 "선 없이 맞닿은" 경계(맞닿은 길이의 절반 이상이 선이 아님)로만 이어진 곳.
  *    캐릭터는 윤곽선으로 둘러싸여 있어 머리카락 끝 · 소매 · 소품이 배경과 색이 비슷해도 넘어가지 않는다
  * keep = 배경에서 되돌린 캐릭터 부분(다시 가져가지 않는다). 결과: 더할 픽셀(없으면 null) */
+/* 얼굴다운 자리인가: 진짜 얼굴은 머리(아래 타원)가 거의 다 그림 안에 있고, 이미 찾은 배경 위에 있지 않다.
+ * 머리 타원의 80% 이상이 그림 안이고 그 안의 배경이 30% 이하인 얼굴만 남긴다(점수가 가장 높은 얼굴은 늘 남긴다) */
+function plausibleFaces(faces, bg, W, H) {
+  return faces.filter((f, i) => {
+    if (i === 0) return true;
+    const R = 2.4 * f.d, x0 = Math.max(0, Math.floor(f.cx - R)), x1 = Math.min(W - 1, Math.ceil(f.cx + R));
+    const y0 = Math.max(0, Math.floor(f.cy - R)), y1 = Math.min(H - 1, Math.ceil(f.cy + R));
+    let n = 0, nb = 0;
+    for (let y = y0 - (y0 & 3); y <= y1; y += 4) for (let x = x0 - (x0 & 3); x <= x1; x += 4) {
+      if (y < 0 || x < 0) continue;
+      const dx = x - f.cx, dy = y - f.cy, u = (dx * f.ex + dy * f.ey) / f.d, v = (dx * f.fx + dy * f.fy) / f.d;
+      if ((u / 2.2) ** 2 + ((v + 0.3) / 2) ** 2 > 1) continue;
+      n++; if (bg[y * W + x]) nb++;
+    }
+    return n >= 0.8 * Math.PI * 2.2 * 2 * f.d * f.d / 16 && nb <= 0.3 * n;
+  });
+}
 function faceCutBg(bg, G, crisp, keep, faces, W, H) {
   const N = W * H;
   if (!G) return null;
@@ -1710,7 +1727,7 @@ function process(img, opts, progress) {
     // 얼굴을 찾으면 그 자리를 캐릭터로 두고, 이미 찾은 배경에서 확실한 배경만 더 넓힌다
     if (bgMask) {
       progress(0.27, '얼굴 찾기');
-      faces = findFaces(R, Gc, B, A, W, H);
+      faces = plausibleFaces(findFaces(R, Gc, B, A, W, H), bgMask, W, H);
       const more = faces.length ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H) : null;
       if (more) for (let p = 0; p < N; p++) if (more[p]) bgMask[p] = 1;
     }
