@@ -582,8 +582,14 @@ function shadeRelated(c1, c2, hueTol, simTol) {
     const ratio = c1.C / c2.C;
     return hueDiff(c1.h, c2.h) < hueTol && ratio > 0.3 && ratio < 3.3;
   }
-  const nu = n1 ? c1 : c2, ch = n1 ? c2 : c1;       // 한쪽만 무채색: 밝은 하이라이트만 허용
-  return nu.L > ch.L + 8 && nu.L > 70;
+  const nu = n1 ? c1 : c2, ch = n1 ? c2 : c1;
+  // 한쪽만 채도가 낮은 경우. 색상을 알아볼 만하면(채도 4 이상) 색상이 같아야 한다(옅은 피부는 파란 머리카락의 하이라이트가 아니다)
+  if (nu.C >= 4 && (hueDiff(c1.h, c2.h) >= hueTol || nu.C / ch.C <= 0.2)) return false;
+  // 흰색 쪽이 밝으면 하이라이트: 충분히 밝아야 한다(중간 회색은 하이라이트가 아니다)
+  if (nu.L >= ch.L) return nu.L > ch.L + 8 && nu.L > 70;
+  // 회색 쪽이 어두우면 채도가 빠진 그림자: 색상을 알아볼 만하고 밝기가 달라야 한다(밝기가 같은데 채도만 다르면 다른 재질).
+  // 아주 어두운 색(밝기 30 미만)은 여러 재질의 그림자가 모이는 색이라(검은 장갑 · 머리카락과 짙은 옷) 빼 둔다
+  return nu.C >= 4 && ch.L - nu.L >= 4 && nu.L >= 30;
 }
 
 function detectBackground(U, known, W, H) {
@@ -1999,22 +2005,59 @@ function process(img, opts, progress) {
 
   /* 6) 영역 인접 그래프: 경계가 선으로 막혔는지(lined) 열려 있는지(open) 집계 */
   progress(0.56, '재질(밑색) 병합');
-  const edgeIdx = new Map(), eA = [], eB = [], eOpen = [], eLined = [];
+  const edgeIdx = new Map(), eA = [], eB = [], eOpen = [], eLined = [], eSide = [];
   const addEdge = (a, b, lined) => {
     if (a > b) { const t = a; a = b; b = t; }
     const key = a * nR + b;
     let i = edgeIdx.get(key);
-    if (i === undefined) { i = eA.length; edgeIdx.set(key, i); eA.push(a); eB.push(b); eOpen.push(0); eLined.push(0); }
+    if (i === undefined) { i = eA.length; edgeIdx.set(key, i); eA.push(a); eB.push(b); eOpen.push(0); eLined.push(0); eSide.push(null); }
     if (lined) eLined[i]++; else eOpen[i]++;
+    return i;
+  };
+  // 선으로 막힌 경계는 선 밖 양쪽(선 굵기 + 3px 안에서 처음 만나는 칠한 픽셀)의 색을 모은다.
+  // 붓 자국 · 머리카락 결처럼 한 색 위에 그은 선이면 양쪽 색이 거의 같다
+  const sideReach = (opts.lineWidth > 0 ? opts.lineWidth : 4) + 3;
+  const sideOf = (p, step, r) => {
+    for (let k = 0, q = p; k <= sideReach; k++) {
+      if (valid[q]) return reg[q] === r ? q : -1;
+      const x = q % W;
+      if ((step === 1 && x === W - 1) || (step === -1 && x === 0) || q + step < 0 || q + step >= N) return -1;
+      q += step;
+    }
+    return -1;
+  };
+  const pairEdge = (p, q, step) => {
+    const a = reg[p], b = reg[q];
+    if (b === a || b < 0 || b >= nR || A[q] <= 0.02) return;
+    const lined = inMask[p] || inMask[q], i = addEdge(a, b, lined);
+    if (!lined) return;
+    const pa = sideOf(p, -step, a), pb = sideOf(q, step, b);
+    if (pa < 0 || pb < 0) return;
+    const s = eSide[i] || (eSide[i] = new Float64Array(7)), lo = a < b ? pa : pb, hi = a < b ? pb : pa;
+    for (let c = 0; c < 3; c++) { s[c] += U[c][lo]; s[3 + c] += U[c][hi]; }
+    s[6]++;
   };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const p = y * W + x, a = reg[p];
     if (a < 0 || a >= nR || A[p] <= 0.02) continue;
-    if (x < W - 1) { const q = p + 1, b = reg[q]; if (b !== a && b >= 0 && b < nR && A[q] > 0.02) addEdge(a, b, inMask[p] || inMask[q]); }
-    if (y < H - 1) { const q = p + W, b = reg[q]; if (b !== a && b >= 0 && b < nR && A[q] > 0.02) addEdge(a, b, inMask[p] || inMask[q]); }
+    if (x < W - 1) pairEdge(p, p + 1, 1);
+    if (y < H - 1) pairEdge(p, p + W, W);
   }
   const m = opts.merge;
   const hueTol = 14 + 40 * m, simTol = 5 + 12 * m, minOpenRatio = 0.8 - 0.45 * m;
+  // 선 양쪽 색이 알아볼 만한 색상(채도 12 이상)으로 거의 같으면(차이가 simTol의 0.55배, 기본 6 미만) 재질 경계가 아니라 칠 위에 그은 결이다.
+  // 흰색 · 회색 · 검정과 채도가 빠진 그림자는 여러 재질이 같이 쓰는 색이라 양쪽이 같아도 증거로 쓰지 않는다
+  const cont = new Uint8Array(eA.length);
+  let sideAll = 0, sideCont = 0;
+  for (let i = 0; i < eA.length; i++) {
+    const s = eSide[i]; if (!s) continue;
+    const n = s[6], c1 = lch([s[0] / n, s[1] / n, s[2] / n]), c2 = lch([s[3] / n, s[4] / n, s[5] / n]);
+    sideAll += n;
+    if (c1.C >= 12 && c2.C >= 12 && Math.hypot(c1.L - c2.L, c1.a - c2.a, c1.b - c2.b) < simTol * 0.55) { cont[i] = 1; sideCont += n; }
+  }
+  // 그림의 선 대부분(절반 이상)이 결이면(붓 자국 · 머리카락 결이 선으로 잡힌 그림) 그 결들은 열린 경계로 센다.
+  // 선화 그림은 옅은 피부와 옅은 머리카락처럼 색이 거의 같은 재질도 선으로 가르므로 그대로 둔다
+  if (sideCont >= 0.5 * sideAll) for (let i = 0; i < eA.length; i++) if (cont[i]) { eOpen[i] += eSide[i][6]; eLined[i] -= eSide[i][6]; }
   const uf = makeUF(nR), rep = new Int32Array(nR), gArea = new Float64Array(nR);
   for (let r = 0; r < nR; r++) { rep[r] = r; gArea[r] = cnt[r]; }
   const order = eA.map((_, i) => i).sort((i, j) => eOpen[j] - eOpen[i]);
@@ -2200,8 +2243,12 @@ function process(img, opts, progress) {
     const shadowOf = (lit, dark) => {
       const r = gLum[dark] / Math.max(gLum[lit], 1e-3);
       if (r < 0.45 || r > 0.93) return false;
+      // 그림자는 밝은 면에 곱하기를 한 색이라 어느 채널도 밝은 면보다 눈에 띄게 밝을 수 없다(회색 옷 옆 살구색 피부는 그림자가 아니다)
+      for (let c = 0; c < 3; c++) if (base[dark * 3 + c] > base[lit * 3 + c] + 0.03) return false;
       const a = gCol[lit], b = gCol[dark];
-      if (a.C < 25 && b.C < 25) return Math.abs(a.C - b.C) < 18 && r >= 0.55; // 흰 머리카락 ↔ 연보라 그림자처럼 채도가 비슷한 경우만
+      // 흰 머리카락 ↔ 연보라 그림자처럼 채도가 비슷한 경우만. 밝은 면에 알아볼 만한 색상이 있으면(채도 4 이상) 그림자도 그 색상 가까이(50° 안)에 있어야 한다
+      // (크림색 옷 옆 분홍 피부, 베이지 옷 옆 청록 넥타이는 그림자가 아니다)
+      if (a.C < 25 && b.C < 25) return Math.abs(a.C - b.C) < 18 && r >= 0.55 && (a.C < 4 || hueDiff(a.h, b.h) < 50);
       return a.C >= 12 && b.C >= 12 && hueDiff(a.h, b.h) < 30 && b.C / a.C > 0.5 && b.C / a.C < 2;
     };
     const minPart = Math.max(64, N * 0.0015);
@@ -2382,7 +2429,8 @@ function colorName(rgb, notSkin) {
  *    덮는 색(옷과 같은 색)이면 부르지 않는다
  *  - 눈: 픽셀의 절반 이상이 두 눈 칸(0.25 ≤ |u| ≤ 0.75, |v| ≤ 0.22) 안에 있는 파츠(피부 · 머리카락 제외, 점수 12 이상인 얼굴만)
  * 얼굴마다 (점수 − 10)²만큼 표를 주고, 가장 센 얼굴 한 표의 40% 이상을 얻은 파츠에 이름을 붙인다(가짜 얼굴은 점수가 낮아 표가 적다).
- * 피부 표와 머리카락 표를 함께 받은 파츠, 픽셀의 절반 넘게 센 얼굴에서 멀리(6d 밖) 있는 파츠(바닥 · 소품과 한 색)는 이름을 붙이지 않는다.
+ * 피부 표와 머리카락 표를 함께 받은 파츠, 픽셀의 3분의 2 넘게 센 얼굴에서 멀리(6d 밖) 있는 파츠(바닥 · 소품과 한 색)는 이름을 붙이지 않는다
+ *  (긴 머리카락 · 전신 그림의 다리 피부는 절반 넘게 6d 밖에 있을 수 있다).
  * 결과: 파츠마다 이름 또는 null */
 function partMeaning(part, pal, faces, W, H) {
   const nP = pal.length, names = new Array(nP).fill(null);
@@ -2427,7 +2475,7 @@ function partMeaning(part, pal, faces, W, H) {
     if (nB) for (let k = 0; k < nP; k++) if (body[k] >= 0.25 * nB) onBody[k] += w;   // 몸통 가운데를 덮는 색(옷)
     if (f.score >= 12) for (let k = 0; k < nP; k++) if (k !== ks && k !== kh) inEye[k] += eye[k];
   }
-  // 파츠 픽셀 중 센 얼굴(점수가 가장 높은 얼굴의 90% 이상) 둘레 6d 안에 있는 비율. 바닥 · 소품과 한 색이 되어 대부분 멀리 있는 파츠는 이름을 붙이지 않는다
+  // 파츠 픽셀 중 센 얼굴(점수가 가장 높은 얼굴의 90% 이상) 둘레 6d 안에 있는 비율. 바닥 · 소품과 한 색이 되어 대부분(3분의 2 넘게) 멀리 있는 파츠는 이름을 붙이지 않는다
   const near = new Float64Array(nP), sMax = Math.max(...faces.map(f => f.score)), strong = faces.filter(f => f.score >= 0.9 * sMax);
   for (let p = 0; p < part.length; p += 3) {
     const k = part[p]; if (k < 0) continue;
@@ -2441,7 +2489,7 @@ function partMeaning(part, pal, faces, W, H) {
     return g >= b - 0.02 || (b - g) < 0.35 * (r - Math.min(g, b));            // 분홍까지는 허용, 보라 · 파랑은 제외
   };
   for (let k = 0; k < nP; k++) {
-    if (!tot[k] || near[k] < 0.5 * tot[k]) continue;
+    if (!tot[k] || near[k] < tot[k] / 3) continue;
     const s = vSkin[k] >= 0.4 * wMax, h = vHair[k] >= 0.4 * wMax;
     if (s && h) continue;                              // 피부이기도 하고 머리카락이기도 한 색: 가리지 않는다
     if (s && skinLike(pal[k].rgb)) names[k] = '피부';
@@ -2890,8 +2938,8 @@ function buildLayers(ctx) {
           partLayer('하이라이트', 'highlight', 'norm', hlB, k, { clipping: clip })].filter(Boolean);
         if (!kids.length) continue;
         let nm = meaning[k] || colorName(pal[k].rgb);
-        // 얼굴로 피부 파츠를 찾았으면, 나머지 살색 파츠는 피부가 아니라 색 이름으로
-        if (!meaning[k] && nm === '피부' && meaning.includes('피부')) nm = colorName(pal[k].rgb, true);
+        // 얼굴을 찾은 그림에서는 얼굴로 확인한 파츠만 "피부". 나머지 살색 파츠(스타킹, 바닥, 음식 …)는 색 이름으로
+        if (!meaning[k] && nm === '피부' && (meaning.includes('피부') || (ctx.faces && ctx.faces.length))) nm = colorName(pal[k].rgb, true);
         used[nm] = (used[nm] || 0) + 1;
         if (used[nm] > 1) nm += ' ' + used[nm];
         (pal[k].extra && !meaning[k] ? extras : colorKids).push(partGroup(nm, k, kids));   // 뜻 이름이 붙은 파츠는 작아도 밖에
