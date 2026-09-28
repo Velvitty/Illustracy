@@ -2367,6 +2367,87 @@ function partMeaning(part, pal, faces, W, H) {
   return names;
 }
 
+/* 캐릭터 나누기 1) 어느 얼굴이 캐릭터인가: 한 그림의 캐릭터들은 얼굴 크기가 비슷하고(0.55~1.8배) 높이도 비슷하며(서로의 얼굴 틀에서
+ * 세로 3d 안), 서로의 머리 · 몸 자리 밖에 있다. 무릎 · 신발 · 옷 무늬의 가짜 얼굴은 대개 진짜 얼굴보다 한참 아래(몸 자리 안)에 있다.
+ * 점수 11.5 이상인 얼굴(과 점수가 가장 높은 얼굴) 중에서 서로 어울리는 묶음을 모두 보고, 표((점수 − 10)²)의 합이 가장 큰 묶음을 고른다 */
+function characterFaces(faces) {
+  if (!faces || !faces.length) return [];
+  const frameOf = (f, g) => { const dx = g.cx - f.cx, dy = g.cy - f.cy; return [(dx * f.ex + dy * f.ey) / f.d, (dx * f.fx + dy * f.fy) / f.d]; };
+  const inZone = (f, g) => {
+    const [u, v] = frameOf(f, g);
+    return (v >= -1.2 && v <= 8 && Math.abs(u) <= 1.2 + 0.35 * Math.max(v - 1.5, 0)) || (u / 2.2) ** 2 + ((v + 0.3) / 2) ** 2 <= 1;
+  };
+  const fits = (f, g) => g.d >= 0.55 * f.d && g.d <= 1.8 * f.d && Math.abs(frameOf(f, g)[1]) <= 3 && Math.abs(frameOf(g, f)[1]) <= 3 && !inZone(f, g) && !inZone(g, f);
+  const cand = faces.filter((f, i) => i === 0 || f.score >= 11.5).slice(0, 8), n = cand.length, wt = cand.map(f => Math.max(0, f.score - 10) ** 2);
+  let best = [cand[0]], bestW = wt[0];
+  for (let m = 1; m < 1 << n; m++) {
+    const set = [], ws = [];
+    for (let i = 0; i < n; i++) if (m >> i & 1) { set.push(cand[i]); ws.push(wt[i]); }
+    if (set.length < 2) continue;
+    let ok = true;
+    for (let i = 0; ok && i < set.length; i++) for (let j = i + 1; j < set.length; j++) if (!fits(set[i], set[j])) { ok = false; break; }
+    const w = ws.reduce((a, b) => a + b, 0);
+    if (ok && w > bestW) { best = set; bestW = w; }
+  }
+  return best;
+}
+
+/* 캐릭터 나누기 2) 픽셀마다 어느 캐릭터인가: 얼굴 틀의 머리(가로 2.2d · 세로 2d 타원)와 몸(눈 아래 8d까지, 1.5d 아래부터 넓어지는 기둥) 자리 중
+ * 한 캐릭터의 자리에만 드는 칠한 픽셀을 그 캐릭터의 씨앗으로 두고, 나머지(자리가 겹치거나 자리 밖인 곳)는 씨앗에서 캐릭터 쪽 픽셀(칠 · 선)을 따라 퍼져 정한다.
+ * 한 걸음 비용은 1 + 30·(선 알파)²라 진한 윤곽선을 넘기가 어렵다. 닿지 못한 픽셀(떨어진 조각, 배경)은 가장 가까운 캐릭터로.
+ * 결과: 픽셀마다 캐릭터 번호(0부터) */
+function assignCharacters(chars, part, lineA, W, H) {
+  const N = W * H, lab = new Int8Array(N).fill(-1), dist = new Int32Array(N).fill(2147483647);
+  const walk = p => part[p] >= 0 || lineA[p] > 0;
+  const B = 32, buckets = Array.from({ length: B }, () => []);
+  chars.forEach((f, c) => {
+    const r = 10 * f.d, x0 = Math.max(0, Math.floor(f.cx - r)), x1 = Math.min(W - 1, Math.ceil(f.cx + r));
+    const y0 = Math.max(0, Math.floor(f.cy - r)), y1 = Math.min(H - 1, Math.ceil(f.cy + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const p = y * W + x; if (part[p] < 0) continue;
+      const dx = x - f.cx, dy = y - f.cy, u = (dx * f.ex + dy * f.ey) / f.d, v = (dx * f.fx + dy * f.fy) / f.d;
+      const inHead = (u / 2.2) ** 2 + ((v + 0.3) / 2) ** 2 <= 1;
+      const inBody = v >= -1.2 && v <= 8 && Math.abs(u) <= 1.2 + 0.35 * Math.max(v - 1.5, 0);
+      if (!inHead && !inBody) continue;
+      if (lab[p] >= 0 && lab[p] !== c) { lab[p] = -2; continue; }   // 두 캐릭터의 자리가 겹치는 곳은 씨앗으로 쓰지 않는다
+      if (lab[p] === -2) continue;
+      lab[p] = c;
+    }
+  });
+  let pending = 0;
+  for (let p = 0; p < N; p++) {
+    if (lab[p] === -2) lab[p] = -1;
+    else if (lab[p] >= 0) { dist[p] = 0; buckets[0].push(p); pending++; }
+  }
+  for (let cur = 0; pending > 0; cur++) {
+    const bk = buckets[cur % B];
+    while (bk.length) {
+      const p = bk.pop(); pending--;
+      if (dist[p] !== cur) continue;
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q < 0 || !walk(q)) continue;
+        const nd = cur + 1 + Math.round(30 * lineA[q] * lineA[q]);
+        if (nd < dist[q]) { dist[q] = nd; lab[q] = lab[p]; buckets[nd % B].push(q); pending++; }
+      }
+    }
+  }
+  // 닿지 못한 픽셀: 가장 가까운 캐릭터(너비 우선)
+  let front = [];
+  for (let p = 0; p < N; p++) if (lab[p] >= 0) front.push(p);
+  while (front.length) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && lab[q] < 0) { lab[q] = lab[p]; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  return lab;
+}
+
 /* 레이어 구성 — 실제 작가의 작업 파일처럼:
  *   러프(숨김)
  *   [캐릭터]
@@ -2754,8 +2835,32 @@ function buildLayers(ctx) {
     namedFxB.forEach((F, i) => { if (F) bgKids.push(fullLayerOf(null)(fxNames[i], 'bgfx', 'scrn', F)); });
     out.push(group('배경', bgKids.filter(Boolean)));
   }
-  const kids = buildChar(null);
-  if (bgB || ctx.hasAlpha) out.push(group('캐릭터', kids)); else out.push(...kids);
+  // 캐릭터가 둘 이상이면 캐릭터마다 폴더(왼쪽부터 1, 2 …). 캐릭터 쪽 픽셀의 5% 미만을 차지한 캐릭터는 빼고 다시 나눈다
+  let chars = characterFaces(ctx.faces).sort((a, b) => a.cx - b.cx), charLab = null;
+  while (chars.length > 1) {
+    charLab = assignCharacters(chars, part, lineA, W, H);
+    const cnt = new Float64Array(chars.length); let tot = 0;
+    for (let p = 0; p < N; p++) if (part[p] >= 0) { cnt[charLab[p]]++; tot++; }
+    const keep = chars.filter((_, c) => cnt[c] >= 0.05 * tot);
+    if (keep.length === chars.length) break;
+    chars = keep; charLab = null;
+  }
+  if (charLab) {                                       // 한 캐릭터에 64픽셀도 안 되는 파츠 조각(옆 캐릭터 파츠의 끝자락)은 그 파츠가 가장 많은 캐릭터로
+    const nC = chars.length, pc = new Int32Array(pal.length * nC);
+    for (let p = 0; p < N; p++) if (part[p] >= 0) pc[part[p] * nC + charLab[p]]++;
+    const home = new Int32Array(pal.length);
+    for (let k = 0; k < pal.length; k++) { let b = 0; for (let c = 1; c < nC; c++) if (pc[k * nC + c] > pc[k * nC + b]) b = c; home[k] = b; }
+    for (let p = 0; p < N; p++) { const k = part[p]; if (k >= 0 && pc[k * nC + charLab[p]] < 64) charLab[p] = home[k]; }
+  }
+  if (charLab) chars.forEach((_, c) => {
+    const sel = new Uint8Array(N);
+    for (let p = 0; p < N; p++) if (charLab[p] === c) sel[p] = 1;
+    out.push(group(`캐릭터 ${c + 1}`, buildChar(sel)));
+  });
+  else {
+    const kids = buildChar(null);
+    if (bgB || ctx.hasAlpha) out.push(group('캐릭터', kids)); else out.push(...kids);
+  }
   if (opts.rough) { progress(0.9, '러프 스케치 생성'); out.push(makeRough(ctx)); }
   progress(1, '완료');
   return {
@@ -2764,7 +2869,8 @@ function buildLayers(ctx) {
       ms: Date.now() - t0, psnr, regions: ctx.counts.regions, tones: ctx.counts.tones, parts: parts.filter(k => !pal[k].extra).length,
       smallParts: parts.filter(k => pal[k].extra).length, hasAlpha: ctx.hasAlpha,
       background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR, auto: ctx.autoInfo || null,
-      faces: ctx.faces ? ctx.faces.length : 0
+      faces: ctx.faces ? ctx.faces.length : 0, characters: charLab ? chars.length : 1,
+      faceList: (ctx.faces || []).map(f => [Math.round(f.cx), Math.round(f.cy), Math.round(f.d), f.score])
     }
   };
 }
