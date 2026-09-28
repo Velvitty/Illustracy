@@ -1083,6 +1083,80 @@ function attachedParts(bg, U, known, lineMask, W, H) {
   return out;
 }
 
+/* 외곽 글로우 · 형광 테두리: 캐릭터 바깥 윤곽선 둘레에 두른 채도 높고 밝은 띠.
+ *  1) 띠 후보 = 배경 경계에서 캐릭터 쪽으로 선을 넘지 않고 D(= max(12, 0.025 · 긴 변)) 걸음 안에 닿는 칠한 픽셀
+ *  2) 형광 = L* > 60이고 채도 C* > 45. 띠 후보의 18% 이상이 형광이고, 캐릭터 안쪽(배경에서 2D 넘게 떨어진 곳)의 4배 이상이면 글로우가 있는 그림
+ *  3) 글로우 = 띠 후보의 형광 픽셀에서 이어진 곳. 띠 후보 안에서는 "글로우 색"(형광 핵의 a*, b* 칸에 들고 채도 25 · 밝기 45 초과)이나
+ *     흰 심(L* > 80)으로, 배경 쪽으로는 캐릭터에서 D 안의 글로우 색으로 넓힌다
+ *     캐릭터 쪽은 배경과 윤곽선 사이에 끼인 띠(배경까지 깊이 + 선까지 거리 ≤ D)만
+ *  4) 찾은 글로우가 캐릭터와 배경의 경계를 35% 이상 두를 때만 쓴다
+ * 글로우는 원래 색 그대로 불투명한 "외곽 글로우" 층(배경 폴더, 배경 바로 위)이 되고, 그 아래 배경색은 주변 배경에서 짐작한다.
+ * 결과: 글로우 픽셀(없으면 null) */
+function outerGlow(bg, U, known, lineMask, W, H) {
+  const N = W * H;
+  let nbg = 0; for (let p = 0; p < N; p++) nbg += bg[p];
+  if (nbg < 0.02 * N || nbg > 0.95 * N) return null;
+  const D = Math.max(12, Math.round(0.025 * Math.max(W, H)));
+  const [L, A, B] = toLab(U[0], U[1], U[2], N);
+  const neon = p => L[p] > 60 && A[p] * A[p] + B[p] * B[p] > 45 * 45;
+  // 1) 배경 경계에서 선을 넘지 않고 D 걸음 안
+  const depth = new Int32Array(N).fill(-1);
+  let front = [];
+  for (let p = 0; p < N; p++) {
+    if (bg[p] || lineMask[p] || !known[p]) continue;
+    const x = p % W;
+    if ((x > 0 && bg[p - 1]) || (x < W - 1 && bg[p + 1]) || (p >= W && bg[p - W]) || (p < N - W && bg[p + W])) { depth[p] = 1; front.push(p); }
+  }
+  for (let d = 2; d <= D && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && depth[q] < 0 && !bg[q] && !lineMask[q] && known[q]) { depth[q] = d; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  // 2) 띠 후보와 안쪽의 형광 비율
+  const inv = new Uint8Array(N); for (let p = 0; p < N; p++) inv[p] = bg[p] ? 1 : 0;
+  const dBg = chamfer(inv, W, H);                    // 배경까지의 거리
+  let nr = 0, fr = 0, ni = 0, fi = 0;
+  const hist = new Float64Array(256);
+  const bin = p => Math.min(15, Math.max(0, Math.floor((A[p] + 128) / 16))) * 16 + Math.min(15, Math.max(0, Math.floor((B[p] + 128) / 16)));
+  for (let p = 0; p < N; p++) {
+    if (depth[p] > 0) { nr++; if (neon(p)) { fr++; hist[bin(p)]++; } }
+    else if (!bg[p] && known[p] && dBg[p] > 2 * D) { ni++; if (neon(p)) fi++; }
+  }
+  if (!nr || fr < 0.18 * nr || fr / nr < 4 * (ni ? fi / ni : 0) || fr < 0.002 * N) return null;
+  // 3) 글로우 픽셀: 띠 후보(캐릭터 쪽) · 캐릭터에서 D 안의 배경 쪽 중, 글로우 색(형광 핵의 a*, b* 칸)에 들고 채도 25 · 밝기 45를 넘는 픽셀을
+  //    띠 후보의 형광 핵에서 이어진 만큼
+  const cm = new Uint8Array(N); for (let p = 0; p < N; p++) cm[p] = bg[p] ? 0 : 1;
+  const dCh = chamfer(cm, W, H);                     // 캐릭터까지의 거리
+  const dLine = chamfer(lineMask, W, H);             // 가장 가까운 선까지
+  const like = new Uint8Array(N), glow = new Uint8Array(N);
+  for (let p = 0; p < N; p++) {
+    if (!known[p] || lineMask[p]) continue;
+    const colored = L[p] > 45 && A[p] * A[p] + B[p] * B[p] > 25 * 25 && hist[bin(p)] >= 0.005 * fr;
+    // 캐릭터 쪽: 배경과 윤곽선 사이에 끼인 띠(배경까지 깊이 + 선까지 거리 ≤ D)의 글로우 색이나 흰 심. 배경 쪽: 캐릭터에서 D 안의 글로우 색
+    if (depth[p] > 0 ? depth[p] + dLine[p] <= D && (colored || L[p] > 80) : bg[p] && dCh[p] <= D && colored) like[p] = 1;
+  }
+  const st = [];
+  let n = 0;
+  for (let p = 0; p < N; p++) if (depth[p] > 0 && neon(p) && like[p]) { glow[p] = 1; st.push(p); n++; }
+  while (st.length) {
+    const p = st.pop(), x = p % W;
+    for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+      if (q >= 0 && like[q] && !glow[q]) { glow[q] = 1; st.push(q); n++; }
+    }
+  }
+  // 4) 글로우는 캐릭터를 두른다: 캐릭터와 배경의 경계(배경 쪽 1px) 중 글로우에서 3px 안인 곳이 35% 이상일 때만.
+  //    배경을 조금만 찾은 그림에서는 경계가 글로우를 따라가지 않아, 찾은 "글로우"가 대부분 배경의 불꽃 · 등롱 조각이다
+  const g3 = dilate(Float32Array.from(glow), W, H, 3);
+  let nb = 0, nc = 0;
+  for (let p = 0; p < N; p++) if (bg[p] && dCh[p] <= 1.5) { nb++; if (g3[p] > 0) nc++; }
+  return n && nb && nc >= 0.35 * nb ? glow : null;
+}
+
 /* 그림에 맞춘 자동 설정: 최대 선 굵기
  * 넉넉한 창(12s px)으로 "주변보다 어둡고 가는 구조"를 뽑아, 진한 것(세기 0.5 이상)의 중심선에서 굵기를 잰다.
  * 작가는 같은 펜으로 선을 그으므로 굵기 분포에 봉우리가 생긴다. 봉우리의 3배까지를 선으로 보고, 그중 90%를 덮는 굵기가
@@ -1740,6 +1814,12 @@ function process(img, opts, progress) {
     for (let p = 0; p < N; p++) if (forceBg[p] && A[p] > 0.02) bgMask[p] = 1;
   }
   if (forceChar && bgMask) for (let p = 0; p < N; p++) if (forceChar[p]) bgMask[p] = 0;
+  // 캐릭터 둘레의 외곽 글로우 · 형광 테두리는 배경 위의 "외곽 글로우" 효과 층으로(아래 배경색은 주변에서 짐작)
+  const glow = bgMask && auto ? outerGlow(bgMask, U, known, lineMask, W, H) : null;
+  if (glow) for (let p = 0; p < N; p++) {
+    if (!glow[p]) continue;
+    if ((forceChar && forceChar[p]) || (back && back[p])) glow[p] = 0; else bgMask[p] = 1;
+  }
   // 배경 위에 떠 있는 작은 조각(입자, 빛줄기 조각)은 캐릭터 파츠가 아니라 "배경 + 효과"로 본다
   let bgFx = null, bgBase = null, fxId = null, fxNames = null;
   if (bgMask) {
@@ -1753,12 +1833,16 @@ function process(img, opts, progress) {
     const keepChar = new Uint8Array(cc.count);
     for (const keep of [forceChar, back]) if (keep) for (let p = 0; p < N; p++) if (keep[p] && cc.rid[p] >= 0) keepChar[cc.rid[p]] = 1;
     for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && !keepChar[cc.rid[p]] && area[cc.rid[p]] < N * 0.015) { bgFx[p] = 1; any = true; }
+    if (glow) {
+      fxId = new Uint8Array(N); fxNames = ['외곽 글로우'];
+      for (let p = 0; p < N; p++) if (glow[p]) { bgFx[p] = 1; fxId[p] = 1; any = true; }
+    }
     if (any) {
       const Ubg = [Float32Array.from(U[0]), Float32Array.from(U[1]), Float32Array.from(U[2])], skip = new Uint8Array(N), kb = new Uint8Array(N);
       for (let p = 0; p < N; p++) { skip[p] = notBg[p] && !bgFx[p] ? 1 : 0; kb[p] = bgMask[p] && !bgFx[p] ? 1 : 0; }
       inpaint(Ubg, kb, W, H, skip);                    // 조각 아래의 배경색을 주변에서 추정
       bgBase = Ubg;
-      for (let p = 0; p < N; p++) if (bgFx[p]) { bgMask[p] = 1; for (let c = 0; c < 3; c++) bgBase[c][p] = Math.min(U[c][p], Ubg[c][p]); }
+      for (let p = 0; p < N; p++) if (bgFx[p]) { bgMask[p] = 1; for (let c = 0; c < 3; c++) bgBase[c][p] = fxId && fxId[p] ? Ubg[c][p] : Math.min(U[c][p], Ubg[c][p]); }
     } else bgFx = null;
   }
   // 배경으로 거의 둘러싸여 있고 색도 주변 배경과 같은 "선"은 선이 아니라 배경이 드러난 틈(빛줄기 사이 등)
@@ -2524,7 +2608,7 @@ function buildLayers(ctx) {
   for (let p = 0; p < N; p++) {
     const a0 = A[p]; if (a0 <= 0.02) continue;
     if (isBg(p)) {                                     // 배경 위 효과 조각: 추정한 배경색 위의 밝아짐만 배경 효과로
-      if (bgFx && bgFx[p]) {
+      if (bgFx && bgFx[p] && !(fxId && fxId[p])) {
         let sm = 0;
         for (let c = 0; c < 3; c++) {
           const x = bgBase[c][p], u = U[c][p];
@@ -2648,7 +2732,7 @@ function buildLayers(ctx) {
   }
   const sparkB = new Uint8ClampedArray(N * 4), fxB = new Uint8ClampedArray(N * 4), rimB = new Uint8ClampedArray(N * 4), reflB = new Uint8ClampedArray(N * 4);
   const bgB = bgMask ? new Uint8ClampedArray(N * 4) : null, bgFxB = bgMask ? new Uint8ClampedArray(N * 4) : null;
-  const namedFxB = [];                                  // 이름 붙은 배경 효과(자동으로 찾은 외곽 글로우 등)마다 한 장
+  const namedFxB = [];                                  // 이름 붙은 배경 효과(외곽 글로우)마다 한 장: 원래 색 그대로 불투명한 일반 층
   if (bgMask && fxId && fxNames) for (let p = 0; p < N; p++) if (fxId[p] && bgFx && bgFx[p] && !namedFxB[fxId[p] - 1]) namedFxB[fxId[p] - 1] = new Uint8ClampedArray(N * 4);
   const take = (s, w) => { const a = s * w; return [a, a < 0.9999 ? clamp01(1 - (1 - s) / (1 - a)) : 0]; };
   // 순서: 작은 반짝임 조각 → 림라이트 → 가는 반짝임(탑햇) → 반사광 → 빛. out = [반짝임, 림, 반사, 빛] × RGB
@@ -2686,7 +2770,8 @@ function buildLayers(ctx) {
       const fx = bgFx && bgFx[p];
       for (let c = 0; c < 3; c++) bgB[i + c] = Math.round((fx ? bgBase[c][p] : U[c][p]) * 255);
       bgB[i + 3] = 255;
-      if (fx && sMax[p] > 1e-4) putMinAlpha(fxId && fxId[p] ? namedFxB[fxId[p] - 1] : bgFxB, i, S[0][p], S[1][p], S[2][p], a0);
+      if (fx && fxId && fxId[p]) { const F = namedFxB[fxId[p] - 1]; for (let c = 0; c < 3; c++) F[i + c] = Math.round(clamp01(U[c][p]) * 255); F[i + 3] = 255; }
+      else if (fx && sMax[p] > 1e-4) putMinAlpha(bgFxB, i, S[0][p], S[1][p], S[2][p], a0);
       continue;
     }
     if (sMax[p] <= 1e-4) continue;
@@ -2724,7 +2809,7 @@ function buildLayers(ctx) {
       if (bgB && isBg(p)) {
         v = bgB[i + c] / 255;
         if (bgFxB[i + 3]) v = 1 - (1 - v) * (1 - bgFxB[i + 3] / 255 * bgFxB[i + c] / 255);
-        for (const F of namedFxB) if (F && F[i + 3]) v = 1 - (1 - v) * (1 - F[i + 3] / 255 * F[i + c] / 255);
+        for (const F of namedFxB) if (F && F[i + 3]) { const fa = F[i + 3] / 255; v = v * (1 - fa) + fa * F[i + c] / 255; }
       } else {
         v = baseB[i + c] / 255;
         if (sh1B[i + 3]) v *= sh1B[i + c] / 255;
@@ -2832,7 +2917,7 @@ function buildLayers(ctx) {
   const out = [];
   if (bgB) {
     const bgKids = [layer('배경', 'bg', 'norm', bgB, W, H), fullLayerOf(null)('배경 효과', 'bgfx', 'scrn', bgFxB)];
-    namedFxB.forEach((F, i) => { if (F) bgKids.push(fullLayerOf(null)(fxNames[i], 'bgfx', 'scrn', F)); });
+    namedFxB.forEach((F, i) => { if (F) bgKids.splice(1, 0, fullLayerOf(null)(fxNames[i], 'glow', 'norm', F)); });
     out.push(group('배경', bgKids.filter(Boolean)));
   }
   // 캐릭터가 둘 이상이면 캐릭터마다 폴더(왼쪽부터 1, 2 …). 캐릭터 쪽 픽셀의 5% 미만을 차지한 캐릭터는 빼고 다시 나눈다
@@ -3131,7 +3216,7 @@ const PSD = (() => {
   }
 
   const ASCII_KIND = {
-    bg: 'Background', bgfx: 'Background FX', flat: 'Base', shadow: 'Shadow 1', shadow2: 'Shadow 2', highlight: 'Highlight',
+    bg: 'Background', bgfx: 'Background FX', glow: 'Outer glow', flat: 'Base', shadow: 'Shadow 1', shadow2: 'Shadow 2', highlight: 'Highlight',
     gradient: 'Gradient', shade: 'Shading', reflect: 'Reflected light', rim: 'Rim light', sparkle: 'Sparkle', effect: 'Light',
     line: 'Lineart', trace: 'Line color', rough: 'Rough', silhouette: 'Silhouette', part: 'Part', group: 'Group'
   };
