@@ -858,21 +858,16 @@ function maxflowMinCut(n, s, t, from, to, cap, rcap) {   // Dinic. 반환: s 쪽
   while (qh < qt) { const u = q[qh++]; for (let e = head[u]; e >= 0; e = nxt[e]) if (c[e] > EPS && !side[dst[e]]) { side[dst[e]] = 1; q[qt++] = dst[e]; } }
   return side;
 }
-function colorCutBg(bg, O, known, inMask, crisp, W, H) {
-  const N = W * H, rnd = mulberry32(777);             // 따로 쓰는 난수(다른 단계의 결과를 바꾸지 않게)
-  if (bg) {                                            // 찾은 배경이 이미 위 · 왼쪽 · 오른쪽 테두리를 90% 이상 두르면 배경은 다 찾은 것
-    let c = 0;
-    for (let x = 0; x < W; x++) c += bg[x];
-    for (let y = 0; y < H; y++) c += bg[y * W] + bg[y * W + W - 1];
-    if (c >= 0.9 * (W + 2 * H)) return null;
-  }
-  const [Lo, Ao, Bo] = toLab(O[0], O[1], O[2], N);
+/* 색 영역 그래프: Lab k-means(24색) → 색마다 연결 성분(40px 미만은 이웃 영역으로) →
+ * 맞닿은 길이(선 없이 · 선으로 · 선명한 선으로), 영역 평균색, 색 분포(Lab 13×32×32 칸, 이웃 칸까지 합쳐 부드럽게) 도구.
+ * 알고 있는 픽셀이 20% 미만이면 null */
+function regionGraph(O, known, inMask, crisp, W, H, rnd) {
+  const N = W * H, [Lo, Ao, Bo] = toLab(O[0], O[1], O[2], N);
   let nk = 0;
   for (let p = 0; p < N; p++) if (known[p]) nk++;
   if (nk < N * 0.2) return null;
   const kidx = new Int32Array(nk);
   for (let p = 0, i = 0; p < N; p++) if (known[p]) kidx[i++] = p;
-  // 1) 영역
   const K = 24, km = kmeans(Lo, Ao, Bo, kidx, K, rnd, 40000), q = new Int32Array(N).fill(-1);
   for (const p of kidx) {
     let best = 0, bd = Infinity;
@@ -883,23 +878,8 @@ function colorCutBg(bg, O, known, inMask, crisp, W, H) {
   for (let p = 0; p < N; p++) if (cc.rid[p] >= 0) cnt0[cc.rid[p]]++;
   for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && cnt0[cc.rid[p]] >= 40) reg[p] = cc.rid[p];
   fillLabels(reg, W, H);
-  const R = cc.count;
-  // 2) 영역 통계
-  const sig = Math.max(W, H) * 0.02, cr = new Float32Array(N);
-  let ncr = 0;
-  for (let p = 0; p < N; p++) if (crisp[p]) { cr[p] = 1; ncr++; }
-  if (!ncr) return null;
-  const Dc = blur(cr, W, H, sig);
-  let tauC;
-  { const hist = new Int32Array(1001); for (let p = 0; p < N; p++) if (crisp[p]) hist[Math.min(1000, Math.round(Dc[p] * 1000))]++;
-    let acc = 0, i = 0; for (; i <= 1000; i++) { acc += hist[i]; if (acc * 2 >= ncr) break; } tauC = Math.max(1e-4, i / 1000 * 0.25); }
-  const area = new Float64Array(R), dcS = new Float64Array(R), abS = new Float64Array(R), fr = new Float64Array(R);
-  for (let p = 0; p < N; p++) { const r = reg[p]; if (r < 0) continue; area[r]++; dcS[r] += Dc[p]; if (bg && bg[p]) abS[r]++; }
-  for (let x = 0; x < W; x++) if (reg[x] >= 0) fr[reg[x]]++;
-  for (let y = 0; y < H; y++) { if (reg[y * W] >= 0) fr[reg[y * W]]++; if (reg[y * W + W - 1] >= 0) fr[reg[y * W + W - 1]]++; }
-  const rel = new Float64Array(R), abf = new Float64Array(R);
-  for (let r = 0; r < R; r++) if (area[r]) { rel[r] = dcS[r] / area[r] / tauC; abf[r] = abS[r] / area[r]; }
-  // 3) 인접: 선 없이 / 선으로 / 선명한 선으로 맞닿은 길이
+  const R = cc.count, area = new Float64Array(R);
+  for (let p = 0; p < N; p++) if (reg[p] >= 0) area[reg[p]]++;
   const eIdx = new Map(), eA = [], eB = [], eO = [], eL = [], eC = [], per = new Float64Array(R), crb = new Float64Array(R);
   const addE = (p, q2) => {
     let a = reg[p], b = reg[q2]; if (a === b || a < 0 || b < 0) return;
@@ -912,23 +892,15 @@ function colorCutBg(bg, O, known, inMask, crisp, W, H) {
     if (cs) eC[i]++;
   };
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const p = y * W + x; if (x < W - 1) addE(p, p + 1); if (y < H - 1) addE(p, p + W); }
-  const E = eA.length, mL = new Float64Array(R * 3), kn = new Float64Array(R);
+  const mL = new Float64Array(R * 3), kn = new Float64Array(R);
   for (const p of kidx) { const r = reg[p]; if (r < 0) continue; kn[r]++; mL[r * 3] += Lo[p]; mL[r * 3 + 1] += Ao[p]; mL[r * 3 + 2] += Bo[p]; }
   for (let r = 0; r < R; r++) if (kn[r]) for (let c = 0; c < 3; c++) mL[r * 3 + c] /= kn[r];
-  const wpair = new Float64Array(E), cross = new Uint8Array(E);
-  for (let i = 0; i < E; i++) {
-    const a = eA[i], b = eB[i], dE = Math.hypot(mL[a * 3] - mL[b * 3], mL[a * 3 + 1] - mL[b * 3 + 1], mL[a * 3 + 2] - mL[b * 3 + 2]);
-    wpair[i] = 8 * eO[i] * Math.exp(-dE * dE / (2 * 144)) + 0.3 * eL[i];
-    const tot = eO[i] + eL[i];
-    cross[i] = tot - eC[i] >= Math.max(3, 0.3 * tot) ? 1 : 0;   // 선명한 선이 아닌 접촉이 충분하면 건너갈 수 있음
-  }
-  // 4) 색 분포(Lab 13×32×32 칸, 이웃 칸까지 합쳐 부드럽게)
   const NB = 13 * 1024, bin = new Int32Array(N);
   for (const p of kidx) {
     const l = Math.min(12, Math.max(0, Math.floor(Lo[p] / 8))), a = Math.min(31, Math.max(0, Math.floor((Ao[p] + 128) / 8))), b = Math.min(31, Math.max(0, Math.floor((Bo[p] + 128) / 8)));
     bin[p] = (l * 32 + a) * 32 + b;
   }
-  const histOf = flag => {
+  const histOf = flag => {                           // flag[r]인 영역의 알고 있는 픽셀 색 분포
     const h = new Float64Array(NB), o = new Float64Array(NB);
     for (const p of kidx) { const r = reg[p]; if (r >= 0 && flag[r]) h[bin[p]]++; }
     let sum = 0;
@@ -942,6 +914,51 @@ function colorCutBg(bg, O, known, inMask, crisp, W, H) {
     if (sum) for (let i = 0; i < NB; i++) o[i] /= sum;
     return o;
   };
+  // 영역별 색 로그 우도비 합: 캐릭터(flagF) 대 배경(flagB) 분포, 칸마다 ±3으로 자른다
+  const llrSum = (flagF, flagB, out) => {
+    const pF = histOf(flagF), pB = histOf(flagB), llr = new Float32Array(NB);
+    for (let i = 0; i < NB; i++) llr[i] = Math.max(-3, Math.min(3, Math.log((pF[i] + 1e-6) / (pB[i] + 1e-6))));
+    out.fill(0);
+    for (const p of kidx) { const r = reg[p]; if (r >= 0) out[r] += llr[bin[p]]; }
+    return out;
+  };
+  return { Lo, Ao, Bo, kidx, reg, R, area, eA, eB, eO, eL, eC, E: eA.length, per, crb, mL, kn, NB, histOf, llrSum };
+}
+function colorCutBg(bg, getGraph, crisp, W, H) {
+  const N = W * H;
+  if (bg) {                                            // 찾은 배경이 이미 위 · 왼쪽 · 오른쪽 테두리를 90% 이상 두르면 배경은 다 찾은 것
+    let c = 0;
+    for (let x = 0; x < W; x++) c += bg[x];
+    for (let y = 0; y < H; y++) c += bg[y * W] + bg[y * W + W - 1];
+    if (c >= 0.9 * (W + 2 * H)) return null;
+  }
+  // 1) 영역
+  const G = getGraph();
+  if (!G) return null;
+  const { reg, R, area, eA, eB, eO, eL, eC, E, per, crb, mL, NB, histOf } = G;
+  // 2) 영역 통계
+  const sig = Math.max(W, H) * 0.02, cr = new Float32Array(N);
+  let ncr = 0;
+  for (let p = 0; p < N; p++) if (crisp[p]) { cr[p] = 1; ncr++; }
+  if (!ncr) return null;
+  const Dc = blur(cr, W, H, sig);
+  let tauC;
+  { const hist = new Int32Array(1001); for (let p = 0; p < N; p++) if (crisp[p]) hist[Math.min(1000, Math.round(Dc[p] * 1000))]++;
+    let acc = 0, i = 0; for (; i <= 1000; i++) { acc += hist[i]; if (acc * 2 >= ncr) break; } tauC = Math.max(1e-4, i / 1000 * 0.25); }
+  const dcS = new Float64Array(R), abS = new Float64Array(R), fr = new Float64Array(R);
+  for (let p = 0; p < N; p++) { const r = reg[p]; if (r < 0) continue; dcS[r] += Dc[p]; if (bg && bg[p]) abS[r]++; }
+  for (let x = 0; x < W; x++) if (reg[x] >= 0) fr[reg[x]]++;
+  for (let y = 0; y < H; y++) { if (reg[y * W] >= 0) fr[reg[y * W]]++; if (reg[y * W + W - 1] >= 0) fr[reg[y * W + W - 1]]++; }
+  const rel = new Float64Array(R), abf = new Float64Array(R);
+  for (let r = 0; r < R; r++) if (area[r]) { rel[r] = dcS[r] / area[r] / tauC; abf[r] = abS[r] / area[r]; }
+  // 3) 인접: 선 없이 / 선으로 / 선명한 선으로 맞닿은 길이
+  const wpair = new Float64Array(E), cross = new Uint8Array(E);
+  for (let i = 0; i < E; i++) {
+    const a = eA[i], b = eB[i], dE = Math.hypot(mL[a * 3] - mL[b * 3], mL[a * 3 + 1] - mL[b * 3 + 1], mL[a * 3 + 2] - mL[b * 3 + 2]);
+    wpair[i] = 8 * eO[i] * Math.exp(-dE * dE / (2 * 144)) + 0.3 * eL[i];
+    const tot = eO[i] + eL[i];
+    cross[i] = tot - eC[i] >= Math.max(3, 0.3 * tot) ? 1 : 0;   // 선명한 선이 아닌 접촉이 충분하면 건너갈 수 있음
+  }
   const B0 = new Uint8Array(R), F0 = new Uint8Array(R), anchor = new Uint8Array(R);
   for (let r = 0; r < R; r++) {
     if (!area[r]) continue;
@@ -959,10 +976,7 @@ function colorCutBg(bg, O, known, inMask, crisp, W, H) {
   const S = R, T = R + 1, U = new Float64Array(R);
   for (let iter = 0; iter < 4; iter++) {
     const bgF = new Uint8Array(R); for (let r = 0; r < R; r++) bgF[r] = area[r] && !fg[r] ? 1 : 0;
-    const pF = histOf(fg), pB = histOf(bgF), llr = new Float32Array(NB);
-    for (let i = 0; i < NB; i++) llr[i] = Math.max(-3, Math.min(3, Math.log((pF[i] + 1e-6) / (pB[i] + 1e-6))));
-    U.fill(0);
-    for (const p of kidx) { const r = reg[p]; if (r >= 0) U[r] += llr[bin[p]]; }
+    G.llrSum(fg, bgF, U);
     const from = [], to = [], cap = [], rcap = [];
     for (let r = 0; r < R; r++) {
       if (!area[r]) continue;
@@ -1099,6 +1113,320 @@ function autoLineWidth(Lw, W, H, scale) {
   const need = Math.ceil(out.penWidth / 2) + 1;
   if (need >= defLw + 2) out.lineWidth = Math.min(16, need);
   return out;
+}
+
+/* 얼굴 찾기(학습 없이 손으로 정한 규칙). 애니풍 얼굴은 어두운 둥근 눈 두 개가 나란히 있고 그 아래가 밝고 고른 피부다.
+ * 긴 변 800px로 맞춘 그림에서
+ *  1) 눈 후보 = 어두운 둥근 덩어리(여러 크기에서 헤세 행렬식이 가장 큰 점)
+ *  2) 크기가 비슷하고, 거리가 알맞고, 많이 기울지 않은 두 후보를 짝으로
+ *  3) 두 눈 사이 거리 d를 잣대로 얼굴 틀(u = 눈 방향, v = 아래)을 세워 눈 · 속눈썹 · 콧등 · 볼을 재고,
+ *     평균 눈 · 얼굴 무늬와의 상관과 눈 속 반짝임까지 더해 점수를 매긴다
+ *  4) 점수 상위 짝은 얼굴 무늬에 가장 잘 맞게 눈 위치를 조금씩 옮겨 다시 잰다
+ *  5) 문턱을 넘은 것에서 겹치는 것을 빼면 얼굴 */
+function resample1D(src, n, dst, m) {               // 줄일 때 면적 평균, 키울 때 선형
+  const f = n / m;
+  if (f >= 1) for (let i = 0; i < m; i++) {
+    const s0 = i * f, s1 = s0 + f; let acc = 0;
+    for (let k = Math.floor(s0); k < s1 && k < n; k++) acc += src[k] * (Math.min(s1, k + 1) - Math.max(s0, k));
+    dst[i] = acc / f;
+  } else for (let i = 0; i < m; i++) {
+    const x = Math.min(n - 1, Math.max(0, (i + 0.5) * f - 0.5)), k = Math.min(n - 2, Math.floor(x)), t = x - k;
+    dst[i] = n > 1 ? src[k] * (1 - t) + src[k + 1] * t : src[0];
+  }
+}
+function resizePlane(src, W, H, w, h) {
+  const tmp = new Float32Array(w * H), out = new Float32Array(w * h);
+  const a = new Float32Array(Math.max(W, H)), b = new Float32Array(Math.max(w, h));
+  for (let y = 0; y < H; y++) { for (let x = 0; x < W; x++) a[x] = src[y * W + x]; resample1D(a, W, b, w); for (let x = 0; x < w; x++) tmp[y * w + x] = b[x]; }
+  for (let x = 0; x < w; x++) { for (let y = 0; y < H; y++) a[y] = tmp[y * w + x]; resample1D(a, H, b, h); for (let y = 0; y < h; y++) out[y * w + x] = b[y]; }
+  return out;
+}
+const meanOf = a => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i]; return s / a.length; };
+const stdOf = a => { const m = meanOf(a); let s = 0; for (let i = 0; i < a.length; i++) s += (a[i] - m) * (a[i] - m); return Math.sqrt(s / a.length); };
+function pctOf(a, q) {                              // 백분위(선형 보간)
+  const s = Float64Array.from(a).sort(), x = (s.length - 1) * q / 100, k = Math.floor(x), t = x - k;
+  return k + 1 < s.length ? s[k] * (1 - t) + s[k + 1] * t : s[k];
+}
+function zNorm(a) {                                 // 평균 0 · 표준편차 1
+  const m = meanOf(a), s = stdOf(a), o = new Float32Array(a.length);
+  if (s > 1e-6) for (let i = 0; i < a.length; i++) o[i] = (a[i] - m) / s;
+  return o;
+}
+function faceKit(R, G, B, A, W, H) {
+  const sc = 800 / Math.max(W, H), w = Math.max(2, Math.round(W * sc)), h = Math.max(2, Math.round(H * sc)), n = w * h;
+  const pl = [R, G, B].map(P => { const o = new Float32Array(W * H); for (let i = 0; i < W * H; i++) o[i] = P[i] * A[i] + 1 - A[i]; return resizePlane(o, W, H, w, h); });
+  const [L, a, b] = toLab(pl[0], pl[1], pl[2], n);
+  const X = new Float64Array(512), Y = new Float64Array(512);
+  // 두 눈(왼쪽이 a) → 얼굴 틀
+  const frame = (ax, ay, bx, by) => {
+    if (ax > bx) { let t = ax; ax = bx; bx = t; t = ay; ay = by; by = t; }
+    const dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy), ex = dx / d, ey = dy / d;
+    let fx = -ey, fy = ex; if (fy < 0) { fx = -fx; fy = -fy; }
+    return { cx: (ax + bx) / 2, cy: (ay + by) / 2, ex, ey, fx, fy, d, tilt: Math.abs(dy) / Math.max(Math.abs(dx), 1e-6) };
+  };
+  // 얼굴 틀 격자(u0..u1 × v0..v1, 행 = v)의 표본 좌표. 반환: 그림 안에 든 비율
+  const grid = (f, u0, u1, v0, v1, nu, nv) => {
+    let k = 0, inside = 0;
+    for (let j = 0; j < nv; j++) {
+      const v = nv > 1 ? v0 + (v1 - v0) * j / (nv - 1) : v0;
+      for (let i = 0; i < nu; i++, k++) {
+        const u = nu > 1 ? u0 + (u1 - u0) * i / (nu - 1) : u0;
+        const x = f.cx + (u * f.ex + v * f.fx) * f.d, y = f.cy + (u * f.ey + v * f.fy) * f.d;
+        if (x >= 0 && y >= 0 && x < w && y < h) inside++;
+        X[k] = x; Y[k] = y;
+      }
+    }
+    return inside / k;
+  };
+  const samp = (P, cnt) => {                         // 쌍선형 보간
+    const out = new Float32Array(cnt);
+    for (let k = 0; k < cnt; k++) {
+      const x = Math.min(Math.max(X[k], 0), w - 1.001), y = Math.min(Math.max(Y[k], 0), h - 1.001);
+      const x0 = x | 0, y0 = y | 0, tx = x - x0, ty = y - y0, p = y0 * w + x0;
+      out[k] = P[p] * (1 - tx) * (1 - ty) + P[p + 1] * tx * (1 - ty) + P[p + w] * (1 - tx) * ty + P[p + w + 1] * tx * ty;
+    }
+    return out;
+  };
+  const eyePatches = f => {                          // 두 눈 칸(12×12). 오른눈은 좌우를 뒤집어 왼눈과 맞춘다
+    grid(f, -0.8, -0.2, -0.3, 0.3, 12, 12); const le = samp(L, 144);
+    grid(f, 0.2, 0.8, -0.3, 0.3, 12, 12); const r0 = samp(L, 144), re = new Float32Array(144);
+    for (let j = 0; j < 12; j++) for (let i = 0; i < 12; i++) re[j * 12 + i] = r0[j * 12 + 11 - i];
+    return [zNorm(le), zNorm(re)];
+  };
+  const facePatch = f => { grid(f, -1.1, 1.1, -0.9, 1.3, 16, 16); return zNorm(samp(L, 256)); };
+  return { sc, w, h, L, a, b, frame, grid, samp, eyePatches, facePatch };
+}
+const corrOf = (p, T) => { let s = 0; for (let i = 0; i < p.length; i++) s += p[i] * T[i]; return s / p.length; };
+// 점수: 특징마다 0~1로 자른 근거의 합(무게는 얼굴 무늬 3, 반짝임 2, 나머지 1)
+const FACE_EV = {
+  contrast: m => (m.contrast - 8) / 16, skinL: m => (m.skinL - 60) / 25, bridgeStd: m => (16 - m.bridgeStd) / 12,
+  skinDE: m => (32 - m.skinDE) / 22, dcol: m => (28 - m.dcol) / 20, lashC: m => (m.lashC - 20) / 30,
+  eyeMin: m => (25 - m.eyeMin) / 18, cheekStd: m => (22 - m.cheekStd) / 14, tilt: m => (0.7 - m.tilt) / 0.5,
+  faceCorr: m => (m.faceCorr - 0.2) / 0.3, eyeCorr: m => (m.eyeCorr - 0.1) / 0.4, spot: m => (m.spotMin - 2) / 8,
+};
+const FACE_WT = { faceCorr: 3, spot: 2 }, FACE_THR = 11;
+// 평균 눈 무늬(12×12, 왼눈 기준)와 얼굴 무늬(16×16): 그림 24장의 얼굴 31개를 두 눈 위치로 맞춰 잰 밝기를 평균 0 · 표준편차 1로 맞춰 평균한 것
+const FACE_TE = Float32Array.from([
+  -.15,.02,.17,.19,.48,.53,.58,.50,.32,.42,.40,.39,
+  -.14,-.03,-.12,.01,.08,.02,.23,.18,.04,.16,.40,.33,
+  -.35,-.73,-.94,-1.18,-1.47,-1.37,-.96,-.71,-.40,-.19,.04,.34,
+  -.99,-1.59,-1.79,-2.48,-2.58,-2.60,-1.86,-1.69,-1.21,-.40,-.15,.19,
+  -1.59,-1.72,-1.34,-1.71,-2.26,-1.72,-1.58,-1.90,-1.68,-.35,.29,.57,
+  -1.22,-.74,-.62,-1.17,-1.59,-1.72,-1.70,-1.52,-1.22,-.04,.73,.97,
+  -.65,-.20,-.11,-.35,-.57,-.70,-.77,-.46,-.28,.60,1.22,1.23,
+  -.07,.21,.26,.52,.09,.34,.28,.37,.51,.89,1.37,1.43,
+  -.02,.12,.45,.77,.77,.48,.65,.72,.77,1.26,1.32,1.48,
+  .01,.25,.47,.72,.95,.83,.87,.97,1.09,1.23,1.35,1.44,
+  -.05,.25,.34,.61,.98,1.02,.99,1.11,1.12,1.19,1.36,1.46,
+  .10,.08,.40,.62,.80,.94,.99,1.04,1.18,1.34,1.42,1.47]);
+const FACE_TF = Float32Array.from([
+  -1.02,-.75,-.42,-.39,-.76,-.65,-.02,-.29,-.19,-.54,-.18,.07,-.06,-.27,.25,-.29,
+  -.71,-.63,-.89,-.48,-1.06,0,-.73,-.38,-.28,-.21,-.01,-.19,-.09,.11,.27,.03,
+  -.56,-.36,-.61,-.33,-.44,-.16,-.82,-.03,-.30,.20,.37,.01,.25,-.04,.19,.22,
+  -.04,-.33,-.77,-.38,.40,-.12,-.48,-.26,.34,.67,.79,.19,.08,-.13,-.31,.28,
+  .13,-.24,-1.03,.52,.54,.14,-.23,0,.26,.70,1.00,.67,0,.12,-.07,.48,
+  .07,.14,-.44,-2.90,-3.02,-1.33,-.17,.16,.63,.21,-1.98,-2.93,-2.38,-1.43,0,.37,
+  -.07,-.45,-2.43,-1.46,-2.67,-1.99,.90,1.16,1.24,1.48,-1.85,-2.63,-.65,-1.42,-.32,.11,
+  -.53,-.08,-.38,.93,.34,.84,2.02,2.04,2.17,2.18,.84,.87,.99,-.02,.07,.05,
+  -.96,-.69,-.13,.51,1.39,1.60,2.03,2.12,2.15,2.03,1.51,1.47,.84,.07,-.64,-.43,
+  -.95,-.47,-.35,.39,1.70,1.96,2.12,2.19,2.21,2.18,2.06,1.44,.54,-.17,-.64,-.90,
+  -.61,-.21,-.52,-.22,1.55,2.20,1.33,1.61,1.62,1.55,1.86,1.38,-.24,-.40,-.67,-.50,
+  -.95,-.34,-.71,-.22,.91,1.59,1.88,1.77,1.16,1.65,1.50,.82,0,-.22,.01,-.35,
+  -.63,-1.24,-1.02,-.37,-.50,.80,.99,1.05,1.23,1.36,.56,.44,-.32,-.59,-.52,.11,
+  -.66,-1.38,-1.10,-.20,.12,-.09,.67,.77,.22,.45,.04,-.06,-.81,-.50,-.50,-.15,
+  -.27,-.59,-.80,0,-.57,-.12,-.49,-.66,-1.08,-.55,-.88,-.83,-.48,-.06,.03,-.21,
+  -.44,-.44,-.72,-.15,-.04,-.85,-.08,-1.22,-.52,-1.21,-.95,-.95,-1.12,-1.28,-.48,-.54]);
+function findFaces(R, G, B, A, W, H, opt) {
+  opt = opt || {};
+  const K = faceKit(R, G, B, A, W, H), { w, h, L, frame, grid, samp } = K, n = w * h;
+  const TE = opt.TE || FACE_TE, TF = opt.TF || FACE_TF, WT = Object.assign({}, FACE_WT, opt.weights || {});
+  const thr = opt.thr != null ? opt.thr : FACE_THR;
+  // 1) 눈 후보: 박스 블러 3회(가우시안 근사) 뒤 헤세 행렬식 × σ⁴. 가운데가 둘레보다 어두운 것만
+  const Ln = new Float32Array(n); for (let i = 0; i < n; i++) Ln[i] = L[i] / 100;
+  const RAD = [1, 2, 3, 4, 5, 7, 9, 12, 15, 20], SIG = RAD.map(r => Math.sqrt(r * r + r)), NK = RAD.length;
+  const doh = k => {
+    const s = SIG[k], bl = blur(Ln, w, h, s), D = new Float32Array(n), s4 = s * s * s * s;
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x, c = bl[p], xx = bl[p - 1] - 2 * c + bl[p + 1], yy = bl[p - w] - 2 * c + bl[p + w];
+      if (xx + yy <= 0) continue;
+      const xy = (bl[p + w + 1] - bl[p + w - 1] - bl[p - w + 1] + bl[p - w - 1]) / 4;
+      D[p] = (xx * yy - xy * xy) * s4;
+    }
+    return D;
+  };
+  let cand = [], Dm = null, D0 = doh(0), Dp = NK > 1 ? doh(1) : null;
+  for (let k = 0; k < NK; k++) {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const v = D0[y * w + x];
+      if (v <= 0.004) continue;
+      let ok = true;                                 // 이웃 크기 · 5×5 안에서 가장 큰가
+      for (const M of [Dm, D0, Dp]) {
+        if (!M) continue;
+        for (let yy = Math.max(0, y - 2); ok && yy <= Math.min(h - 1, y + 2); yy++)
+          for (let xx = Math.max(0, x - 2); xx <= Math.min(w - 1, x + 2); xx++) if (M[yy * w + xx] > v) { ok = false; break; }
+        if (!ok) break;
+      }
+      if (ok) cand.push({ x, y, r: 1.414 * SIG[k], v });
+    }
+    Dm = D0; D0 = Dp; Dp = k + 2 < NK ? doh(k + 2) : null;
+  }
+  cand.sort((p, q) => q.v - p.v); if (cand.length > 3000) cand.length = 3000;
+  // 2) 짝
+  const pairs = [];
+  for (let i = 0; i < cand.length; i++) for (let j = i + 1; j < cand.length; j++) {
+    let p = cand[i], q = cand[j];
+    if (p.x > q.x) { const t = p; p = q; q = t; }
+    const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy), rr = (p.r + q.r) / 2;
+    if (d < 16 || d / rr < 4 || d / rr > 24 || Math.abs(dy) > 0.8 * dx) continue;
+    if (Math.max(p.r, q.r) / Math.min(p.r, q.r) > 1.7) continue;
+    pairs.push({ a: { x: p.x, y: p.y }, b: { x: q.x, y: q.y } });
+  }
+  // 3) 얼굴 틀 특징
+  const lab3 = (f, u0, u1, v0, v1, nu, nv) => { grid(f, u0, u1, v0, v1, nu, nv); const c = nu * nv; return { L: samp(L, c), A: samp(K.a, c), B: samp(K.b, c) }; };
+  const mc = g => [meanOf(g.L), meanOf(g.A), meanOf(g.B)], d3 = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+  const iris = g => {                                // 눈 칸의 어두운 절반 = 홍채 색
+    const md = pctOf(g.L, 50), s = [0, 0, 0]; let c = 0;
+    for (let i = 0; i < g.L.length; i++) if (g.L[i] <= md) { s[0] += g.L[i]; s[1] += g.A[i]; s[2] += g.B[i]; c++; }
+    return s.map(v => v / c);
+  };
+  const lashOf = (f, u0, u1) => {                    // 눈 위 띠: 줄마다 가장 어두운 값의 평균
+    grid(f, u0, u1, -0.32, -0.14, 8, 3); const v = samp(L, 24); let s = 0;
+    for (let j = 0; j < 3; j++) { let mn = 1e9; for (let i = 0; i < 8; i++) mn = Math.min(mn, v[j * 8 + i]); s += mn; }
+    return s / 3;
+  };
+  const spotOf = (f, u0) => {                        // 눈 칸에서 가장 밝은 점이 둘레보다 얼마나 밝은가(반짝임)
+    grid(f, u0 - 0.2, u0 + 0.2, -0.2, 0.2, 17, 17); const bx = samp(L, 289);
+    let bi = 0; for (let i = 1; i < 289; i++) if (bx[i] > bx[bi]) bi = i;
+    const j = (bi / 17) | 0, i = bi % 17, ring = [];
+    for (const [dj, di] of [[-3, 0], [3, 0], [0, -3], [0, 3], [-2, -2], [-2, 2], [2, -2], [2, 2]])
+      ring.push(bx[Math.min(16, Math.max(0, j + dj)) * 17 + Math.min(16, Math.max(0, i + di))]);
+    return bx[bi] - pctOf(ring, 50);
+  };
+  const measure = f => {
+    const m = {}, eL = lab3(f, -0.72, -0.28, -0.18, 0.18, 8, 6), eR = lab3(f, 0.28, 0.72, -0.18, 0.18, 8, 6);
+    const br = lab3(f, -0.12, 0.12, 0.05, 0.45, 4, 6), cL = lab3(f, -0.7, -0.3, 0.35, 0.7, 5, 5), cR = lab3(f, 0.3, 0.7, 0.35, 0.7, 5, 5);
+    const skin = new Float32Array(br.L.length + cL.L.length + cR.L.length);
+    skin.set(br.L); skin.set(cL.L, br.L.length); skin.set(cR.L, br.L.length + cL.L.length);
+    m.skinL = pctOf(skin, 50);
+    m.contrast = m.skinL - (meanOf(eL.L) + meanOf(eR.L)) / 2;
+    m.eyeMin = (Math.min(...eL.L) + Math.min(...eR.L)) / 2;
+    m.lashC = m.skinL - (lashOf(f, -0.75, -0.25) + lashOf(f, 0.25, 0.75)) / 2;
+    m.bridgeStd = stdOf(br.L); m.cheekStd = (stdOf(cL.L) + stdOf(cR.L)) / 2;
+    const mb = mc(br), ml = mc(cL), mr = mc(cR);
+    m.skinDE = Math.max(d3(mb, ml), d3(mb, mr), d3(ml, mr));
+    m.dcol = d3(iris(eL), iris(eR));
+    m.tilt = f.tilt;
+    const [le, re] = K.eyePatches(f);
+    m.eyeCorr = Math.min(corrOf(le, TE), corrOf(re, TE)); m.faceCorr = corrOf(K.facePatch(f), TF);
+    m.spotMin = Math.min(spotOf(f, -0.5), spotOf(f, 0.5));
+    return m;
+  };
+  const score = m => { let s = 0; for (const k in FACE_EV) s += (WT[k] != null ? WT[k] : 1) * clamp01(FACE_EV[k](m)); return s; };
+  for (const P of pairs) { P.f = frame(P.a.x, P.a.y, P.b.x, P.b.y); P.m = measure(P.f); P.score = score(P.m); }
+  pairs.sort((p, q) => q.score - p.score);
+  // 4) 상위 40개: 눈 위치를 ±0.12d 안에서 옮겨 얼굴 무늬 상관이 가장 큰 곳으로(두 번 번갈아)
+  for (const P of pairs.slice(0, 40)) {
+    let Pa = [P.a.x, P.a.y], Pb = [P.b.x, P.b.y];
+    const d0 = Math.hypot(Pb[0] - Pa[0], Pb[1] - Pa[1]), fc = (p, q) => corrOf(K.facePatch(frame(p[0], p[1], q[0], q[1])), TF);
+    let best = fc(Pa, Pb);
+    for (let rnd = 0; rnd < 2; rnd++) for (let which = 0; which < 2; which++) {
+      const P0 = which ? Pb : Pa; let bp = P0;
+      for (let iy = 0; iy < 5; iy++) for (let ix = 0; ix < 5; ix++) {
+        const Q = [P0[0] + (-0.12 + 0.06 * ix) * d0, P0[1] + (-0.12 + 0.06 * iy) * d0], v = which ? fc(Pa, Q) : fc(Q, Pb);
+        if (v > best) { best = v; bp = Q; }
+      }
+      if (which) Pb = bp; else Pa = bp;
+    }
+    P.a = { x: Pa[0], y: Pa[1] }; P.b = { x: Pb[0], y: Pb[1] };
+    P.f = frame(Pa[0], Pa[1], Pb[0], Pb[1]); P.m = measure(P.f); P.score = score(P.m); P.refined = true;
+  }
+  pairs.sort((p, q) => q.score - p.score);
+  // 5) 문턱 이상, 이미 고른 얼굴과 겹치면(가운데가 d 안, 또는 한 눈이 그 얼굴 눈의 0.5d 안) 뺀다
+  const sel = [], near = (e, q, r) => Math.min(Math.hypot(e.x - q.a.x, e.y - q.a.y), Math.hypot(e.x - q.b.x, e.y - q.b.y)) < r;
+  for (const P of pairs) {
+    if (P.score < thr) break;
+    const f = P.f;
+    if (sel.some(q => Math.hypot(f.cx - q.f.cx, f.cy - q.f.cy) < Math.max(f.d, q.f.d))) continue;
+    if (sel.some(q => near(P.a, q, 0.5 * Math.max(f.d, q.f.d)) || near(P.b, q, 0.5 * Math.max(f.d, q.f.d)))) continue;
+    sel.push(P);
+  }
+  const s = K.sc;
+  const faces = sel.map(P => ({ cx: P.f.cx / s, cy: P.f.cy / s, d: P.f.d / s, ex: P.f.ex, ey: P.f.ey, fx: P.f.fx, fy: P.f.fy,
+    a: { x: P.a.x / s, y: P.a.y / s }, b: { x: P.b.x / s, y: P.b.y / s }, score: +P.score.toFixed(2) }));
+  return opt.debug ? { faces, sel, pairs, cand, kit: K } : faces;
+}
+
+/* 얼굴 자리로 배경 넓히기: 얼굴을 찾으면 캐릭터가 어디 있는지 대강 안다.
+ * 얼굴마다 머리(눈 아래 0.3d를 가운데로 가로 2.2d · 세로 2d 타원)와 몸(눈 아래로 8d까지, 1.5d 아래부터 넓어지는 기둥)을
+ * 캐릭터일 확률 0.85 · 0.9, 그 밖을 0.45로 두고, 색 분포와 함께 영역 그래프 컷을 4번 되풀이한다(GrabCut 방식).
+ * 그래도 배경으로는 확실한 곳만 더한다:
+ *  - 색이 배경 쪽으로 분명하고(알고 있는 픽셀의 평균 로그 우도비 < -1) 머리 · 몸 자리 밖(확률 평균 ≤ 0.5)
+ *  - 이미 찾은 배경에서 "선 없이 맞닿은" 경계(맞닿은 길이의 절반 이상이 선이 아님)로만 이어진 곳.
+ *    캐릭터는 윤곽선으로 둘러싸여 있어 머리카락 끝 · 소매 · 소품이 배경과 색이 비슷해도 넘어가지 않는다
+ * keep = 배경에서 되돌린 캐릭터 부분(다시 가져가지 않는다). 결과: 더할 픽셀(없으면 null) */
+function faceCutBg(bg, G, crisp, keep, faces, W, H) {
+  const N = W * H;
+  if (!G) return null;
+  const { reg, R, area, eA, eB, eO, eL, E, mL, kn } = G;
+  const prS = new Float64Array(R), lpS = new Float64Array(R), abS = new Float64Array(R), kpS = new Float64Array(R);
+  const logit = {};
+  for (const q of [0.45, 0.85, 0.9]) logit[q] = Math.log(q / (1 - q));
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x, r = reg[p]; if (r < 0) continue;
+    let pr = 0.45;
+    for (const f of faces) {
+      const dx = x - f.cx, dy = y - f.cy, u = (dx * f.ex + dy * f.ey) / f.d, v = (dx * f.fx + dy * f.fy) / f.d;
+      let q = 0.45;
+      if (v >= -1.2 && v <= 8 && Math.abs(u) <= 1.2 + 0.35 * Math.max(v - 1.5, 0)) q = 0.9;
+      else if ((u / 2.2) ** 2 + ((v + 0.3) / 2) ** 2 <= 1) q = 0.85;
+      if (q > pr) pr = q;
+    }
+    prS[r] += pr; lpS[r] += logit[pr];
+    if (bg[p]) abS[r]++;
+    if (keep && keep[p]) kpS[r]++;
+  }
+  const prR = new Float64Array(R), abf = new Float64Array(R);
+  for (let r = 0; r < R; r++) if (area[r]) { prR[r] = prS[r] / area[r]; abf[r] = abS[r] / area[r]; }
+  const wpair = new Float64Array(E);
+  for (let i = 0; i < E; i++) {
+    const a = eA[i], b = eB[i], dE = Math.hypot(mL[a * 3] - mL[b * 3], mL[a * 3 + 1] - mL[b * 3 + 1], mL[a * 3 + 2] - mL[b * 3 + 2]);
+    wpair[i] = eO[i] * Math.exp(-dE * dE / 288) + 0.0375 * eL[i];
+  }
+  // 처음 색 분포: 캐릭터 = 머리 · 몸 자리(기존 배경 제외), 배경 = 기존 배경
+  let fg = new Uint8Array(R), bgR = new Uint8Array(R);
+  for (let r = 0; r < R; r++) if (area[r]) { fg[r] = prR[r] >= 0.8 && abf[r] < 0.5 ? 1 : 0; bgR[r] = abf[r] > 0.5 ? 1 : 0; }
+  const S = R, T = R + 1, U = new Float64Array(R);
+  for (let iter = 0; iter < 4; iter++) {
+    G.llrSum(fg, bgR, U);
+    const from = [], to = [], cap = [], rcap = [];
+    for (let r = 0; r < R; r++) {
+      if (!area[r]) continue;
+      const sc = U[r] + lpS[r] - 2 * area[r] * abf[r];
+      if (sc > 0) { from.push(S); to.push(r); cap.push(sc); rcap.push(0); } else if (sc < 0) { from.push(r); to.push(T); cap.push(-sc); rcap.push(0); }
+    }
+    for (let i = 0; i < E; i++) if (wpair[i] > 0) { from.push(eA[i]); to.push(eB[i]); cap.push(wpair[i]); rcap.push(wpair[i]); }
+    const side = maxflowMinCut(R + 2, S, T, from, to, cap, rcap);
+    fg = new Uint8Array(R); bgR = new Uint8Array(R);
+    for (let r = 0; r < R; r++) if (area[r]) { fg[r] = side[r] ? 1 : 0; bgR[r] = 1 - fg[r]; }
+  }
+  // 확실한 곳만: 기존 배경에서 선 없는 경계로 이어진 후보
+  const cand = new Uint8Array(R), reach = new Uint8Array(R), nb = Array.from({ length: R }, () => []);
+  for (let r = 0; r < R; r++) {
+    if (!area[r] || fg[r] || kpS[r] > 0.5 * area[r]) continue;
+    cand[r] = abf[r] > 0.5 || (kn[r] > 0 && U[r] / kn[r] < -1 && prR[r] <= 0.5) ? 1 : 0;
+  }
+  for (let i = 0; i < E; i++) if (eO[i] >= 0.5 * (eO[i] + eL[i])) { nb[eA[i]].push(eB[i]); nb[eB[i]].push(eA[i]); }
+  const st = [];
+  for (let r = 0; r < R; r++) if (area[r] && abf[r] > 0.5) { reach[r] = 1; st.push(r); }
+  while (st.length) { const r = st.pop(); for (const v of nb[r]) if (!reach[v] && cand[v]) { reach[v] = 1; st.push(v); } }
+  const add = new Uint8Array(N);
+  let n = 0;
+  for (let p = 0; p < N; p++) {
+    const r = reg[p];
+    if (r < 0 || !reach[r] || abf[r] > 0.5 || bg[p] || crisp[p] || (keep && keep[p])) continue;
+    add[p] = 1; n++;
+  }
+  return n ? add : null;
 }
 
 // mask=1 픽셀까지의 거리(px, 체임퍼 1-√2 근사)
@@ -1365,7 +1693,7 @@ function process(img, opts, progress) {
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
   const auto = opts.bg && !hasAlpha;
-  let bgMask = auto ? detectBackground(U, known, W, H) : null, back = null;
+  let bgMask = auto ? detectBackground(U, known, W, H) : null, back = null, faces = [];
   if (auto) {                                          // 선 없이 칠한 장면 배경도 배경으로
     const scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale);
     if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
@@ -1373,9 +1701,19 @@ function process(img, opts, progress) {
     back = bgMask ? attachedParts(bgMask, U, known, lineMask, W, H) : null;
     // 선으로 그린 배경: 색이 캐릭터와 확연히 다르면 색 모델로 넓힌다
     progress(0.26, '배경 색 모델');
-    const add = colorCutBg(bgMask, O, known, inMask, crisp, W, H);
+    // 색 영역 그래프는 색 모델과 얼굴 단계가 같이 쓴다(처음 필요할 때 한 번 만든다. 난수는 이 단계만의 고정 씨앗)
+    let graph;
+    const getGraph = () => graph !== undefined ? graph : (graph = regionGraph(O, known, inMask, crisp, W, H, mulberry32(777)));
+    const add = colorCutBg(bgMask, getGraph, crisp, W, H);
     if (add) { if (!bgMask) bgMask = new Uint8Array(N); for (let p = 0; p < N; p++) if (add[p]) bgMask[p] = 1; }
     if (back) for (let p = 0; p < N; p++) if (back[p]) bgMask[p] = 0;
+    // 얼굴을 찾으면 그 자리를 캐릭터로 두고, 이미 찾은 배경에서 확실한 배경만 더 넓힌다
+    if (bgMask) {
+      progress(0.27, '얼굴 찾기');
+      faces = findFaces(R, Gc, B, A, W, H);
+      const more = faces.length ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H) : null;
+      if (more) for (let p = 0; p < N; p++) if (more[p]) bgMask[p] = 1;
+    }
   }
   // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
   const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
@@ -1879,7 +2217,7 @@ function process(img, opts, progress) {
     R, G: Gc, B, A, U, lineA, lineC, lineK0, traceMask, inMask, bgMask, bgFx, bgBase, tone, nT, bgTone, toneGroup, nG: nGroups, base, partExtra,
     fxId, fxNames,
     toneG, toneHi, toneCol: tMean, tCnt, sparkPix, sparkR, sparkArea,
-    counts: { regions: nR, tones: nT }, autoInfo
+    counts: { regions: nR, tones: nT }, autoInfo, faces
   });
 }
 /* ---------------- 레이어 분해 ---------------- */
@@ -2329,7 +2667,8 @@ function buildLayers(ctx) {
     stats: {
       ms: Date.now() - t0, psnr, regions: ctx.counts.regions, tones: ctx.counts.tones, parts: parts.filter(k => !pal[k].extra).length,
       smallParts: parts.filter(k => pal[k].extra).length, hasAlpha: ctx.hasAlpha,
-      background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR, auto: ctx.autoInfo || null
+      background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR, auto: ctx.autoInfo || null,
+      faces: ctx.faces ? ctx.faces.length : 0
     }
   };
 }
