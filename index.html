@@ -996,6 +996,79 @@ function colorCutBg(bg, O, known, inMask, crisp, W, H) {
   return n ? add : null;
 }
 
+/* 배경에 딸려 들어간 캐릭터 부분 되돌리기
+ * 선을 거의 쓰지 않고 부드럽게 칠한 팔 · 손 · 소매 · 날개는 선 밀도로는 배경과 구분되지 않아, 배경 채우기가
+ * 선 없는 경계를 타고 들어간다. 이런 부분은 초점이 맞은 물체라 둘레가 "선명한 색 경계"(2px 사이 ΔE ≥ 20)다.
+ * 찾은 배경을 선명한 경계와 선에서 잘라 조각으로 나누고, 다음을 모두 만족하는 조각만 캐릭터로 되돌린다.
+ *  - 위 · 왼쪽 · 오른쪽 테두리에 닿지 않는다(테두리에 닿은 조각은 대개 진짜 배경)
+ *  - 둘레의 80% 이상이 캐릭터와 맞닿아 있다(떠 있는 등롱 · 빛 조각은 둘레가 대부분 배경)
+ *  - 색이 나머지 배경보다 캐릭터 쪽에 가깝다(색 로그 우도비 평균 ≥ 0.8)
+ * 결과: 되돌릴 픽셀(없으면 null) */
+function attachedParts(bg, U, known, lineMask, W, H) {
+  const N = W * H, [L, A, B] = toLab(U[0], U[1], U[2], N);
+  const de = (p, q) => Math.hypot(L[p] - L[q], A[p] - A[q], B[p] - B[q]);
+  const edge = new Uint8Array(N);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x;
+    if ((x > 0 && x < W - 1 && de(p - 1, p + 1) >= 20) || (y > 0 && y < H - 1 && de(p - W, p + W) >= 20)) edge[p] = 1;
+  }
+  const valid = new Uint8Array(N);
+  for (let p = 0; p < N; p++) valid[p] = bg[p] && !edge[p] && !lineMask[p] ? 1 : 0;
+  const cc = components(new Int32Array(N), valid, W, H), n = cc.count, CH = n;
+  if (!n) return null;
+  // 경계 픽셀은 가장 가까운 조각(또는 캐릭터)에 붙여 맞닿은 길이를 잰다
+  const lab = new Int32Array(N);
+  for (let p = 0; p < N; p++) lab[p] = cc.rid[p] >= 0 ? cc.rid[p] : !bg[p] ? CH : -1;
+  fillLabels(lab, W, H);
+  const area = new Float64Array(n), upper = new Uint8Array(n), withChar = new Float64Array(n), withBg = new Float64Array(n);
+  for (let p = 0; p < N; p++) if (cc.rid[p] >= 0) area[cc.rid[p]]++;
+  for (let x = 0; x < W; x++) if (cc.rid[x] >= 0) upper[cc.rid[x]] = 1;
+  for (let y = 0; y < H - 1; y++) for (const p of [y * W, y * W + W - 1]) if (cc.rid[p] >= 0) upper[cc.rid[p]] = 1;
+  const pair = (a, b) => {
+    if (a === b || a < 0 || b < 0) return;
+    if (a !== CH) { if (b === CH) withChar[a]++; else withBg[a]++; }
+    if (b !== CH) { if (a === CH) withChar[b]++; else withBg[b]++; }
+  };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const p = y * W + x; if (x < W - 1) pair(lab[p], lab[p + 1]); if (y < H - 1) pair(lab[p], lab[p + W]); }
+  const cand = new Uint8Array(n);
+  let any = false;
+  for (let r = 0; r < n; r++) if (area[r] >= N * 0.001 && !upper[r] && withChar[r] > 0 && withChar[r] >= 0.8 * (withChar[r] + withBg[r])) { cand[r] = 1; any = true; }
+  if (!any) return null;
+  // 색 분포(Lab 10×16×16 칸): 캐릭터 vs 나머지 배경(자기 조각은 뺌)
+  const NB = 2560, bin = new Int32Array(N), hC = new Float64Array(NB), hB = new Float64Array(NB);
+  let nC = 0, nB = 0;
+  for (let p = 0; p < N; p++) {
+    bin[p] = Math.min(9, Math.max(0, Math.floor(L[p] / 10))) * 256 + Math.min(15, Math.max(0, Math.floor((A[p] + 128) / 16))) * 16 + Math.min(15, Math.max(0, Math.floor((B[p] + 128) / 16)));
+    if (!known[p]) continue;
+    if (bg[p]) { hB[bin[p]]++; nB++; } else { hC[bin[p]]++; nC++; }
+  }
+  const own = new Map(), llr = new Float64Array(n);
+  for (let p = 0; p < N; p++) { const r = cc.rid[p]; if (r >= 0 && cand[r] && known[p]) { const k = r * NB + bin[p]; own.set(k, (own.get(k) || 0) + 1); } }
+  for (const [k, c] of own) {
+    const r = Math.floor(k / NB), b = k % NB, rest = Math.max(1, nB - area[r]);
+    const pc = (hC[b] + 1) / (nC + NB), pb = (Math.max(0, hB[b] - c) + 1) / (rest + NB);
+    llr[r] += c * Math.max(-4, Math.min(4, Math.log(pc / pb)));
+  }
+  const out = new Uint8Array(N);
+  any = false;
+  for (let p = 0; p < N; p++) { const r = lab[p]; if (r >= 0 && r < n && cand[r] && llr[r] >= 0.8 * area[r] && bg[p]) { out[p] = 1; any = true; } }
+  if (!any) return null;
+  // 조각과 캐릭터 사이의 경계 · 선 띠(2~3px)도 함께: 되돌린 부분 둘레에 배경 테가 남지 않게
+  let front = [];
+  for (let p = 0; p < N; p++) if (out[p]) front.push(p);
+  for (let d = 0; d < 3 && front.length; d++) {
+    const next = [];
+    for (const p of front) {
+      const x = p % W;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+        if (q >= 0 && !out[q] && bg[q] && lab[q] === CH) { out[q] = 1; next.push(q); }
+      }
+    }
+    front = next;
+  }
+  return out;
+}
+
 // mask=1 픽셀까지의 거리(px, 체임퍼 1-√2 근사)
 function chamfer(mask, W, H) {
   const N = W * H, d = new Float32Array(N), D = Math.SQRT2;
@@ -1257,14 +1330,17 @@ function process(img, opts, progress) {
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
   const auto = opts.bg && !hasAlpha;
-  let bgMask = auto ? detectBackground(U, known, W, H) : null;
+  let bgMask = auto ? detectBackground(U, known, W, H) : null, back = null;
   if (auto) {                                          // 선 없이 칠한 장면 배경도 배경으로
     const scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale);
     if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
+    // 선 없이 칠해 배경에 딸려 들어간 팔 · 손 · 소매(색 모델 단계 뒤에 캐릭터로 되돌린다)
+    back = bgMask ? attachedParts(bgMask, U, known, lineMask, W, H) : null;
     // 선으로 그린 배경: 색이 캐릭터와 확연히 다르면 색 모델로 넓힌다
     progress(0.26, '배경 색 모델');
     const add = colorCutBg(bgMask, O, known, inMask, crisp, W, H);
     if (add) { if (!bgMask) bgMask = new Uint8Array(N); for (let p = 0; p < N; p++) if (add[p]) bgMask[p] = 1; }
+    if (back) for (let p = 0; p < N; p++) if (back[p]) bgMask[p] = 0;
   }
   // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
   const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
@@ -1279,13 +1355,13 @@ function process(img, opts, progress) {
   if (bgMask) {
     const notBg = new Uint8Array(N);
     for (let p = 0; p < N; p++) notBg[p] = !bgMask[p] && A[p] > 0.02 ? 1 : 0;
-    // (사용자가 캐릭터로 되돌린 조각은 작아도 배경 효과로 보내지 않는다)
+    // (사용자가 캐릭터로 되돌린 조각, 배경에서 되돌린 캐릭터 부분은 작아도 배경 효과로 보내지 않는다)
     const cc = components(new Int32Array(N), notBg, W, H), area = new Int32Array(cc.count);
     for (let p = 0; p < N; p++) if (cc.rid[p] >= 0) area[cc.rid[p]]++;
     let any = false;
     bgFx = new Uint8Array(N);
     const keepChar = new Uint8Array(cc.count);
-    if (forceChar) for (let p = 0; p < N; p++) if (forceChar[p] && cc.rid[p] >= 0) keepChar[cc.rid[p]] = 1;
+    for (const keep of [forceChar, back]) if (keep) for (let p = 0; p < N; p++) if (keep[p] && cc.rid[p] >= 0) keepChar[cc.rid[p]] = 1;
     for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && !keepChar[cc.rid[p]] && area[cc.rid[p]] < N * 0.015) { bgFx[p] = 1; any = true; }
     if (any) {
       const Ubg = [Float32Array.from(U[0]), Float32Array.from(U[1]), Float32Array.from(U[2])], skip = new Uint8Array(N), kb = new Uint8Array(N);
