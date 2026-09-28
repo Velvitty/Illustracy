@@ -2273,14 +2273,14 @@ function putMinAlpha(buf, i, v0, v1, v2, a0) {
 }
 
 // 파츠 이름: 밑색으로 대략적인 색 이름을 붙인다(피부색은 "피부")
-function colorName(rgb) {
+function colorName(rgb, notSkin) {
   const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   const v = mx, s = mx ? (mx - mn) / mx : 0;
   let h = 0;
   if (mx !== mn) h = 60 * (mx === r ? ((g - b) / (mx - mn) + 6) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4);
   if (v < 0.18) return '검정';
   if (s < 0.1) return v > 0.9 ? '흰색' : '회색';
-  if (h >= 5 && h <= 45 && s >= 0.08 && s <= 0.55 && v >= 0.7) return '피부';
+  if (h >= 5 && h <= 45 && s >= 0.08 && s <= 0.55 && v >= 0.7) return notSkin ? (s < 0.25 ? '베이지' : '살구') : '피부';
   if (h < 15 || h >= 345) return v < 0.45 ? '갈색' : s < 0.5 && v > 0.8 ? '분홍' : '빨강';
   if (h < 40) return v < 0.6 ? '갈색' : '주황';
   if (h < 65) return v < 0.5 ? '갈색' : '노랑';
@@ -2289,6 +2289,82 @@ function colorName(rgb) {
   if (h < 255) return '파랑';
   if (h < 290) return '보라';
   return '분홍';
+}
+
+/* 파츠의 뜻: 얼굴을 찾았으면 얼굴 틀(두 눈 사이 거리 d, u = 눈 방향, v = 아래)로 눈 · 피부 · 머리카락 파츠를 가린다.
+ *  - 피부: 콧등(|u| ≤ 0.15, 0.1 ≤ v ≤ 0.5)과 볼(0.3 ≤ |u| ≤ 0.7, 0.35 ≤ v ≤ 0.7)에서 가장 넓은 파츠(35% 이상). 색이 따뜻하고
+ *    너무 하얗지 않아야 한다(하얀 옷과 한 파츠로 합쳐진 창백한 피부는 부르지 않는다)
+ *  - 머리카락: 앞머리(|u| ≤ 0.8, −0.9 ≤ v ≤ −0.45)에서 피부(이마)를 뺀 나머지의 40% 이상인 가장 넓은 파츠. 몸통 가운데(|u| ≤ 0.8, 2 ≤ v ≤ 3.5)도
+ *    덮는 색(옷과 같은 색)이면 부르지 않는다
+ *  - 눈: 픽셀의 절반 이상이 두 눈 칸(0.25 ≤ |u| ≤ 0.75, |v| ≤ 0.22) 안에 있는 파츠(피부 · 머리카락 제외, 점수 12 이상인 얼굴만)
+ * 얼굴마다 (점수 − 10)²만큼 표를 주고, 가장 센 얼굴 한 표의 40% 이상을 얻은 파츠에 이름을 붙인다(가짜 얼굴은 점수가 낮아 표가 적다).
+ * 피부 표와 머리카락 표를 함께 받은 파츠, 픽셀의 절반 넘게 센 얼굴에서 멀리(6d 밖) 있는 파츠(바닥 · 소품과 한 색)는 이름을 붙이지 않는다.
+ * 결과: 파츠마다 이름 또는 null */
+function partMeaning(part, pal, faces, W, H) {
+  const nP = pal.length, names = new Array(nP).fill(null);
+  if (!faces || !faces.length) return names;
+  const tot = new Float64Array(nP), vSkin = new Float64Array(nP), vHair = new Float64Array(nP), inEye = new Float64Array(nP), onBody = new Float64Array(nP);
+  for (let p = 0; p < part.length; p++) if (part[p] >= 0) tot[part[p]]++;
+  let wMax = 0;
+  for (const f of faces) {
+    const w = Math.max(0, f.score - 10) ** 2;
+    if (!w) continue;
+    wMax = Math.max(wMax, w);
+    const skin = new Float64Array(nP), hair = new Float64Array(nP), eye = new Float64Array(nP), body = new Float64Array(nP);
+    let nS = 0, nH = 0, nB = 0, aS = 0, aH = 0;
+    const r = 3.6 * f.d, x0 = Math.max(0, Math.floor(f.cx - r)), x1 = Math.min(W - 1, Math.ceil(f.cx + r));
+    const y0 = Math.max(0, Math.floor(f.cy - r)), y1 = Math.min(H - 1, Math.ceil(f.cy + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const dx = x - f.cx, dy = y - f.cy, u = (dx * f.ex + dy * f.ey) / f.d, v = (dx * f.fx + dy * f.fy) / f.d, au = Math.abs(u);
+      const zEye = au >= 0.25 && au <= 0.75 && Math.abs(v) <= 0.22;
+      const zSkin = !zEye && ((au <= 0.15 && v >= 0.1 && v <= 0.5) || (au >= 0.3 && au <= 0.7 && v >= 0.35 && v <= 0.7));
+      const zHair = au <= 0.8 && v >= -0.9 && v <= -0.45;   // 앞머리(눈썹 위 이마)
+      const zBody = au <= 0.8 && v >= 2 && v <= 3.5;      // 몸통 가운데(목 아래)
+      if (!zEye && !zSkin && !zHair && !zBody) continue;
+      if (zSkin) aS++; if (zHair) aH++;
+      const k = part[y * W + x]; if (k < 0) continue;
+      if (zEye) eye[k]++; else if (zSkin) { skin[k]++; nS++; } else if (zHair) { hair[k]++; nH++; } else { body[k]++; nB++; }
+    }
+    const top = (arr, n, share, skip) => {
+      let b = -1;
+      for (let k = 0; k < nP; k++) if (k !== skip && (b < 0 || arr[k] > arr[b])) b = k;
+      return b >= 0 && arr[b] >= share * n ? b : -1;
+    };
+    const ks = nS >= 0.5 * aS ? top(skin, nS, 0.35, -1) : -1;   // 볼 · 콧등이 절반 넘게 배경이면 표를 주지 않는다
+    if (ks >= 0) vSkin[ks] += w;
+    // 앞머리: 이마(피부)가 보이는 곳을 뺀 나머지의 40% 이상인 가장 넓은 파츠, 그다음 파츠도 30% 이상이면(머리색 + 광택)
+    const nHs = nH - (ks >= 0 ? hair[ks] : 0), kh = nH >= 0.5 * aH ? top(hair, nHs, 0.4, ks) : -1;
+    if (kh >= 0) {
+      vHair[kh] += w;
+      let k2 = -1;
+      for (let k = 0; k < nP; k++) if (k !== ks && k !== kh && (k2 < 0 || hair[k] > hair[k2])) k2 = k;
+      if (k2 >= 0 && hair[k2] >= 0.3 * nHs) vHair[k2] += w;
+    }
+    if (nB) for (let k = 0; k < nP; k++) if (body[k] >= 0.25 * nB) onBody[k] += w;   // 몸통 가운데를 덮는 색(옷)
+    if (f.score >= 12) for (let k = 0; k < nP; k++) if (k !== ks && k !== kh) inEye[k] += eye[k];
+  }
+  // 파츠 픽셀 중 센 얼굴(점수가 가장 높은 얼굴의 90% 이상) 둘레 6d 안에 있는 비율. 바닥 · 소품과 한 색이 되어 대부분 멀리 있는 파츠는 이름을 붙이지 않는다
+  const near = new Float64Array(nP), sMax = Math.max(...faces.map(f => f.score)), strong = faces.filter(f => f.score >= 0.9 * sMax);
+  for (let p = 0; p < part.length; p += 3) {
+    const k = part[p]; if (k < 0) continue;
+    const x = p % W, y = (p / W) | 0;
+    if (strong.some(f => (x - f.cx) ** 2 + (y - f.cy) ** 2 <= 36 * f.d * f.d)) near[k] += 3;
+  }
+  // 피부로 볼 만한 색: 따뜻한 색(빨강 ~ 노랑 쪽), 너무 하얗거나 어둡지 않음
+  const skinLike = rgb => {
+    const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx < 0.55 || mx - mn < 0.07 * mx || mx !== r) return false;          // 빨강 채널이 가장 밝아야 따뜻한 색
+    return g >= b - 0.02 || (b - g) < 0.35 * (r - Math.min(g, b));            // 분홍까지는 허용, 보라 · 파랑은 제외
+  };
+  for (let k = 0; k < nP; k++) {
+    if (!tot[k] || near[k] < 0.5 * tot[k]) continue;
+    const s = vSkin[k] >= 0.4 * wMax, h = vHair[k] >= 0.4 * wMax;
+    if (s && h) continue;                              // 피부이기도 하고 머리카락이기도 한 색: 가리지 않는다
+    if (s && skinLike(pal[k].rgb)) names[k] = '피부';
+    else if (h && onBody[k] < 0.4 * wMax) names[k] = '머리카락';   // 옷과 같은 색이면 머리카락이라 부르지 않는다
+    else if (tot[k] && inEye[k] >= 30 && inEye[k] >= 0.5 * tot[k]) names[k] = '눈';
+  }
+  return names;
 }
 
 /* 레이어 구성 — 실제 작가의 작업 파일처럼:
@@ -2606,6 +2682,7 @@ function buildLayers(ctx) {
   const partUsed = new Uint8Array(pal.length);
   for (let p = 0; p < N; p++) if (part[p] >= 0) partUsed[part[p]] = 1;
   const parts = pal.map((_, k) => k).filter(k => partUsed[k]).sort((a, b) => pal[b].area - pal[a].area);
+  const meaning = partMeaning(part, pal, ctx.faces, W, H);
 
   // 캐릭터 한 명(sel = 그 캐릭터 픽셀, 없으면 전체)의 [채색] · [효과] · [선화]
   const buildChar = sel => {
@@ -2646,10 +2723,12 @@ function buildLayers(ctx) {
           partLayer('2차 그림자', 'shadow2', 'mul ', sh2B, k, { clipping: clip }),
           partLayer('하이라이트', 'highlight', 'norm', hlB, k, { clipping: clip })].filter(Boolean);
         if (!kids.length) continue;
-        let nm = colorName(pal[k].rgb);
+        let nm = meaning[k] || colorName(pal[k].rgb);
+        // 얼굴로 피부 파츠를 찾았으면, 나머지 살색 파츠는 피부가 아니라 색 이름으로
+        if (!meaning[k] && nm === '피부' && meaning.includes('피부')) nm = colorName(pal[k].rgb, true);
         used[nm] = (used[nm] || 0) + 1;
         if (used[nm] > 1) nm += ' ' + used[nm];
-        (pal[k].extra ? extras : colorKids).push(partGroup(nm, k, kids));
+        (pal[k].extra && !meaning[k] ? extras : colorKids).push(partGroup(nm, k, kids));   // 뜻 이름이 붙은 파츠는 작아도 밖에
       }
       // 색이 비슷한 이웃이 없어 합치지 않은 작은 파츠(장식, 효과 조각 등)
       if (extras.length) colorKids.splice(1, 0, group(`작은 파츠 (${extras.length})`, extras, { open: false }));
