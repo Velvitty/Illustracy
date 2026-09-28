@@ -213,7 +213,7 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
       <div class="field">
         <label class="row">최대 선 굵기 <span class="val" id="v_lineWidth"></span></label>
         <input type="range" id="o_lineWidth" min="0" max="16" value="0">
-        <div class="hint">0 = 해상도에 맞춰 자동</div>
+        <div class="hint" id="h_lineWidth">0 = 그림에서 선(펜) 굵기를 재서 자동</div>
       </div>
       <div class="field">
         <label class="row">선 색상</label>
@@ -244,7 +244,7 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
       <div class="field">
         <label class="row">반짝임 최대 크기 <span class="val" id="v_sparkle"></span></label>
         <input type="range" id="o_sparkle" min="0" max="30" value="0">
-        <div class="hint">0 = 자동</div>
+        <div class="hint">0 = 해상도에 맞춰 자동</div>
       </div>
       <div class="field">
         <label class="row">최대 파츠 수 <span class="val" id="v_maxParts"></span></label>
@@ -1069,6 +1069,38 @@ function attachedParts(bg, U, known, lineMask, W, H) {
   return out;
 }
 
+/* 그림에 맞춘 자동 설정: 최대 선 굵기
+ * 넉넉한 창(12s px)으로 "주변보다 어둡고 가는 구조"를 뽑아, 진한 것(세기 0.5 이상)의 중심선에서 굵기를 잰다.
+ * 작가는 같은 펜으로 선을 그으므로 굵기 분포에 봉우리가 생긴다. 봉우리의 3배까지를 선으로 보고, 그중 90%를 덮는 굵기가
+ * 펜 굵기 w90. 이 선을 담는 검출 창 반지름 ⌈w90/2⌉+1이 해상도로 정한 기본값보다 2 이상 크면 그 값으로(최대 16px),
+ * 아니면 기본값 그대로 둔다(보통 그림은 기본값이 맞고, 창을 바꾸면 배경 찾기가 쓰는 선 밀도까지 달라진다).
+ * 중심선이 150개 미만이면 기본값 */
+function autoLineWidth(Lw, W, H, scale) {
+  const N = W * H, defLw = Math.max(3, Math.round(4 * scale)), out = { lineWidth: defLw, penWidth: 0 };
+  const Rb = Math.max(8, Math.round(12 * scale)), cl = erode(dilate(Lw, W, H, Rb), W, H, Rb), outside = new Uint8Array(N);
+  for (let i = 0; i < N; i++) { const c = cl[i], d = c - Lw[i]; outside[i] = c > 0.02 && d > 0 && Math.min(d / c, d / 0.3) >= 0.5 ? 0 : 1; }
+  const dist = chamfer(outside, W, H), ws = [];
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const p = y * W + x; if (outside[p]) continue;
+    const d = dist[p];
+    if (d >= dist[p - 1] && d >= dist[p + 1] && d >= dist[p - W] && d >= dist[p + W] && 2 * d - 1 >= 1.8) ws.push(2 * d - 1);
+  }
+  if (ws.length < 150) return out;
+  const hist = new Float64Array(64);
+  for (const w of ws) hist[Math.min(63, Math.round(w))]++;
+  let mode = 2, bv = -1;
+  for (let w = 2; w < 60; w++) {                     // 굵기 ±20% 안의 개수가 가장 많은 굵기
+    const r = Math.max(1, Math.round(0.2 * w)); let v = 0;
+    for (let k = Math.max(2, w - r); k <= Math.min(63, w + r); k++) v += hist[k];
+    if (v > bv) { bv = v; mode = w; }
+  }
+  const pop = ws.filter(w => w <= 3 * mode).sort((a, b) => a - b);
+  out.penWidth = +pop[Math.floor((pop.length - 1) * 0.9)].toFixed(1);
+  const need = Math.ceil(out.penWidth / 2) + 1;
+  if (need >= defLw + 2) out.lineWidth = Math.min(16, need);
+  return out;
+}
+
 // mask=1 픽셀까지의 거리(px, 체임퍼 1-√2 근사)
 function chamfer(mask, W, H) {
   const N = W * H, d = new Float32Array(N), D = Math.SQRT2;
@@ -1156,6 +1188,9 @@ function process(img, opts, progress) {
     Lw[i] = lumOf(r * a + 1 - a, g * a + 1 - a, b * a + 1 - a);
   }
   const hasAlpha = transparent > N * 0.001;
+  // 그림에 맞춘 자동 설정: 최대 선 굵기가 0(자동)이면 그림에서 선 굵기를 재서 정한다
+  const autoInfo = opts.lineWidth > 0 ? null : autoLineWidth(Lw, W, H, scale);
+  if (autoInfo) opts = Object.assign({}, opts, { lineWidth: autoInfo.lineWidth });
 
   /* 1) 선화 검출: 블랙 탑햇(closing - 원본)으로 얇고 어두운 구조만 추출 + 히스테리시스 */
   progress(0.08, '선화 검출');
@@ -1844,7 +1879,7 @@ function process(img, opts, progress) {
     R, G: Gc, B, A, U, lineA, lineC, lineK0, traceMask, inMask, bgMask, bgFx, bgBase, tone, nT, bgTone, toneGroup, nG: nGroups, base, partExtra,
     fxId, fxNames,
     toneG, toneHi, toneCol: tMean, tCnt, sparkPix, sparkR, sparkArea,
-    counts: { regions: nR, tones: nT }
+    counts: { regions: nR, tones: nT }, autoInfo
   });
 }
 /* ---------------- 레이어 분해 ---------------- */
@@ -2294,7 +2329,7 @@ function buildLayers(ctx) {
     stats: {
       ms: Date.now() - t0, psnr, regions: ctx.counts.regions, tones: ctx.counts.tones, parts: parts.filter(k => !pal[k].extra).length,
       smallParts: parts.filter(k => pal[k].extra).length, hasAlpha: ctx.hasAlpha,
-      background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR
+      background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR, auto: ctx.autoInfo || null
     }
   };
 }
@@ -2669,12 +2704,18 @@ function toast(msg, ms = 2600) {
 
 /* ---------- 옵션 ---------- */
 const OPT_LABELS = {
-  lineSens: v => v, lineWidth: v => v == 0 ? '자동' : v + ' px', colors: v => v, merge: v => v, shadow: v => v, sparkle: v => v == 0 ? '자동' : v + ' px', maxParts: v => v + '개'
+  lineSens: v => v, lineWidth: v => v == 0 ? autoLabel('lineWidth') : v + ' px', colors: v => v, merge: v => v, shadow: v => v,
+  sparkle: v => v == 0 ? autoLabel('sparkle') : v + ' px', maxParts: v => v + '개'
 };
-for (const k of Object.keys(OPT_LABELS)) {
-  const el = $('o_' + k), upd = () => { $('v_' + k).textContent = OPT_LABELS[k](el.value); };
-  el.addEventListener('input', () => { upd(); markDirty(); }); upd();
+// 자동(0)일 때: 마지막 결과에서 실제로 쓴 값
+const autoLabel = k => state.result ? `자동 · ${state.result.stats[k]} px` : '자동';
+function refreshOptLabels() {
+  for (const k of Object.keys(OPT_LABELS)) $('v_' + k).textContent = OPT_LABELS[k]($('o_' + k).value);
+  const a = state.result && state.result.stats.auto;
+  $('h_lineWidth').textContent = '0 = 그림에서 선(펜) 굵기를 재서 자동' + (a && a.penWidth ? ` (이 그림 ${a.penWidth} px)` : '');
 }
+for (const k of Object.keys(OPT_LABELS)) $('o_' + k).addEventListener('input', () => { refreshOptLabels(); markDirty(); });
+refreshOptLabels();
 for (const k of ['maxSize', 'lineColor', 'splitColors', 'clip', 'bg', 'rough', 'roughColor']) $('o_' + k).addEventListener('change', markDirty);
 function markDirty() { if (state.result) $('runBtn').textContent = '다시 분리'; }
 function readOpts() {
@@ -2834,6 +2875,7 @@ function installResult(res, keepUndo) {
   state.result = res;
   state.selected = null;
   state.visSnapshot = null;
+  refreshOptLabels();
   if (!keepUndo) state.undo = [];
   $('bgToolBtn').disabled = $('charToolBtn').disabled = false; updateUndoBtn();
   renderLayerList();
