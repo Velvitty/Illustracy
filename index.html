@@ -2777,7 +2777,7 @@ function partMeaning(part, pal, faces, chars, W, H) {
  * 캐릭터 얼굴의 머리 자리(얼굴 틀에서 (u/2.2)² + ((v+0.3)/2)² ≤ 1)에 있는 그 파츠 픽셀에서 같은 파츠를 따라(4-이웃) 닿는 픽셀만 이름을 남기고,
  * 닿지 않는 픽셀은 같은 색의 새 파츠(색 이름)로 옮긴다. 파츠 층만 나뉘고 어느 픽셀의 색도 바뀌지 않는다.
  * kinds: 떼어 낼 이름들. 결과: 새로 만든 파츠 번호들 */
-const SPLIT_KINDS = ['머리카락'], SPLIT_REACH = 1.5;
+const SPLIT_KINDS = ['머리카락'], SPLIT_REACH = 1, SPLIT_GAP = 2.5;
 function splitDetached(part, pal, meaning, chars, W, H, kinds) {
   const N = W * H, nP = pal.length, target = new Uint8Array(nP);
   let any = false;
@@ -2785,7 +2785,7 @@ function splitDetached(part, pal, meaning, chars, W, H, kinds) {
   if (!any || !chars || !chars.length) return [];
   const keep = new Uint8Array(N), stack = [];
   for (const f of chars) {
-    const r = 3.7 * f.d, x0 = Math.max(0, Math.floor(f.cx - r)), x1 = Math.min(W - 1, Math.ceil(f.cx + r));
+    const r = (2.2 * SPLIT_REACH + 0.5) * f.d, x0 = Math.max(0, Math.floor(f.cx - r)), x1 = Math.min(W - 1, Math.ceil(f.cx + r));
     const y0 = Math.max(0, Math.floor(f.cy - r)), y1 = Math.min(H - 1, Math.ceil(f.cy + r));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const p = y * W + x, k = part[p];
@@ -2800,6 +2800,37 @@ function splitDetached(part, pal, meaning, chars, W, H, kinds) {
     if (x < W - 1 && !keep[p + 1] && part[p + 1] === k) { keep[p + 1] = 1; stack.push(p + 1); }
     if (p >= W && !keep[p - W] && part[p - W] === k) { keep[p - W] = 1; stack.push(p - W); }
     if (p < N - W && !keep[p + W] && part[p + W] === k) { keep[p + W] = 1; stack.push(p + W); }
+  }
+  // 떨어진 조각(같은 파츠의 4-연결 조각) 중 남긴 곳에서 SPLIT_GAP·d(가장 큰 캐릭터 얼굴의 d) 안에 있는 것은 남긴다: 팔 · 소매 · 리본에 가려 끊긴 긴 머리 · 트윈테일.
+  // 몸 가운데 기둥(얼굴 틀에서 |u| < 1, v > 1.5)에 절반 넘게 드는 조각(넥타이 · 가슴 리본 · 다리)은 가까워도 뗀다. 새로 남긴 조각에서 다시 재며 세 번까지
+  const comp = new Int32Array(N).fill(-1), cSize = [], cCol = [];
+  const inColumn = (x, y) => chars.some(f => {
+    const dx = x - f.cx, dy = y - f.cy, u = (dx * f.ex + dy * f.ey) / f.d, v = (dx * f.fx + dy * f.fy) / f.d;
+    return Math.abs(u) < 1 && v > 1.5;
+  });
+  for (let p0 = 0; p0 < N; p0++) {
+    const k = part[p0];
+    if (k < 0 || !target[k] || keep[p0] || comp[p0] >= 0) continue;
+    const c = cSize.length; let n = 0, col = 0;
+    comp[p0] = c; stack.push(p0);
+    while (stack.length) {
+      const p = stack.pop(), x = p % W; n++;
+      if (inColumn(x, (p / W) | 0)) col++;
+      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1])
+        if (q >= 0 && comp[q] < 0 && !keep[q] && part[q] === k) { comp[q] = c; stack.push(q); }
+    }
+    cSize.push(n); cCol.push(col);
+  }
+  if (cSize.length) {
+    const gap = SPLIT_GAP * Math.max(...chars.map(f => f.d)), done = new Uint8Array(cSize.length);
+    for (let round = 0; round < 3; round++) {
+      const dist = chamfer(keep, W, H), near = new Uint8Array(cSize.length);
+      for (let p = 0; p < N; p++) { const c = comp[p]; if (c >= 0 && !done[c] && dist[p] <= gap) near[c] = 1; }
+      let any = false;
+      for (let c = 0; c < cSize.length; c++) if (near[c] && cCol[c] <= 0.5 * cSize[c]) { done[c] = 1; any = true; }
+      if (!any) break;
+      for (let p = 0; p < N; p++) if (comp[p] >= 0 && done[comp[p]]) keep[p] = 1;
+    }
   }
   const moved = new Int32Array(nP).fill(-1), added = [];
   for (let p = 0; p < N; p++) {
