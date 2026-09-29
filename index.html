@@ -2772,6 +2772,45 @@ function partMeaning(part, pal, faces, chars, W, H) {
   return names;
 }
 
+/* 뜻 이름을 받은 파츠에서 캐릭터 얼굴과 이어지지 않은 조각은 떼어 색 이름 파츠로 둔다.
+ * 파츠는 밑색이 같은 칠을 그림 전체에서 모은 것이라, 머리카락과 같은 색의 다리 · 치마 · 소매 · 소품 · 배경 조각이 한 파츠에 들어 그 이름을 함께 받는다.
+ * 캐릭터 얼굴의 머리 자리(얼굴 틀에서 (u/2.2)² + ((v+0.3)/2)² ≤ 1)에 있는 그 파츠 픽셀에서 같은 파츠를 따라(4-이웃) 닿는 픽셀만 이름을 남기고,
+ * 닿지 않는 픽셀은 같은 색의 새 파츠(색 이름)로 옮긴다. 파츠 층만 나뉘고 어느 픽셀의 색도 바뀌지 않는다.
+ * kinds: 떼어 낼 이름들. 결과: 새로 만든 파츠 번호들 */
+const SPLIT_KINDS = ['머리카락'];
+function splitDetached(part, pal, meaning, chars, W, H, kinds) {
+  const N = W * H, nP = pal.length, target = new Uint8Array(nP);
+  let any = false;
+  for (let k = 0; k < nP; k++) if (meaning[k] && kinds.includes(meaning[k])) { target[k] = 1; any = true; }
+  if (!any || !chars || !chars.length) return [];
+  const keep = new Uint8Array(N), stack = [];
+  for (const f of chars) {
+    const r = 2.5 * f.d, x0 = Math.max(0, Math.floor(f.cx - r)), x1 = Math.min(W - 1, Math.ceil(f.cx + r));
+    const y0 = Math.max(0, Math.floor(f.cy - r)), y1 = Math.min(H - 1, Math.ceil(f.cy + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const p = y * W + x, k = part[p];
+      if (k < 0 || !target[k] || keep[p]) continue;
+      const dx = x - f.cx, dy = y - f.cy, u = (dx * f.ex + dy * f.ey) / f.d, v = (dx * f.fx + dy * f.fy) / f.d;
+      if ((u / 2.2) ** 2 + ((v + 0.3) / 2) ** 2 <= 1) { keep[p] = 1; stack.push(p); }
+    }
+  }
+  while (stack.length) {
+    const p = stack.pop(), k = part[p], x = p % W;
+    if (x > 0 && !keep[p - 1] && part[p - 1] === k) { keep[p - 1] = 1; stack.push(p - 1); }
+    if (x < W - 1 && !keep[p + 1] && part[p + 1] === k) { keep[p + 1] = 1; stack.push(p + 1); }
+    if (p >= W && !keep[p - W] && part[p - W] === k) { keep[p - W] = 1; stack.push(p - W); }
+    if (p < N - W && !keep[p + W] && part[p + W] === k) { keep[p + W] = 1; stack.push(p + W); }
+  }
+  const moved = new Int32Array(nP).fill(-1), added = [];
+  for (let p = 0; p < N; p++) {
+    const k = part[p];
+    if (k < 0 || k >= nP || !target[k] || keep[p]) continue;
+    if (moved[k] < 0) { pal.push({ rgb: pal[k].rgb, lab: pal[k].lab, area: 0, extra: pal[k].extra }); meaning.push(null); moved[k] = pal.length - 1; added.push(moved[k]); }
+    part[p] = moved[k]; pal[moved[k]].area++; pal[k].area--;
+  }
+  return added;
+}
+
 /* 캐릭터 나누기 1) 어느 얼굴이 캐릭터인가: 한 그림의 캐릭터들은 얼굴 크기가 비슷하고(0.5~2배. 찾은 얼굴 크기는 실제보다 ±20% 흔들린다) 높이도 비슷하며(서로의 얼굴 틀에서
  * 세로 4d 안), 서로의 머리 · 몸 자리 밖에 있다. 무릎 · 신발 · 옷 무늬의 가짜 얼굴은 대개 진짜 얼굴보다 한참 아래(몸 자리 안)에 있다.
  * 점수 11.5 이상인 얼굴(과 점수가 가장 높은 얼굴) 중에서 서로 어울리는 묶음을 모두 보고, 표((점수 − 10)²)의 합이 가장 큰 묶음을 고른다 */
@@ -3166,10 +3205,14 @@ function buildLayers(ctx) {
     return L.w ? L : null;
   };
   const group = (name, children, extra) => Object.assign({ name, kind: 'group', group: true, blend: 'pass', opacity: 255, visible: true, open: true, children }, extra || {});
+  const charFaces = characterFaces(ctx.faces), meaning = partMeaning(part, pal, ctx.faces, charFaces, W, H);
+  const added = splitDetached(part, pal, meaning, charFaces, W, H, SPLIT_KINDS);
   const partUsed = new Uint8Array(pal.length);
   for (let p = 0; p < N; p++) if (part[p] >= 0) partUsed[part[p]] = 1;
   const parts = pal.map((_, k) => k).filter(k => partUsed[k]).sort((a, b) => pal[b].area - pal[a].area);
-  const meaning = partMeaning(part, pal, ctx.faces, characterFaces(ctx.faces), W, H);
+  // 떼어 낸 조각으로 파츠가 최대 파츠 수를 넘으면, 넘는 만큼 작은 조각부터 "작은 파츠"로
+  let over = parts.filter(k => !pal[k].extra).length - Math.max(4, opts.maxParts || 32);
+  for (const k of added.filter(k => partUsed[k] && !pal[k].extra).sort((a, b) => pal[a].area - pal[b].area)) { if (over-- <= 0) break; pal[k].extra = 1; }
 
   // 캐릭터 한 명(sel = 그 캐릭터 픽셀, 없으면 전체)의 [채색] · [효과] · [선화]
   const buildChar = sel => {
