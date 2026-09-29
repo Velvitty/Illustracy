@@ -2772,19 +2772,20 @@ function partMeaning(part, pal, faces, chars, W, H) {
   return names;
 }
 
-/* 뜻 이름을 받은 파츠에서 캐릭터 얼굴과 이어지지 않은 조각은 떼어 색 이름 파츠로 둔다.
+/* 뜻 이름을 받은 파츠에서 얼굴과 이어지지 않은 조각은 떼어 색 이름 파츠로 둔다.
  * 파츠는 밑색이 같은 칠을 그림 전체에서 모은 것이라, 머리카락과 같은 색의 다리 · 치마 · 소매 · 소품 · 배경 조각이 한 파츠에 들어 그 이름을 함께 받는다.
- * 캐릭터 얼굴의 머리 자리(얼굴 틀에서 (u/2.2)² + ((v+0.3)/2)² ≤ 1)에 있는 그 파츠 픽셀에서 같은 파츠를 따라(4-이웃) 닿는 픽셀만 이름을 남기고,
- * 닿지 않는 픽셀은 같은 색의 새 파츠(색 이름)로 옮긴다. 파츠 층만 나뉘고 어느 픽셀의 색도 바뀌지 않는다.
- * kinds: 떼어 낼 이름들. 결과: 새로 만든 파츠 번호들 */
-const SPLIT_KINDS = ['머리카락'], SPLIT_REACH = 1, SPLIT_GAP = 2.5;
-function splitDetached(part, pal, meaning, chars, W, H, kinds) {
+ * 닻 얼굴(캐릭터 얼굴과 점수 SPLIT_ANCHOR 이상인 얼굴: 캐릭터 묶음에 들지 못한 다른 인물 · 같은 인물의 두 번째 모습)의 머리 자리
+ * (얼굴 틀에서 (u/2.2)² + ((v+0.3)/2)² ≤ 1)에 있는 그 파츠 픽셀에서 같은 파츠를 따라(4-이웃) 닿는 픽셀과, 거기서 SPLIT_GAP·d 안의 조각(아래)만 이름을 남기고,
+ * 나머지는 같은 색의 새 파츠(색 이름)로 옮긴다. 피부는 떨어진 조각도 대부분 진짜 손 · 팔 · 다리라 떼지 않는다(kinds = 머리카락만).
+ * 파츠 층만 나뉘고 어느 픽셀의 색도 바뀌지 않는다. 결과: 새로 만든 파츠 번호들 */
+const SPLIT_KINDS = ['머리카락'], SPLIT_REACH = 1, SPLIT_GAP = 2.5, SPLIT_ANCHOR = 11;
+function splitDetached(part, pal, meaning, chars, W, H, kinds, anchors) {
   const N = W * H, nP = pal.length, target = new Uint8Array(nP);
   let any = false;
   for (let k = 0; k < nP; k++) if (meaning[k] && kinds.includes(meaning[k])) { target[k] = 1; any = true; }
   if (!any || !chars || !chars.length) return [];
   const keep = new Uint8Array(N), stack = [];
-  for (const f of chars) {
+  for (const f of anchors || chars) {
     const r = (2.2 * SPLIT_REACH + 0.5) * f.d, x0 = Math.max(0, Math.floor(f.cx - r)), x1 = Math.min(W - 1, Math.ceil(f.cx + r));
     const y0 = Math.max(0, Math.floor(f.cy - r)), y1 = Math.min(H - 1, Math.ceil(f.cy + r));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -3237,7 +3238,7 @@ function buildLayers(ctx) {
   };
   const group = (name, children, extra) => Object.assign({ name, kind: 'group', group: true, blend: 'pass', opacity: 255, visible: true, open: true, children }, extra || {});
   const charFaces = characterFaces(ctx.faces), meaning = partMeaning(part, pal, ctx.faces, charFaces, W, H);
-  const added = splitDetached(part, pal, meaning, charFaces, W, H, SPLIT_KINDS);
+  const added = splitDetached(part, pal, meaning, charFaces, W, H, SPLIT_KINDS, (ctx.faces || []).filter(f => f.score >= SPLIT_ANCHOR).concat(charFaces));
   const partUsed = new Uint8Array(pal.length);
   for (let p = 0; p < N; p++) if (part[p] >= 0) partUsed[part[p]] = 1;
   const parts = pal.map((_, k) => k).filter(k => partUsed[k]).sort((a, b) => pal[b].area - pal[a].area);
