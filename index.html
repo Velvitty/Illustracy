@@ -1627,6 +1627,20 @@ function plausibleFaces(faces, bg, W, H) {
     return n >= 0.8 * Math.PI * 2.2 * 2 * f.d * f.d / 16 && (nb <= 0.3 * n || (nc > 0 && ncb <= 0.05 * nc));
   });
 }
+/* 배경이 거의 한 색인가: 배경 픽셀(최대 약 2만 개를 고른 간격으로)의 Lab 채널별 중앙값에서 ΔE 10 안에 드는 비율.
+ * 흰 배경 · 단색 배경은 0.6 이상이고, 선이나 칠로 그린 장면 배경은 대부분 그 아래다 */
+function bgFlatness(bg, R, G, B, N) {
+  let nb = 0;
+  for (let p = 0; p < N; p++) nb += bg[p];
+  if (nb < 100) return 0;
+  const st = Math.max(1, Math.floor(nb / 20000)), Ls = [], As = [], Bs = [];
+  for (let p = 0, k = 0; p < N; p++) if (bg[p] && (k++ % st) === 0) { const v = labOf(R[p], G[p], B[p]); Ls.push(v[0]); As.push(v[1]); Bs.push(v[2]); }
+  const med = a => { const s = Float64Array.from(a).sort(); return s[s.length >> 1]; };
+  const mL = med(Ls), mA = med(As), mB = med(Bs);
+  let near = 0;
+  for (let i = 0; i < Ls.length; i++) if ((Ls[i] - mL) ** 2 + (As[i] - mA) ** 2 + (Bs[i] - mB) ** 2 < 100) near++;
+  return near / Ls.length;
+}
 function faceCutBg(bg, G, crisp, keep, faces, W, H) {
   const N = W * H;
   if (!G) return null;
@@ -2016,7 +2030,8 @@ function process(img, opts, progress) {
         keepBack();
         faces = plausibleFaces(allFaces(), bgMask, W, H);
         nameFaces = plausibleFaces(allFaces().named, bgMask, W, H);
-        const more = faces.length ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H) : null;
+        // 배경이 거의 한 색이면 이미 찾은 배경으로 충분하고, 얼굴 기준 넓히기는 같은 색의 캐릭터 부분(흰 드레스 · 검은 머리)을 가져가기 쉬워 하지 않는다
+        const more = faces.length && bgFlatness(bgMask, R, Gc, B, N) < 0.6 ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H) : null;
         if (more) for (let p = 0; p < N; p++) if (more[p]) bgMask[p] = 1;
       }
     }
