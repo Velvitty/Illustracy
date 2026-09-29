@@ -1764,6 +1764,15 @@ function kmeans(Lp, Ap, Bp, idx, K, rnd, maxSamples = 50000) {
   return { cL, cA, cB };
 }
 
+// 자동 배경 판정 결과 캐시: 같은 그림 · 같은 선 설정으로 다시 분리할 때(보정 칠하기) 이 단계를 건너뛴다.
+// 이 단계는 보정과 상관없고 입력(선 · 복원색)을 바꾸지 않아, 저장한 결과를 쓰면 처음부터 계산한 것과 바이트 단위로 같다
+let bgCache = null;
+function hashBytes(a) {                             // FNV-1a 두 갈래(그림이 바뀌었는지 알아보는 용도)
+  let h1 = 0x811c9dc5 | 0, h2 = 0x9747b28c | 0;
+  for (let i = 0; i < a.length; i++) { const v = a[i]; h1 = Math.imul(h1 ^ v, 16777619); h2 = Math.imul(h2 ^ v, 2246822519) + i | 0; }
+  return (h1 >>> 0).toString(36) + '.' + (h2 >>> 0).toString(36) + '.' + a.length;
+}
+
 function process(img, opts, progress) {
   const t0 = Date.now();
   const W = img.width, H = img.height, N = W * H, src = img.data;
@@ -1956,60 +1965,69 @@ function process(img, opts, progress) {
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
   const auto = opts.bg && !hasAlpha;
-  let bgMask = auto ? detectBackground(U, known, W, H) : null, back = null, faces = [], nameFaces = [];
-  // 얼굴은 배경과 상관없이 한 번 찾는다(배경 판별 · 파츠 이름 · 캐릭터 나누기에 쓴다)
-  let rawFaces = null;
-  const allFaces = () => rawFaces || (rawFaces = findFaces(R, Gc, B, A, W, H));
-  if (auto) {
-    let swal = null;
-    const E = {}, edgesAt = thr => E[thr] || (E[thr] = crispEdges(U, W, H, thr)), edges = () => edgesAt(20);
-    // 확실한 얼굴 자리가 배경이 되었으면 배경에 삼켜진 캐릭터를 되돌린다(되돌린 부분은 다시 가져가지 않는다)
-    const unswallow = bg => {
-      const sw = swallowedParts(bg, edgesAt, lineMask, allFaces(), W, H);
-      if (!sw) return;
-      if (!swal) swal = new Uint8Array(N);
-      for (let p = 0; p < N; p++) if (sw[p]) { bg[p] = 0; swal[p] = 1; }
-    };
-    // 선 없이 칠한 장면 배경도 배경으로
-    let sceneRaw = null;
-    const scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, bg => { sceneRaw = Uint8Array.from(bg); unswallow(bg); });
-    if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
-    // 선 없이 칠해 배경에 딸려 들어간 팔 · 손 · 소매(색 모델 단계 뒤에 캐릭터로 되돌린다).
-    // 색 비교는 삼켜진 캐릭터를 되돌리기 전의 배경으로 한다(되돌린 부분이 캐릭터 색 분포를 바꿔 다른 조각의 판정이 흔들리지 않게)
-    let preBg = bgMask;
-    if (scene && swal) { preBg = Uint8Array.from(bgMask); for (let p = 0; p < N; p++) if (sceneRaw[p]) preBg[p] = 1; }
-    back = preBg ? attachedParts(preBg, edges(), known, lineMask, W, H) : null;
-    // 선으로 그린 배경: 색이 캐릭터와 확연히 다르면 색 모델로 넓힌다
-    progress(0.26, '배경 색 모델');
-    // 색 영역 그래프는 색 모델과 얼굴 단계가 같이 쓴다(처음 필요할 때 한 번 만든다. 난수는 이 단계만의 고정 씨앗)
-    let graph;
-    const getGraph = () => graph !== undefined ? graph : (graph = regionGraph(O, known, inMask, crisp, W, H, mulberry32(777)));
-    const add = colorCutBg(bgMask, getGraph, crisp, W, H);
-    if (add) { if (!bgMask) bgMask = new Uint8Array(N); for (let p = 0; p < N; p++) if (add[p]) bgMask[p] = 1; }
-    const keepBack = () => {                           // 되돌린 부분은 back에 모은다
-      if (!swal) return;
-      if (!back) back = new Uint8Array(N);
-      for (let p = 0; p < N; p++) back[p] |= swal[p];
-    };
-    keepBack();
-    if (back) for (let p = 0; p < N; p++) if (back[p]) bgMask[p] = 0;
-    // 얼굴을 찾으면 그 자리를 캐릭터로 두고, 이미 찾은 배경에서 확실한 배경만 더 넓힌다
-    if (bgMask) {
-      progress(0.27, '얼굴 찾기');
-      unswallow(bgMask);                               // 색 모델이 삼킨 캐릭터도
+  let bgMask = null, back = null, faces = [], nameFaces = [];
+  const bgKey = [W, H, hashBytes(src), opts.lineWidth, opts.lineSens, opts.lineColor, opts.bg].join('|');
+  if (bgCache && bgCache.key === bgKey) {
+    bgMask = bgCache.bgMask && Uint8Array.from(bgCache.bgMask);
+    back = bgCache.back && Uint8Array.from(bgCache.back);
+    faces = JSON.parse(bgCache.faces); nameFaces = JSON.parse(bgCache.nameFaces);
+  } else {
+    bgMask = auto ? detectBackground(U, known, W, H) : null;
+    // 얼굴은 배경과 상관없이 한 번 찾는다(배경 판별 · 파츠 이름 · 캐릭터 나누기에 쓴다)
+    let rawFaces = null;
+    const allFaces = () => rawFaces || (rawFaces = findFaces(R, Gc, B, A, W, H));
+    if (auto) {
+      let swal = null;
+      const E = {}, edgesAt = thr => E[thr] || (E[thr] = crispEdges(U, W, H, thr)), edges = () => edgesAt(20);
+      // 확실한 얼굴 자리가 배경이 되었으면 배경에 삼켜진 캐릭터를 되돌린다(되돌린 부분은 다시 가져가지 않는다)
+      const unswallow = bg => {
+        const sw = swallowedParts(bg, edgesAt, lineMask, allFaces(), W, H);
+        if (!sw) return;
+        if (!swal) swal = new Uint8Array(N);
+        for (let p = 0; p < N; p++) if (sw[p]) { bg[p] = 0; swal[p] = 1; }
+      };
+      // 선 없이 칠한 장면 배경도 배경으로
+      let sceneRaw = null;
+      const scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, bg => { sceneRaw = Uint8Array.from(bg); unswallow(bg); });
+      if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
+      // 선 없이 칠해 배경에 딸려 들어간 팔 · 손 · 소매(색 모델 단계 뒤에 캐릭터로 되돌린다).
+      // 색 비교는 삼켜진 캐릭터를 되돌리기 전의 배경으로 한다(되돌린 부분이 캐릭터 색 분포를 바꿔 다른 조각의 판정이 흔들리지 않게)
+      let preBg = bgMask;
+      if (scene && swal) { preBg = Uint8Array.from(bgMask); for (let p = 0; p < N; p++) if (sceneRaw[p]) preBg[p] = 1; }
+      back = preBg ? attachedParts(preBg, edges(), known, lineMask, W, H) : null;
+      // 선으로 그린 배경: 색이 캐릭터와 확연히 다르면 색 모델로 넓힌다
+      progress(0.26, '배경 색 모델');
+      // 색 영역 그래프는 색 모델과 얼굴 단계가 같이 쓴다(처음 필요할 때 한 번 만든다. 난수는 이 단계만의 고정 씨앗)
+      let graph;
+      const getGraph = () => graph !== undefined ? graph : (graph = regionGraph(O, known, inMask, crisp, W, H, mulberry32(777)));
+      const add = colorCutBg(bgMask, getGraph, crisp, W, H);
+      if (add) { if (!bgMask) bgMask = new Uint8Array(N); for (let p = 0; p < N; p++) if (add[p]) bgMask[p] = 1; }
+      const keepBack = () => {                           // 되돌린 부분은 back에 모은다
+        if (!swal) return;
+        if (!back) back = new Uint8Array(N);
+        for (let p = 0; p < N; p++) back[p] |= swal[p];
+      };
       keepBack();
-      faces = plausibleFaces(allFaces(), bgMask, W, H);
-      nameFaces = plausibleFaces(allFaces().named, bgMask, W, H);
-      const more = faces.length ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H) : null;
-      if (more) for (let p = 0; p < N; p++) if (more[p]) bgMask[p] = 1;
+      if (back) for (let p = 0; p < N; p++) if (back[p]) bgMask[p] = 0;
+      // 얼굴을 찾으면 그 자리를 캐릭터로 두고, 이미 찾은 배경에서 확실한 배경만 더 넓힌다
+      if (bgMask) {
+        progress(0.27, '얼굴 찾기');
+        unswallow(bgMask);                               // 색 모델이 삼킨 캐릭터도
+        keepBack();
+        faces = plausibleFaces(allFaces(), bgMask, W, H);
+        nameFaces = plausibleFaces(allFaces().named, bgMask, W, H);
+        const more = faces.length ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H) : null;
+        if (more) for (let p = 0; p < N; p++) if (more[p]) bgMask[p] = 1;
+      }
     }
-  }
-  // 배경을 찾지 않았거나 못 찾은 그림도 얼굴로 파츠 이름을 붙이고 캐릭터를 나눈다(투명한 곳은 배경으로 본다)
-  if (!bgMask) {
-    const clear = new Uint8Array(N);
-    for (let p = 0; p < N; p++) clear[p] = A[p] <= 0.02 ? 1 : 0;
-    faces = plausibleFaces(allFaces(), clear, W, H);
-    nameFaces = plausibleFaces(allFaces().named, clear, W, H);
+    // 배경을 찾지 않았거나 못 찾은 그림도 얼굴로 파츠 이름을 붙이고 캐릭터를 나눈다(투명한 곳은 배경으로 본다)
+    if (!bgMask) {
+      const clear = new Uint8Array(N);
+      for (let p = 0; p < N; p++) clear[p] = A[p] <= 0.02 ? 1 : 0;
+      faces = plausibleFaces(allFaces(), clear, W, H);
+      nameFaces = plausibleFaces(allFaces().named, clear, W, H);
+    }
+    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
   }
   // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
   const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
