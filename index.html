@@ -2777,7 +2777,7 @@ function partMeaning(part, pal, faces, chars, W, H) {
  * 캐릭터 얼굴의 머리 자리(얼굴 틀에서 (u/2.2)² + ((v+0.3)/2)² ≤ 1)에 있는 그 파츠 픽셀에서 같은 파츠를 따라(4-이웃) 닿는 픽셀만 이름을 남기고,
  * 닿지 않는 픽셀은 같은 색의 새 파츠(색 이름)로 옮긴다. 파츠 층만 나뉘고 어느 픽셀의 색도 바뀌지 않는다.
  * kinds: 떼어 낼 이름들. 결과: 새로 만든 파츠 번호들 */
-const SPLIT_KINDS = ['머리카락'];
+const SPLIT_KINDS = ['머리카락'], SPLIT_REACH = 1.5;
 function splitDetached(part, pal, meaning, chars, W, H, kinds) {
   const N = W * H, nP = pal.length, target = new Uint8Array(nP);
   let any = false;
@@ -2785,13 +2785,13 @@ function splitDetached(part, pal, meaning, chars, W, H, kinds) {
   if (!any || !chars || !chars.length) return [];
   const keep = new Uint8Array(N), stack = [];
   for (const f of chars) {
-    const r = 2.5 * f.d, x0 = Math.max(0, Math.floor(f.cx - r)), x1 = Math.min(W - 1, Math.ceil(f.cx + r));
+    const r = 3.7 * f.d, x0 = Math.max(0, Math.floor(f.cx - r)), x1 = Math.min(W - 1, Math.ceil(f.cx + r));
     const y0 = Math.max(0, Math.floor(f.cy - r)), y1 = Math.min(H - 1, Math.ceil(f.cy + r));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const p = y * W + x, k = part[p];
       if (k < 0 || !target[k] || keep[p]) continue;
       const dx = x - f.cx, dy = y - f.cy, u = (dx * f.ex + dy * f.ey) / f.d, v = (dx * f.fx + dy * f.fy) / f.d;
-      if ((u / 2.2) ** 2 + ((v + 0.3) / 2) ** 2 <= 1) { keep[p] = 1; stack.push(p); }
+      if ((u / (2.2 * SPLIT_REACH)) ** 2 + ((v + 0.3) / (2 * SPLIT_REACH)) ** 2 <= 1) { keep[p] = 1; stack.push(p); }
     }
   }
   while (stack.length) {
