@@ -2635,15 +2635,15 @@ function putMinAlpha(buf, i, v0, v1, v2, a0) {
   buf[i + 3] = Math.round(aq * a0 * 255);
 }
 
-// 파츠 이름: 밑색으로 대략적인 색 이름을 붙인다(피부색은 "피부")
-function colorName(rgb, notSkin) {
+// 파츠 이름: 밑색으로 대략적인 색 이름을 붙인다. 살색은 "베이지 · 살구"(살색인 머리카락 · 꽃 · 나무 · 과자가 많아, "피부"는 얼굴로 확인한 파츠에만)
+function colorName(rgb) {
   const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   const v = mx, s = mx ? (mx - mn) / mx : 0;
   let h = 0;
   if (mx !== mn) h = 60 * (mx === r ? ((g - b) / (mx - mn) + 6) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4);
   if (v < 0.18) return '검정';
   if (s < 0.1) return v > 0.9 ? '흰색' : '회색';
-  if (h >= 5 && h <= 45 && s >= 0.08 && s <= 0.55 && v >= 0.7) return notSkin ? (s < 0.25 ? '베이지' : '살구') : '피부';
+  if (h >= 5 && h <= 45 && s >= 0.08 && s <= 0.55 && v >= 0.7) return s < 0.25 ? '베이지' : '살구';
   if (h < 15 || h >= 345) return v < 0.45 ? '갈색' : s < 0.5 && v > 0.8 ? '분홍' : '빨강';
   if (h < 40) return v < 0.6 ? '갈색' : '주황';
   if (h < 65) return v < 0.5 ? '갈색' : '노랑';
@@ -3198,8 +3198,6 @@ function buildLayers(ctx) {
           partLayer('하이라이트', 'highlight', 'norm', hlB, k, { clipping: clip })].filter(Boolean);
         if (!kids.length) continue;
         let nm = meaning[k] || colorName(pal[k].rgb);
-        // 얼굴을 찾은 그림에서는 얼굴로 확인한 파츠만 "피부". 나머지 살색 파츠(스타킹, 바닥, 음식 …)는 색 이름으로
-        if (!meaning[k] && nm === '피부' && (meaning.includes('피부') || (ctx.faces && ctx.faces.length))) nm = colorName(pal[k].rgb, true);
         used[nm] = (used[nm] || 0) + 1;
         if (used[nm] > 1) nm += ' ' + used[nm];
         (pal[k].extra && !meaning[k] ? extras : colorKids).push(partGroup(nm, k, kids));   // 뜻 이름이 붙은 파츠는 작아도 밖에
