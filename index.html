@@ -2032,10 +2032,8 @@ function process(img, opts, progress) {
   // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
   const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
   const forceChar = opts.forceChar && opts.forceChar.length === N ? opts.forceChar : null;
-  if (forceBg) {
-    if (!bgMask) bgMask = new Uint8Array(N);
-    for (let p = 0; p < N; p++) if (forceBg[p] && A[p] > 0.02) bgMask[p] = 1;
-  }
+  // (보정 마스크는 화면에서 늘 넘어오므로, 칠한 픽셀이 하나도 없으면 배경 없는 그림에 빈 배경 층을 만들지 않는다)
+  if (forceBg) for (let p = 0; p < N; p++) if (forceBg[p] && A[p] > 0.02) { if (!bgMask) bgMask = new Uint8Array(N); bgMask[p] = 1; }
   if (forceChar && bgMask) for (let p = 0; p < N; p++) if (forceChar[p]) bgMask[p] = 0;
   // 캐릭터 둘레의 외곽 글로우 · 형광 테두리는 배경 위의 "외곽 글로우" 효과 층으로(아래 배경색은 주변에서 짐작)
   const glow = bgMask && auto ? outerGlow(bgMask, U, known, lineMask, W, H) : null;
