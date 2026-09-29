@@ -2739,16 +2739,20 @@ function partMeaning(part, pal, faces, chars, W, H) {
     if (strong.some(f => (x - f.cx) ** 2 + (y - f.cy) ** 2 <= 36 * f.d * f.d)) near[k] += 3;
   }
   // 피부로 볼 만한 색: 따뜻한 색(빨강 ~ 노랑 쪽), 너무 하얗거나 어둡지 않음
-  const skinLike = rgb => {
+  // 아주 밝고 옅은 피부(밝기 85% 이상, 채도 2.5~7%)는 흰 옷 · 흰 머리와 한 파츠로 합쳐지기 쉬워, 파츠가 얼굴 · 손 · 팔다리 정도의 넓이일 때만
+  // (가장 큰 캐릭터 얼굴의 두 눈 사이 d로 12d² 이하, 그림의 13% 이하) 피부로 부른다
+  const dMax = Math.max(...strong.map(f => f.d)), paleOk = k => tot[k] <= 12 * dMax * dMax && tot[k] <= 0.13 * W * H;
+  const skinLike = (rgb, k) => {
     const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    if (mx < 0.55 || mx - mn < 0.07 * mx || mx !== r) return false;          // 빨강 채널이 가장 밝아야 따뜻한 색
+    if (mx < 0.55 || mx !== r) return false;                                  // 빨강 채널이 가장 밝아야 따뜻한 색
+    if (mx - mn < 0.07 * mx && !(mx >= 0.85 && mx - mn >= 0.025 * mx && paleOk(k))) return false;
     return g >= b - 0.02 || (b - g) < 0.35 * (r - Math.min(g, b));            // 분홍까지는 허용, 보라 · 파랑은 제외
   };
   for (let k = 0; k < nP; k++) {
     if (!tot[k] || near[k] < tot[k] / 3) continue;
     const s = vSkin[k] >= 0.4 * wMax, h = vHair[k] >= 0.4 * wMax;
     if (s && h) continue;                              // 피부이기도 하고 머리카락이기도 한 색: 가리지 않는다
-    if (s && skinLike(pal[k].rgb)) names[k] = '피부';
+    if (s && skinLike(pal[k].rgb, k)) names[k] = '피부';
     else if (h && onBody[k] < 0.4 * wMax) names[k] = '머리카락';   // 옷과 같은 색이면 머리카락이라 부르지 않는다
     else if (tot[k] && inEye[k] >= 30 && inEye[k] >= 0.5 * tot[k]) names[k] = '눈';
   }
@@ -2756,7 +2760,7 @@ function partMeaning(part, pal, faces, chars, W, H) {
 }
 
 /* 캐릭터 나누기 1) 어느 얼굴이 캐릭터인가: 한 그림의 캐릭터들은 얼굴 크기가 비슷하고(0.5~2배. 찾은 얼굴 크기는 실제보다 ±20% 흔들린다) 높이도 비슷하며(서로의 얼굴 틀에서
- * 세로 3d 안), 서로의 머리 · 몸 자리 밖에 있다. 무릎 · 신발 · 옷 무늬의 가짜 얼굴은 대개 진짜 얼굴보다 한참 아래(몸 자리 안)에 있다.
+ * 세로 4d 안), 서로의 머리 · 몸 자리 밖에 있다. 무릎 · 신발 · 옷 무늬의 가짜 얼굴은 대개 진짜 얼굴보다 한참 아래(몸 자리 안)에 있다.
  * 점수 11.5 이상인 얼굴(과 점수가 가장 높은 얼굴) 중에서 서로 어울리는 묶음을 모두 보고, 표((점수 − 10)²)의 합이 가장 큰 묶음을 고른다 */
 function characterFaces(faces) {
   if (!faces || !faces.length) return [];
@@ -2765,7 +2769,7 @@ function characterFaces(faces) {
     const [u, v] = frameOf(f, g);
     return (v >= -1.2 && v <= 8 && Math.abs(u) <= 1.2 + 0.35 * Math.max(v - 1.5, 0)) || (u / 2.2) ** 2 + ((v + 0.3) / 2) ** 2 <= 1;
   };
-  const fits = (f, g) => g.d >= 0.5 * f.d && g.d <= 2 * f.d && Math.abs(frameOf(f, g)[1]) <= 3 && Math.abs(frameOf(g, f)[1]) <= 3 && !inZone(f, g) && !inZone(g, f);
+  const fits = (f, g) => g.d >= 0.5 * f.d && g.d <= 2 * f.d && Math.abs(frameOf(f, g)[1]) <= 4 && Math.abs(frameOf(g, f)[1]) <= 4 && !inZone(f, g) && !inZone(g, f);
   const cand = faces.filter((f, i) => i === 0 || f.score >= 11.5).slice(0, 8), n = cand.length, wt = cand.map(f => Math.max(0, f.score - 10) ** 2);
   let best = [cand[0]], bestW = wt[0];
   for (let m = 1; m < 1 << n; m++) {
