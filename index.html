@@ -1341,7 +1341,8 @@ function autoLineWidth(Lw, W, H, scale) {
  *  3) 두 눈 사이 거리 d를 잣대로 얼굴 틀(u = 눈 방향, v = 아래)을 세워 눈 · 속눈썹 · 콧등 · 볼을 재고,
  *     평균 눈 · 얼굴 무늬와의 상관과 눈 속 반짝임까지 더해 점수를 매긴다
  *  4) 점수 상위 짝은 얼굴 무늬에 가장 잘 맞게 눈 위치를 조금씩 옮겨 다시 잰다
- *  5) 문턱을 넘은 것에서 겹치는 것을 빼면 얼굴 */
+ *  5) 문턱을 넘은 것에서 겹치는 것을 빼면 얼굴(배경 판정용)
+ *  6) 조정 항을 더한 점수로 한 번 더 고른 것이 이름 · 캐릭터 폴더용 얼굴(faces.named) */
 function resample1D(src, n, dst, m) {               // 줄일 때 면적 평균, 키울 때 선형
   const f = n / m;
   if (f >= 1) for (let i = 0; i < m; i++) {
@@ -1423,7 +1424,16 @@ const FACE_EV = {
   eyeMin: m => (25 - m.eyeMin) / 18, cheekStd: m => (22 - m.cheekStd) / 14, tilt: m => (0.7 - m.tilt) / 0.5,
   faceCorr: m => (m.faceCorr - 0.2) / 0.3, eyeCorr: m => (m.eyeCorr - 0.1) / 0.4, spot: m => (m.spotMin - 2) / 8,
 };
-const FACE_WT = { faceCorr: 3, spot: 2 }, FACE_THR = 11;
+const FACE_WT = { faceCorr: 3, spot: 2 }, FACE_THR = 11, FACE_THR_NAME = 10.75;
+/* 이름 · 캐릭터 폴더에 쓸 얼굴은 점수에 아래 항을 더해 따로 고른다(문턱 10.75).
+ *  - 입: 코 아래 칸(|u| ≤ 0.25, 0.8 ≤ v ≤ 1.3)의 가장 어두운 값이 볼보다 15 이하로 어두우면 −1, 35 이상 어두우면 0
+ *  - 눈 대비(피부 − 눈 칸 밝기) 40 → 55, 아래 눈꺼풀 띠가 위 속눈썹 띠보다 밝은 정도 35 → 55, 피부 밝기 97 → 100이면 각각 0 → −1
+ * 처음 보는 그림 300장에서 진짜 얼굴은 입이 보이고 가짜(옷 무늬 · 글자 · 소품)는 눈 대비가 지나치게 진하거나 흰 바탕 위에 있는 일이 많았다.
+ * 배경 판정에는 원래 점수의 얼굴을 그대로 쓴다: 가짜 얼굴이 배경을 넓히는 단계를 켜거나 몸 자리를 지키기도 해서, 얼굴이 바뀌면 배경이 좋고 나쁘게 섞여 흔들렸다 */
+const FACE_ADJ = {
+  mouth: m => clamp01((m.mouth - 15) / 20) - 1, hiContrast: m => -clamp01((m.contrast - 40) / 15),
+  lidAsym: m => -clamp01((m.lidAsym - 35) / 20), whiteSkin: m => -clamp01((m.skinL - 97) / 3),
+};
 // 평균 눈 무늬(12×12, 왼눈 기준)와 얼굴 무늬(16×16): 그림 24장의 얼굴 31개를 두 눈 위치로 맞춰 잰 밝기를 평균 0 · 표준편차 1로 맞춰 평균한 것
 const FACE_TE = Float32Array.from([
   -.15,.02,.17,.19,.48,.53,.58,.50,.32,.42,.40,.39,
@@ -1538,9 +1548,14 @@ function findFaces(R, G, B, A, W, H, opt) {
     const [le, re] = K.eyePatches(f);
     m.eyeCorr = Math.min(corrOf(le, TE), corrOf(re, TE)); m.faceCorr = corrOf(K.facePatch(f), TF);
     m.spotMin = Math.min(spotOf(f, -0.5), spotOf(f, 0.5));
+    grid(f, -0.9, 0.9, 0.4, 0.8, 9, 5); const chk = samp(L, 45); grid(f, -0.25, 0.25, 0.8, 1.3, 7, 7); const mo = samp(L, 49);
+    m.mouth = pctOf(chk, 50) - Math.min(...mo);          // 입: 볼 밝기 − 코 아래 가장 어두운 값
+    grid(f, -0.7, 0.7, -0.3, -0.12, 15, 4); const up = meanOf(samp(L, 60));
+    grid(f, -0.7, 0.7, 0.12, 0.3, 15, 4); m.lidAsym = meanOf(samp(L, 60)) - up; // 아래 눈꺼풀 띠 − 위 속눈썹 띠 밝기
     return m;
   };
   const score = m => { let s = 0; for (const k in FACE_EV) s += (WT[k] != null ? WT[k] : 1) * clamp01(FACE_EV[k](m)); return s; };
+  const adj = m => { let s = 0; for (const k in FACE_ADJ) s += FACE_ADJ[k](m); return s; };
   for (const P of pairs) { P.f = frame(P.a.x, P.a.y, P.b.x, P.b.y); P.m = measure(P.f); P.score = score(P.m); }
   pairs.sort((p, q) => q.score - p.score);
   // 4) 상위 40개: 눈 위치를 ±0.12d 안에서 옮겨 얼굴 무늬 상관이 가장 큰 곳으로(두 번 번갈아)
@@ -1561,18 +1576,27 @@ function findFaces(R, G, B, A, W, H, opt) {
   }
   pairs.sort((p, q) => q.score - p.score);
   // 5) 문턱 이상, 이미 고른 얼굴과 겹치면(가운데가 d 안, 또는 한 눈이 그 얼굴 눈의 0.5d 안) 뺀다
-  const sel = [], near = (e, q, r) => Math.min(Math.hypot(e.x - q.a.x, e.y - q.a.y), Math.hypot(e.x - q.b.x, e.y - q.b.y)) < r;
-  for (const P of pairs) {
-    if (P.score < thr) break;
-    const f = P.f;
-    if (sel.some(q => Math.hypot(f.cx - q.f.cx, f.cy - q.f.cy) < Math.max(f.d, q.f.d))) continue;
-    if (sel.some(q => near(P.a, q, 0.5 * Math.max(f.d, q.f.d)) || near(P.b, q, 0.5 * Math.max(f.d, q.f.d)))) continue;
-    sel.push(P);
-  }
-  const s = K.sc;
-  const faces = sel.map(P => ({ cx: P.f.cx / s, cy: P.f.cy / s, d: P.f.d / s, ex: P.f.ex, ey: P.f.ey, fx: P.f.fx, fy: P.f.fy,
+  const near = (e, q, r) => Math.min(Math.hypot(e.x - q.a.x, e.y - q.a.y), Math.hypot(e.x - q.b.x, e.y - q.b.y)) < r;
+  const pick = (list, t) => {
+    const sel = [];
+    for (const P of list) {
+      if (P.score < t) break;
+      const f = P.f;
+      if (sel.some(q => Math.hypot(f.cx - q.f.cx, f.cy - q.f.cy) < Math.max(f.d, q.f.d))) continue;
+      if (sel.some(q => near(P.a, q, 0.5 * Math.max(f.d, q.f.d)) || near(P.b, q, 0.5 * Math.max(f.d, q.f.d)))) continue;
+      sel.push(P);
+    }
+    return sel;
+  };
+  const sel = pick(pairs, thr);
+  // 6) 이름 · 캐릭터 폴더용: 조정 항(FACE_ADJ)을 더한 점수로 같은 방법으로 다시 고른다
+  const Q = pairs.map(P => Object.assign({}, P, { score: P.score + adj(P.m) })).sort((p, q) => q.score - p.score);
+  const selN = pick(Q, opt.thrName != null ? opt.thrName : FACE_THR_NAME);
+  const s = K.sc, out = list => list.map(P => ({ cx: P.f.cx / s, cy: P.f.cy / s, d: P.f.d / s, ex: P.f.ex, ey: P.f.ey, fx: P.f.fx, fy: P.f.fy,
     a: { x: P.a.x / s, y: P.a.y / s }, b: { x: P.b.x / s, y: P.b.y / s }, score: +P.score.toFixed(2) }));
-  return opt.debug ? { faces, sel, pairs, cand, kit: K } : faces;
+  const faces = out(sel);
+  faces.named = out(selN);
+  return opt.debug ? { faces, sel, selN, pairs, Q, cand, kit: K } : faces;
 }
 
 /* 얼굴 자리로 배경 넓히기: 얼굴을 찾으면 캐릭터가 어디 있는지 대강 안다.
@@ -1932,7 +1956,7 @@ function process(img, opts, progress) {
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
   const auto = opts.bg && !hasAlpha;
-  let bgMask = auto ? detectBackground(U, known, W, H) : null, back = null, faces = [];
+  let bgMask = auto ? detectBackground(U, known, W, H) : null, back = null, faces = [], nameFaces = [];
   // 얼굴은 배경과 상관없이 한 번 찾는다(배경 판별 · 파츠 이름 · 캐릭터 나누기에 쓴다)
   let rawFaces = null;
   const allFaces = () => rawFaces || (rawFaces = findFaces(R, Gc, B, A, W, H));
@@ -1975,6 +1999,7 @@ function process(img, opts, progress) {
       unswallow(bgMask);                               // 색 모델이 삼킨 캐릭터도
       keepBack();
       faces = plausibleFaces(allFaces(), bgMask, W, H);
+      nameFaces = plausibleFaces(allFaces().named, bgMask, W, H);
       const more = faces.length ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H) : null;
       if (more) for (let p = 0; p < N; p++) if (more[p]) bgMask[p] = 1;
     }
@@ -1984,6 +2009,7 @@ function process(img, opts, progress) {
     const clear = new Uint8Array(N);
     for (let p = 0; p < N; p++) clear[p] = A[p] <= 0.02 ? 1 : 0;
     faces = plausibleFaces(allFaces(), clear, W, H);
+    nameFaces = plausibleFaces(allFaces().named, clear, W, H);
   }
   // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
   const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
@@ -2553,7 +2579,7 @@ function process(img, opts, progress) {
     R, G: Gc, B, A, U, lineA, lineC, lineK0, traceMask, inMask, bgMask, bgFx, bgBase, tone, nT, bgTone, toneGroup, nG: nGroups, base, partExtra,
     fxId, fxNames,
     toneG, toneHi, toneCol: tMean, tCnt, sparkPix, sparkR, sparkArea,
-    counts: { regions: nR, tones: nT }, autoInfo, faces
+    counts: { regions: nR, tones: nT }, autoInfo, faces: nameFaces
   });
 }
 /* ---------------- 레이어 분해 ---------------- */
