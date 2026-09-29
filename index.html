@@ -627,8 +627,22 @@ function detectBackground(U, known, W, H) {
       }
     }
   };
-  for (const p of path) if (known[p] && !bg[p] && diff(p, ref[0], ref[1], ref[2]) < 0.12) seed(p, ref[0], ref[1], ref[2]);
+  // 위 · 오른쪽 · 왼쪽 테두리에서 먼저 채운다. 아래 테두리에서만 닿는 조각은 거의 한 색일 때(기준색에서 0.04 넘게 벗어난 픽셀 5% 미만)만 배경:
+  // 그림 아래 끝에 걸친 흰 옷 · 치마는 배경과 같은 흰색이어도 명암 · 주름이 있다
+  const bottom0 = W + H - 2, isBottom = k => k >= bottom0 && k < bottom0 + W - 1;
+  const seedPath = low => path.forEach((p, k) => { if (isBottom(k) === low && known[p] && !bg[p] && diff(p, ref[0], ref[1], ref[2]) < 0.12) seed(p, ref[0], ref[1], ref[2]); });
+  seedPath(false);
   flood(0.3);
+  {
+    const before = Uint8Array.from(bg);
+    seedPath(true);
+    flood(0.3);
+    const add = new Uint8Array(N);
+    for (let p = 0; p < N; p++) add[p] = bg[p] && !before[p] ? 1 : 0;
+    const cc = components(new Int32Array(N), add, W, H), tot = new Float64Array(cc.count), off = new Float64Array(cc.count);
+    for (let p = 0; p < N; p++) { const r = cc.rid[p]; if (r < 0) continue; tot[r]++; if (diff(p, ref[0], ref[1], ref[2]) > 0.04) off[r]++; }
+    for (let p = 0; p < N; p++) { const r = cc.rid[p]; if (r >= 0 && off[r] >= 0.05 * tot[r]) bg[p] = 0; }
+  }
   // 테두리를 따라 색이 이어지는 곳은 같은 배경(아래로 밝아지는 그라데이션 등).
   // 선 없이 테두리를 가로지르는 짧은 끊김(빛줄기 등, 64px 이하)은 건너뛴다
   const L = path.length, last = [0, 0, 0];
@@ -1117,6 +1131,10 @@ function attachedParts(bg, E, known, lineMask, W, H) {
  *  - 색이 테두리에 닿은 배경 조각에서 드물다(색 칸마다 로그(균등 확률 / 배경 확률)의 평균 > 0).
  *    머리카락과 목 사이로 보이는 배경 틈은 배경색이라 남는다
  * 되돌린 뒤에도 삼켜진 얼굴이 있으면(배경과 거의 같은 색의 검은 머리카락: 선명한 경계가 없다) 옅은 경계(ΔE ≥ 8)로 한 번 더 나눈다.
+ * 얼굴이 멀쩡해도 그 아래 몸이 배경에 들어갈 수 있다(흰 배경 위의 흰 옷 · 치마가 아래 테두리까지 이어짐). 그래서 먼저 멀쩡한 확실한 얼굴의
+ * 몸 자리(1 ≤ v ≤ 8)에 넓이의 절반 이상이 들고, 위 · 왼쪽 · 오른쪽 테두리에 닿지 않고, 넓이 0.3% 이상인 배경 조각을 되돌린다.
+ * 흰 옷은 배경과 같은 색이라 색이 드물 필요는 없지만, 색이 캐릭터보다 나머지 배경에 훨씬 흔한 조각(평균 로그 우도비 < −2:
+ * 치마와 소매 사이로 보이는 배경 구멍, 글자 칸)은 남긴다.
  * edgesAt(thr) = 그 문턱의 선명한 경계. 결과: 되돌릴 픽셀(없으면 null) */
 function swallowedParts(bg, edgesAt, lineMask, faces, W, H) {
   const N = W * H, zone = f => (x, y) => {
@@ -1160,7 +1178,45 @@ function swallowedParts(bg, edgesAt, lineMask, faces, W, H) {
     }
     return any ? withBand(got, cur, lab, CH, W, H) : null;
   };
+  const bodyParts = (cur, E, intact) => {
+    const P = bgPieces(cur, E, lineMask, W, H);
+    if (!P) return null;
+    const { rid, n, CH, lab, area, upper } = P, { L, A, B } = E, uvs = intact.map(zone), inB = new Float64Array(n);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const r = rid[y * W + x];
+      if (r < 0 || upper[r]) continue;
+      for (const uv of uvs) {
+        const [u, v] = uv(x, y);
+        if (v >= 1 && v <= 8 && Math.abs(u) <= 1.2 + 0.35 * Math.max(v - 1.5, 0)) { inB[r]++; break; }
+      }
+    }
+    const cand = new Uint8Array(n);
+    let any = false;
+    for (let r = 0; r < n; r++) if (!upper[r] && area[r] >= 0.003 * N && inB[r] >= 0.5 * area[r]) { cand[r] = 1; any = true; }
+    if (!any) return null;
+    // 색 분포(Lab 10×16×16 칸): 캐릭터 vs 나머지 배경 조각(자기 조각은 뺌)
+    const NB = 2560, bin = new Int32Array(N), hC = new Float64Array(NB), hB = new Float64Array(NB), llr = new Float64Array(n);
+    let nC = 0, nB = 0;
+    for (let p = 0; p < N; p++) {
+      bin[p] = labBin(L, A, B, p);
+      if (!cur[p]) { hC[bin[p]]++; nC++; } else if (rid[p] >= 0) { hB[bin[p]]++; nB++; }
+    }
+    const own = new Map();
+    for (let p = 0; p < N; p++) { const r = rid[p]; if (r >= 0 && cand[r]) { const k = r * NB + bin[p]; own.set(k, (own.get(k) || 0) + 1); } }
+    for (const [k, c] of own) {
+      const r = Math.floor(k / NB), b = k % NB, rest = Math.max(1, nB - area[r]);
+      const pc = (hC[b] + 1) / (nC + NB), pb = (Math.max(0, hB[b] - c) + 1) / (rest + NB);
+      llr[r] += c * Math.max(-4, Math.min(4, Math.log(pc / pb)));
+    }
+    const got = new Uint8Array(N);
+    any = false;
+    for (let p = 0; p < N; p++) { const r = lab[p]; if (r >= 0 && r < n && cand[r] && llr[r] >= -2 * area[r] && cur[p]) { got[p] = 1; any = true; } }
+    return any ? withBand(got, cur, lab, CH, W, H) : null;
+  };
   let out = null, cur = bg;
+  const intact = faces.filter(f => f.score >= 13 && !swallowed(f, bg));
+  const body = intact.length ? bodyParts(bg, edgesAt(20), intact) : null;
+  if (body) { out = body; cur = Uint8Array.from(bg); for (let p = 0; p < N; p++) if (body[p]) cur[p] = 0; }
   for (const thr of [20, 8]) {
     const sure = faces.filter(f => f.score >= 13 && swallowed(f, cur));
     if (!sure.length) break;
@@ -2089,6 +2145,18 @@ function process(img, opts, progress) {
     else if (cc.rid[p] >= 0 && remap[cc.rid[p]] >= 0) reg[p] = remap[cc.rid[p]];
   }
   if (nR || bgMask) fillLabels(reg, W, H); else reg.fill(0);
+  // 배경 판정이 캐릭터로 둔 칠한 픽셀은 영역 거름(작거나 가는 조각)에서 빠져도 배경 번호를 받지 않는다(배경에서 2.5px 안쪽 테두리는 그대로).
+  // 결이 있는 종이 · 잔 붓 자국은 색 군집이 잘게 부서져 넓은 칠이 통째로 빠지고, 배경 쪽에서 번호가 번져 들어온다
+  if (bgMask && nR) {
+    let leak = false;
+    for (let p = 0; p < N && !leak; p++) if (valid[p] && reg[p] === bgId) leak = true;
+    if (leak) {
+      const cr = new Int32Array(N), dB = chamfer(bgMask, W, H);
+      for (let p = 0; p < N; p++) cr[p] = reg[p] === bgId ? -1 : reg[p];
+      fillLabels(cr, W, H);
+      for (let p = 0; p < N; p++) if (valid[p] && reg[p] === bgId && dB[p] > 2.5) reg[p] = cr[p];
+    }
+  }
   if (!nR && !bgMask) nR = 1;
 
   /* 5) 영역 통계: 평균 / 상위 평균(밝은 쪽) / 하위 평균(어두운 쪽) */
