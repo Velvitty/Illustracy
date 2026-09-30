@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSD 층 이름 바꾸기</title>
+<style>
+:root {
+  --bg: #16171b;
+  --panel: #1f2126;
+  --panel-2: #272a31;
+  --line: #34373f;
+  --text: #e7e8ec;
+  --muted: #9a9ea8;
+  --accent: #6c8cff;
+  --accent-2: #4b6ae0;
+  --ok: #4cc38a;
+  --warn: #e0a84b;
+  --danger: #e06363;
+  --radius: 8px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+main { max-width: 720px; margin: 0 auto; padding: 32px 16px 48px; }
+h1 { font-size: 18px; margin: 0 0 6px; }
+p.lead { color: var(--muted); margin: 0 0 20px; }
+.rule { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; max-width: 26em; }
+.rule input {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; color: var(--text);
+  font: inherit; padding: 6px 8px; flex: 1 1 0; min-width: 0;
+}
+.rule span { color: var(--muted); }
+#drop {
+  border: 1.5px dashed var(--line); border-radius: var(--radius); background: var(--panel);
+  padding: 36px 16px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+}
+#drop:hover, #drop.over { border-color: var(--accent); background: #232633; }
+#drop strong { display: block; font-size: 15px; margin-bottom: 4px; }
+#drop small { color: var(--muted); }
+button {
+  font: inherit; color: #fff; background: var(--accent-2); border: 1px solid var(--accent-2); border-radius: 6px;
+  padding: 7px 12px; cursor: pointer; font-weight: 600;
+}
+button:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+#list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
+#list li {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 10px 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+}
+#list .name { font-weight: 600; word-break: break-all; }
+#list .msg { color: var(--muted); font-size: 13px; }
+#list .ok { color: var(--ok); }
+#list .warn { color: var(--warn); }
+#list .err { color: var(--danger); }
+.bar { display: flex; justify-content: flex-end; margin-top: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PSD 층 이름 바꾸기</h1>
+  <p class="lead">예전 버전의 Illustracy로 저장한 PSD에서 층 이름을 바꿔 다시 저장합니다(PSB, 16 · 32비트 파일도 됩니다). 그림(픽셀) · 층 순서 · 폴더 · 클리핑은 그대로이고, 파일은 이 브라우저 안에서만 다룹니다.</p>
+
+  <div class="rule">
+    <input id="from" value="색트레스" aria-label="바꿀 이름">
+    <span>→</span>
+    <input id="to" value="색 트레이스" aria-label="새 이름">
+  </div>
+
+  <div id="drop" tabindex="0" role="button" aria-label="PSD 파일 고르기">
+    <strong>PSD 파일을 여기에 끌어다 놓거나 눌러서 고르세요</strong>
+    <small>여러 파일을 한꺼번에 고를 수 있습니다</small>
+    <input type="file" id="file" accept=".psd,.psb" multiple hidden>
+  </div>
+
+  <ul id="list"></ul>
+  <div class="bar"><button id="all" hidden>바뀐 파일 모두 저장</button></div>
+</main>
+
+<script>
+/* PSD · PSB 층 이름 바꾸기
+ * 층 레코드의 유니코드 이름('luni' 추가 정보)과, 옛 이름이 들어 있으면 파스칼 이름(ASCII · EUC-KR)에서 from을 to로 바꾼다.
+ * 8비트 층 정보와 16 · 32비트 층 정보('Lr16' · 'Lr32' · 'Layr' 블록)를 모두 보고, 바뀐 곳의 길이만 다시 적는다.
+ * 채널 픽셀 · 병합 이미지 · 이미지 리소스는 바이트 그대로 옮긴다. 결과: { bytes, count } (count = 이름을 바꾼 층 수) */
+let eucKrTable = null;
+function eucKr(s) {                                  // 문자열 → EUC-KR 바이트. 못 적는 글자가 있으면 null
+  if (!eucKrTable) {
+    eucKrTable = new Map();
+    try {
+      const d = new TextDecoder('euc-kr');
+      for (let a = 0xA1; a <= 0xFE; a++) for (let b = 0xA1; b <= 0xFE; b++) {
+        const c = d.decode(new Uint8Array([a, b]));
+        if (c.length === 1 && c !== '�' && !eucKrTable.has(c)) eucKrTable.set(c, [a, b]);
+      }
+    } catch (e) { /* EUC-KR을 모르는 브라우저: ASCII만 */ }
+  }
+  const out = [];
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (c < 0x80) out.push(c); else if (eucKrTable.has(ch)) out.push(...eucKrTable.get(ch)); else return null;
+  }
+  return out;
+}
+function renameLayers(buf, from, to) {
+  const src = new Uint8Array(buf), dv = new DataView(buf);
+  const str = (o, n) => String.fromCharCode(...src.subarray(o, o + n));
+  if (src.length < 26 || str(0, 4) !== '8BPS') throw new Error('PSD 파일이 아닙니다');
+  const ver = dv.getUint16(4), psb = ver === 2;
+  if (ver !== 1 && ver !== 2) throw new Error('알 수 없는 PSD 버전입니다');
+  const u64 = o => dv.getUint32(o) * 2 ** 32 + dv.getUint32(o + 4);
+  const len = (o, big) => big ? u64(o) : dv.getUint32(o);
+  const u32b = v => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v); return b; };
+  const lenb = (v, big) => { if (!big) return u32b(v); const b = new Uint8Array(8), d = new DataView(b.buffer); d.setUint32(0, Math.floor(v / 2 ** 32)); d.setUint32(4, v >>> 0); return b; };
+  const size = parts => parts.reduce((s, a) => s + a.length, 0);
+  let o = 26;
+  o += 4 + dv.getUint32(o);                          // 컬러 모드 데이터
+  o += 4 + dv.getUint32(o);                          // 이미지 리소스
+  const lmAt = o, lmW = psb ? 8 : 4;
+  if (!from || lmAt + lmW > src.length) return { bytes: src, count: 0 };
+  const lmLen = len(lmAt, psb), lmEnd = lmAt + lmW + lmLen;
+  if (!lmLen || lmEnd > src.length) return { bytes: src, count: 0 };
+  // 추가 정보 블록 하나(서명 · 키 · 길이 · 내용)를 읽는다. PSB에서 8바이트 길이를 쓰는 키와 블록 뒤 채움은 프로그램마다 달라서,
+  // 길이 폭(4 · 8)과 채움(없음 · 2 · 4) 가운데 끝이 구역 끝이거나 다음 서명에 맞는 것을 고른다. 맞는 것이 없으면 null
+  const bigKeys = new Set(['LMsk', 'Lr16', 'Lr32', 'Layr', 'Mt16', 'Mt32', 'Mtrn', 'Alph', 'FMsk', 'lnk2', 'FEid', 'FXid', 'PxSD', 'cinf']);
+  const sigAt = q => { const g = str(q, 4); return g === '8BIM' || g === '8B64'; };
+  function block(q, limit) {
+    if (q + 12 > limit || !sigAt(q)) return null;
+    const sig = str(q, 4), key = str(q + 4, 4);
+    const ws = !psb ? [4] : sig === '8B64' || bigKeys.has(key) ? [8, 4] : [4, 8];
+    for (const w of ws) {
+      if (q + 8 + w > limit) continue;
+      const bl = len(q + 8, w === 8), e = q + 8 + w + bl;
+      for (const end of [e, e + (bl & 1), e + (4 - bl % 4) % 4]) {
+        if (end === limit || (end + 12 <= limit && sigAt(end))) return { sig, key, w, at: q + 8 + w, len: bl, end };
+      }
+    }
+    return null;
+  }
+  let count = 0;
+  // 층 레코드 하나: 이름을 바꿨으면 새 조각 배열, 아니면 null
+  function record(recAt, extraLenAt) {
+    const extraAt = extraLenAt + 4, extraEnd = extraAt + dv.getUint32(extraLenAt);
+    let q = extraAt;
+    q += 4 + dv.getUint32(q);                        // 층 마스크
+    q += 4 + dv.getUint32(q);                        // 혼합 범위
+    const nameAt = q, nameLen = src[q];
+    q += (1 + nameLen + 3) & ~3;                     // 파스칼 이름(4바이트 단위로 채움)
+    const body = [src.subarray(extraAt, nameAt)];
+    let changed = false, pascal = src.subarray(nameAt, q);
+    try {
+      const old = new TextDecoder('euc-kr', { fatal: true }).decode(src.subarray(nameAt + 1, nameAt + 1 + nameLen));
+      const nb = old.includes(from) && eucKr(old.split(from).join(to));
+      if (nb && nb.length <= 255) {
+        pascal = new Uint8Array((1 + nb.length + 3) & ~3); pascal[0] = nb.length; pascal.set(nb, 1); changed = true;
+      }
+    } catch (e) { /* 파스칼 이름이 EUC-KR이 아니면 그대로 */ }
+    body.push(pascal);
+    for (let b; (b = block(q, extraEnd)); q = b.end) {
+      if (b.key === 'luni' && b.len >= 4) {
+        const nch = Math.min(dv.getUint32(b.at), (b.len - 4) >> 1);
+        let name = '';
+        for (let i = 0; i < nch; i++) name += String.fromCharCode(dv.getUint16(b.at + 4 + i * 2));
+        if (name.includes(from)) {
+          const nn = name.split(from).join(to), raw = 4 + nn.length * 2, pad = (4 - raw % 4) % 4;
+          const nbk = new Uint8Array(8 + b.w + raw + pad), d = new DataView(nbk.buffer);
+          nbk.set(src.subarray(q, q + 8)); nbk.set(lenb(raw + pad, b.w === 8), 8); d.setUint32(8 + b.w, nn.length);
+          for (let i = 0; i < nn.length; i++) d.setUint16(12 + b.w + i * 2, nn.charCodeAt(i));
+          body.push(nbk); changed = true;
+          continue;
+        }
+      }
+      body.push(src.subarray(q, b.end));
+    }
+    if (!changed) return null;
+    if (q < extraEnd) body.push(src.subarray(q, extraEnd));
+    count++;
+    return [src.subarray(recAt, extraLenAt), u32b(size(body)), ...body];
+  }
+  // 층 정보 본문(층 수 + 레코드 + 채널 픽셀): 이름을 바꿨으면 { parts, raw }(채움 없음), 아니면 null
+  function info(at, end) {
+    if (end - at < 2) return null;
+    const nLayers = Math.abs(dv.getInt16(at)), recs = [];
+    let p = at + 2, chanTotal = 0, any = false;
+    for (let n = 0; n < nLayers; n++) {
+      const recAt = p;
+      p += 16;
+      const nc = dv.getUint16(p); p += 2;
+      for (let c = 0; c < nc; c++) { p += 2; chanTotal += len(p, psb); p += psb ? 8 : 4; }
+      p += 12;                                       // 혼합 모드 서명 · 키, 불투명도, 클리핑, 플래그, 채움
+      const extraLenAt = p, extraEnd = p + 4 + dv.getUint32(p);
+      if (extraEnd > end) throw new Error('층 정보가 망가져 있습니다');
+      const r = record(recAt, extraLenAt);
+      if (r) any = true;
+      recs.push(...(r || [src.subarray(recAt, extraEnd)]));
+      p = extraEnd;
+    }
+    if (!any) return null;
+    const parts = [src.subarray(at, at + 2), ...recs, src.subarray(p, p + chanTotal)];
+    return { parts, raw: size(parts) };
+  }
+  const out = [];
+  // 8비트 층 정보(길이 + 본문 + 채움: 원래 파일과 같은 단위, 4의 배수였으면 4 아니면 2)
+  const liAt = lmAt + lmW, liLen = len(liAt, psb), liEnd = liAt + lmW + liLen;
+  const li = liLen ? info(liAt + lmW, liEnd) : null;
+  if (li) {
+    const unit = liLen % 4 === 0 ? 4 : 2, liNew = li.raw + (unit - li.raw % unit) % unit;
+    out.push(lenb(liNew, psb), ...li.parts, new Uint8Array(liNew - li.raw));
+  } else out.push(src.subarray(liAt, liEnd));
+  // 전역 층 마스크 정보, 그 뒤 추가 정보 블록(16 · 32비트 층 정보는 여기 'Lr16' · 'Lr32' · 'Layr'에 있다)
+  let q = liEnd;
+  if (q + 4 <= lmEnd) { const g = q + 4 + dv.getUint32(q); out.push(src.subarray(q, g)); q = g; }
+  for (let b; (b = block(q, lmEnd)); q = b.end) {
+    const r = (b.key === 'Lr16' || b.key === 'Lr32' || b.key === 'Layr') ? info(b.at, b.at + b.len) : null;
+    if (!r) { out.push(src.subarray(q, b.end)); continue; }
+    const padded = r.raw + (4 - r.raw % 4) % 4;
+    out.push(src.subarray(q, q + 8), lenb(padded, b.w === 8), ...r.parts, new Uint8Array(padded - r.raw));
+  }
+  if (q < lmEnd) out.push(src.subarray(q, lmEnd));
+  if (!count) return { bytes: src, count: 0 };
+  const lmNew = size(out);
+  out.unshift(src.subarray(0, lmAt), lenb(lmNew, psb));
+  out.push(src.subarray(lmEnd));
+  const bytes = new Uint8Array(size(out));
+  let k = 0; for (const a of out) { bytes.set(a, k); k += a.length; }
+  return { bytes, count };
+}
+
+const $ = id => document.getElementById(id);
+const drop = $('drop'), input = $('file'), list = $('list'), allBtn = $('all');
+const done = [];
+function save(name, bytes) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'image/vnd.adobe.photoshop' }));
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+async function handle(files) {
+  const from = $('from').value, to = $('to').value;
+  for (const f of files) {
+    const li = document.createElement('li'), left = document.createElement('div'), nm = document.createElement('div'), msg = document.createElement('div');
+    nm.className = 'name'; nm.textContent = f.name; msg.className = 'msg'; msg.textContent = '읽는 중…';
+    left.append(nm, msg); li.append(left); list.append(li);
+    try {
+      const { bytes, count } = renameLayers(await f.arrayBuffer(), from, to);
+      if (!count) { msg.innerHTML = `<span class="warn">"${from.replace(/[<&]/g, '')}" 이름의 층이 없습니다</span>`; continue; }
+      msg.innerHTML = `<span class="ok">층 ${count}개의 이름을 바꿨습니다</span>`;
+      const btn = document.createElement('button'); btn.textContent = '저장'; btn.onclick = () => save(f.name, bytes);
+      li.append(btn); done.push({ name: f.name, bytes });
+      allBtn.hidden = done.length < 2;
+    } catch (e) {
+      msg.innerHTML = `<span class="err">바꾸지 못했습니다: ${String(e.message || e).replace(/[<&]/g, '')}</span>`;
+    }
+  }
+}
+drop.onclick = () => input.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } };
+input.onchange = () => { handle([...input.files]); input.value = ''; };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); handle([...e.dataTransfer.files]); };
+allBtn.onclick = () => done.forEach((d, i) => setTimeout(() => save(d.name, d.bytes), i * 300));
+</script>
+</body>
+</html>
