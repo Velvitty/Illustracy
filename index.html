@@ -592,7 +592,14 @@ function shadeRelated(c1, c2, hueTol, simTol) {
   return nu.C >= 4 && ch.L - nu.L >= 4 && nu.L >= 30;
 }
 
+/* 픽셀 사이 색 걸음 문턱의 크기 비율: 문턱은 긴 변 1200px 그림에서 맞췄다. 더 큰 그림은 같은 경계의 색 변화가 더 많은 픽셀에 나뉘므로
+ * 한 걸음 문턱을 1200/긴 변 배로 줄인다(더 작은 그림은 키우면 경계를 넘어가 그대로 둔다) */
+const stepScale = (W, H) => Math.min(1, 1200 / Math.max(W, H));
 function detectBackground(U, known, W, H) {
+  const s = stepScale(W, H);
+  return detectBackgroundAt(U, known, W, H, 0.035 * s) || (s < 1 ? detectBackgroundAt(U, known, W, H, 0.035) : null);
+}
+function detectBackgroundAt(U, known, W, H, stepMax) {
   const N = W * H, hist = new Int32Array(4096), path = [];
   // 테두리를 한 바퀴 도는 순서(위 → 오른쪽 → 아래 → 왼쪽)
   for (let x = 0; x < W; x++) path.push(x);
@@ -623,7 +630,7 @@ function detectBackground(U, known, W, H) {
       const nb4 = [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1];
       for (const q of nb4) {
         if (q < 0 || bg[q] || !known[q]) continue;
-        if (step(p, q) < 0.035 && diff(q, rf[0][p], rf[1][p], rf[2][p]) < tol) seed(q, rf[0][p], rf[1][p], rf[2][p]);
+        if (step(p, q) < stepMax && diff(q, rf[0][p], rf[1][p], rf[2][p]) < tol) seed(q, rf[0][p], rf[1][p], rf[2][p]);
       }
     }
   };
@@ -808,23 +815,31 @@ function detectSceneBg(U, known, lineMask, crisp, W, H, scale, fix) {
   }
   // 캐릭터 둘레 여백: 선을 넘지 않고, 배경과 색이 매끄럽게 이어지는 곳까지 넓힌다
   // (여백 폭 정도까지만: 배경과 같은 색의 가는 소품을 따라 멀리 새지 않게)
-  const rf = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
-  let front = [];
-  for (let p = 0; p < N; p++) if (bg[p]) { for (let c = 0; c < 3; c++) rf[c][p] = U[c][p]; front.push(p); }
+  // (큰 그림은 한 걸음 문턱을 줄이고, 그러면 넓이 기준 5%에 못 미칠 때는 원래 문턱 0.03으로 다시)
+  const rf = [new Float32Array(N), new Float32Array(N), new Float32Array(N)], bg0 = Uint8Array.from(bg);
   const maxGrow = Math.round(Math.max(W, H) * 0.05);
-  for (let d = 0; d < maxGrow && front.length; d++) {
-    const next = [];
-    for (const p of front) {
-      const x = p % W;
-      for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
-        if (q < 0 || bg[q] || !known[q] || (cropped && cropped[q])) continue;
-        let st = 0, dr = 0;
-        for (let c = 0; c < 3; c++) { st = Math.max(st, Math.abs(U[c][q] - U[c][p])); dr = Math.max(dr, Math.abs(U[c][q] - rf[c][p])); }
-        if (st < 0.03 && dr < 0.1) { bg[q] = 1; for (let c = 0; c < 3; c++) rf[c][q] = rf[c][p]; next.push(q); }
+  const grow = stepMax => {
+    let front = [];
+    for (let p = 0; p < N; p++) if (bg[p]) { for (let c = 0; c < 3; c++) rf[c][p] = U[c][p]; front.push(p); }
+    for (let d = 0; d < maxGrow && front.length; d++) {
+      const next = [];
+      for (const p of front) {
+        const x = p % W;
+        for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+          if (q < 0 || bg[q] || !known[q] || (cropped && cropped[q])) continue;
+          let st = 0, dr = 0;
+          for (let c = 0; c < 3; c++) { st = Math.max(st, Math.abs(U[c][q] - U[c][p])); dr = Math.max(dr, Math.abs(U[c][q] - rf[c][p])); }
+          if (st < stepMax && dr < 0.1) { bg[q] = 1; for (let c = 0; c < 3; c++) rf[c][q] = rf[c][p]; next.push(q); }
+        }
       }
+      front = next;
     }
-    front = next;
-  }
+    let a = 0;
+    for (let p = 0; p < N; p++) a += bg[p];
+    return a;
+  };
+  const sStep = stepScale(W, H);
+  if (grow(0.03 * sStep) < N * 0.05 && sStep < 1) { bg.set(bg0); grow(0.03); }
   if (fix) fix(bg);                                    // 삼켜진 캐릭터를 되돌린 뒤 넓이를 잰다
   let area = 0;
   for (let p = 0; p < N; p++) area += bg[p];
