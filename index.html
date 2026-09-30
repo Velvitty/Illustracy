@@ -821,6 +821,21 @@ function lineEnclosure(lineMask, W, H) {
   return out;
 }
 
+/* 그림 가장자리를 두른 테두리 선(액자)의 두께: 바깥 고리(테두리를 한 바퀴 도는 픽셀)의 5% 미만이 선이 아닌 칠한 픽셀이면,
+ * 안쪽으로 한 고리씩 들어가며 칠한 픽셀이 절반 이상인 첫 고리의 깊이(최대 max(3, 긴 변의 1%))를 돌려준다. 액자가 없으면 0 */
+function frameDepth(known, W, H) {
+  const ring = d => {
+    let n = 0, k = 0;
+    for (let x = d; x < W - d; x++) { n += 2; k += known[d * W + x] + known[(H - 1 - d) * W + x]; }
+    for (let y = d + 1; y < H - 1 - d; y++) { n += 2; k += known[y * W + d] + known[y * W + W - 1 - d]; }
+    return n ? k / n : 0;
+  };
+  if (Math.min(W, H) <= 16 || ring(0) >= 0.05) return 0;
+  const dMax = Math.max(3, Math.round(0.01 * Math.max(W, H)));
+  for (let d = 1; d <= dMax && 2 * d < Math.min(W, H) - 4; d++) if (ring(d) >= 0.5) return d;
+  return 0;
+}
+
 function detectSceneBg(U, known, lineMask, crisp, W, H, scale, fix, enc) {
   const N = W * H, sig = Math.max(W, H) * 0.02;
   const all = new Float32Array(N), cr = new Float32Array(N), soft = new Float32Array(N);
@@ -846,7 +861,7 @@ function detectSceneBg(U, known, lineMask, crisp, W, H, scale, fix, enc) {
   for (let y = 1; y < H - 1; y++) { upper.push(y * W, y * W + W - 1); }
   // 1단계(선으로 둘러싸인 곳은 선이 드물어도 뺀다: 안에 선이 없는 흰 옷 · 치마 · 단색 머리)
   const cand1 = new Float32Array(N);
-  for (let p = 0; p < N; p++) cand1[p] = known[p] && Da[p] < tauA && enc[p] < ENCLOSED ? 1 : 0;
+  for (let p = 0; p < N; p++) cand1[p] = known[p] && Da[p] < tauA && !(enc && enc[p] >= ENCLOSED) ? 1 : 0;
   // 아래 테두리는 씨앗으로 쓰지 않는다: 화면 아래에서 잘린 캐릭터(소매, 치마, 다리)를 배경으로 채우지 않게.
   // 바닥처럼 아래 테두리에 닿은 배경은 옆 테두리나 위쪽 배경과 이어져 있으면 그쪽에서 채워진다
   const bg = floodCand(cand1, upper, W, H, r);
@@ -879,7 +894,7 @@ function detectSceneBg(U, known, lineMask, crisp, W, H, scale, fix, enc) {
       for (const p of front) {
         const x = p % W;
         for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
-          if (q < 0 || bg[q] || !known[q] || (cropped && cropped[q]) || enc[q] >= ENCLOSED) continue;
+          if (q < 0 || bg[q] || !known[q] || (cropped && cropped[q]) || (enc && enc[q] >= ENCLOSED)) continue;
           let st = 0, dr = 0;
           for (let c = 0; c < 3; c++) { st = Math.max(st, Math.abs(U[c][q] - U[c][p])); dr = Math.max(dr, Math.abs(U[c][q] - rf[c][p])); }
           if (st < stepMax && dr < 0.1) { bg[q] = 1; for (let c = 0; c < 3; c++) rf[c][q] = rf[c][p]; next.push(q); }
@@ -896,7 +911,7 @@ function detectSceneBg(U, known, lineMask, crisp, W, H, scale, fix, enc) {
   if (fix) fix(bg);                                    // 삼켜진 캐릭터를 되돌린 뒤 넓이를 잰다
   let area = 0;
   for (let p = 0; p < N; p++) area += bg[p];
-  return area >= N * 0.05 && area <= N * 0.9 ? bg : null;
+  return area >= N * 0.02 && area <= N * 0.9 ? bg : null;
 }
 
 /* 색 모델로 배경 넓히기(GrabCut 방식, 영역 단위 그래프 컷)
@@ -2085,6 +2100,19 @@ function process(img, opts, progress) {
     ({ bgMask, back, faces, nameFaces } = downscaledBackground(R, Gc, B, A, W, H, bgDown, inMask, userOpts, progress));
     bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
   } else {
+    // 액자(가장자리를 두른 테두리 선)가 있으면 배경 찾기가 테두리에서 출발하지 못한다.
+    // 배경 단계 동안만 액자 두께만큼의 바깥 고리를 그 안쪽 첫 고리의 값으로 채우고, 끝나면 되돌린다
+    const fk = auto ? frameDepth(known, W, H) : 0;
+    let frameSave = null;
+    if (fk) {
+      const arrs = [U[0], U[1], U[2], R, Gc, B, known, lineMask, crisp, inMask], idx = [];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < fk || y < fk || x >= W - fk || y >= H - fk) idx.push(y * W + x);
+      frameSave = { arrs, idx, vals: arrs.map(a => idx.map(p => a[p])) };
+      for (const p of idx) {
+        const x = p % W, y = (p - x) / W, q = Math.min(H - 1 - fk, Math.max(fk, y)) * W + Math.min(W - 1 - fk, Math.max(fk, x));
+        for (const a of arrs) a[p] = a[q];
+      }
+    }
     bgMask = auto ? detectBackground(U, known, W, H) : null;
     // 얼굴은 배경과 상관없이 한 번 찾는다(배경 판별 · 파츠 이름 · 캐릭터 나누기에 쓴다)
     let rawFaces = null;
@@ -2101,9 +2129,11 @@ function process(img, opts, progress) {
       };
       // 선으로 둘러싸인 정도: 장면 배경 · 색 모델 · 얼굴 기준 넓히기가 둘러싸인 곳(캐릭터 안쪽)을 가져가지 않게
       const enc = lineEnclosure(lineMask, W, H);
-      // 선 없이 칠한 장면 배경도 배경으로
+      // 선 없이 칠한 장면 배경도 배경으로. 둘러싸인 곳을 빼면 넓이 기준에 못 미치는 그림(선이 촘촘한 그림)은 빼지 않고 다시 찾는다
       let sceneRaw = null;
-      const scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, bg => { sceneRaw = Uint8Array.from(bg); unswallow(bg); }, enc);
+      const sceneFix = bg => { sceneRaw = Uint8Array.from(bg); unswallow(bg); };
+      let scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, sceneFix, enc);
+      if (!scene) { swal = null; sceneRaw = null; scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, sceneFix, null); }
       if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
       // 선 없이 칠해 배경에 딸려 들어간 팔 · 손 · 소매(색 모델 단계 뒤에 캐릭터로 되돌린다).
       // 색 비교는 삼켜진 캐릭터를 되돌리기 전의 배경으로 한다(되돌린 부분이 캐릭터 색 분포를 바꿔 다른 조각의 판정이 흔들리지 않게)
@@ -2144,6 +2174,7 @@ function process(img, opts, progress) {
       faces = plausibleFaces(allFaces(), clear, W, H);
       nameFaces = plausibleFaces(allFaces().named, clear, W, H);
     }
+    if (frameSave) frameSave.arrs.forEach((a, k) => frameSave.idx.forEach((p, j) => { a[p] = frameSave.vals[k][j]; }));
     bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
   }
   if (opts.bgOnly) return { W, H, bgMask, back, faces, nameFaces };   // downscaledBackground가 부른 경우: 배경 단계까지만
