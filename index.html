@@ -42,6 +42,16 @@ button.primary { background: var(--accent-2); border-color: var(--accent-2); col
 button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
 select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=range]:disabled { opacity: .4; }
+.field label.row:has(+ input:disabled), .field label.row:has(+ select:disabled) { opacity: .5; }
+select:disabled { opacity: .45; }
+dialog.confirm { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; max-width: 460px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+dialog.confirm::backdrop { background: rgba(0,0,0,.5); }
+dialog.confirm h3 { margin: 0 0 10px; font-size: 14px; }
+dialog.confirm p, dialog.confirm li { margin: 0 0 8px; color: var(--text); font-size: 12.5px; }
+dialog.confirm ul { margin: 0 0 8px; padding-left: 18px; }
+dialog.confirm .muted { color: var(--muted); }
+dialog.confirm .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 input[type=checkbox] { accent-color: var(--accent); }
 input[type=color] { width: 36px; height: 24px; border: 1px solid var(--line); border-radius: 4px; background: none; padding: 0; }
 
@@ -202,6 +212,17 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
           <option value="0">원본 크기</option>
         </select>
       </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" id="o_bgDownOn"> 큰 그림은 줄여서 나누기</label>
+        <label class="row">줄이는 방식</label>
+        <select id="o_bgDownMode" style="width:100%" disabled>
+          <option value="all" selected>전부 줄여서 나누기</option>
+          <option value="bg">배경 · 얼굴만 줄여서 찾기</option>
+        </select>
+        <label class="row" style="margin-top:6px">줄일 크기 (긴 변) <span class="val" id="v_bgDown"></span></label>
+        <input type="range" id="o_bgDown" min="800" max="2000" step="100" value="1200" disabled>
+        <div class="hint">긴 변이 이 크기보다 큰 그림만 줄입니다. "전부"는 PSD도 줄인 크기, "배경 · 얼굴만"은 PSD가 처리 해상도 그대로. 켜거나 방식을 바꾸면 설명을 보고 확인한 뒤 실행합니다</div>
+      </div>
     </div>
 
     <div class="section">
@@ -317,6 +338,11 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
   </aside>
 </main>
 <div class="toast" id="toast"></div>
+<dialog class="confirm" id="bgDownDlg">
+  <h3 id="bgDownDlgTitle"></h3>
+  <div id="bgDownDlgBody"></div>
+  <div class="btns"><button id="bgDownCancel">취소</button><button class="primary" id="bgDownOk">확인하고 실행</button></div>
+</dialog>
 
 <script>
 /* ============================================================
@@ -1802,8 +1828,31 @@ function hashBytes(a) {                             // FNV-1a 두 갈래(그림�
   return (h1 >>> 0).toString(36) + '.' + (h2 >>> 0).toString(36) + '.' + a.length;
 }
 
+/* 큰 그림은 줄여서 배경 찾기(설정 "큰 그림은 줄여서 배경 찾기", 기본 꺼짐).
+ * 긴 변이 size px보다 큰 그림을 넓이 평균으로 size px로 줄여 배경 단계(단색 배경 · 장면 배경 · 색 모델 · 되돌리기 · 얼굴)까지 돌리고,
+ * 배경 · 되돌린 부분 지도는 쌍선형으로 키워 절반 이상이면 켠다. 다만 이 크기의 선(+ 가장자리 1px, inMask) 위에서는
+ * 줄인 지도가 완전히 배경(1)일 때만 배경으로 둔다(윤곽선이 캐릭터 쪽에 남게). 얼굴은 위치 · 크기만 키운다.
+ * 선 굵기 · 선 감도 등은 사용자가 고른 값 그대로(자동이면 줄인 그림에서 다시 잰다). 레이어는 이 크기 그대로 만든다 */
+function downscaledBackground(R, G, B, A, W, H, size, inMask, userOpts, progress) {
+  const k = size / Math.max(W, H), w = Math.max(2, Math.round(W * k)), h = Math.max(2, Math.round(H * k)), n = w * h, N = W * H;
+  const pl = [R, G, B, A].map(P => resizePlane(P, W, H, w, h)), data = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 4; c++) data[i * 4 + c] = Math.round(pl[c][i] * 255);
+  const sub = Object.assign({}, userOpts, { bgDown: 0, bgOnly: true, forceBg: null, forceChar: null,
+    lineWidth: userOpts.lineWidth > 0 ? Math.max(1, Math.round(userOpts.lineWidth * k)) : 0 });
+  const r = process({ width: w, height: h, data }, sub, (p, label) => progress(0.24 + 0.04 * Math.min(1, p / 0.28), `배경 판별 (긴 변 ${size}px로 줄여서) · ${label}`));
+  const up = m => {
+    if (!m) return null;
+    const f = new Float32Array(n);
+    for (let i = 0; i < n; i++) f[i] = m[i];
+    const v = resizePlane(f, w, h, W, H), o = new Uint8Array(N);
+    for (let p = 0; p < N; p++) o[p] = v[p] >= 0.5 && (!inMask[p] || v[p] >= 1 - 1e-6) ? 1 : 0;
+    return o;
+  };
+  const sc = f => Object.assign({}, f, { cx: f.cx / k, cy: f.cy / k, d: f.d / k, a: { x: f.a.x / k, y: f.a.y / k }, b: { x: f.b.x / k, y: f.b.y / k } });
+  return { bgMask: up(r.bgMask), back: up(r.back), faces: r.faces.map(sc), nameFaces: r.nameFaces.map(sc) };
+}
 function process(img, opts, progress) {
-  const t0 = Date.now();
+  const t0 = Date.now(), userOpts = opts;
   const W = img.width, H = img.height, N = W * H, src = img.data;
   const scale = Math.max(W, H) / 1000;
   const rnd = mulberry32(12345);
@@ -1995,11 +2044,16 @@ function process(img, opts, progress) {
   progress(0.24, '배경 판별');
   const auto = opts.bg && !hasAlpha;
   let bgMask = null, back = null, faces = [], nameFaces = [];
-  const bgKey = [W, H, hashBytes(src), opts.lineWidth, opts.lineSens, opts.lineColor, opts.bg].join('|');
+  const bgDown = auto && opts.bgDown > 0 && Math.max(W, H) > opts.bgDown ? opts.bgDown : 0;
+  const bgKey = [W, H, hashBytes(src), opts.lineWidth, opts.lineSens, opts.lineColor, opts.bg, bgDown].join('|');
   if (bgCache && bgCache.key === bgKey) {
     bgMask = bgCache.bgMask && Uint8Array.from(bgCache.bgMask);
     back = bgCache.back && Uint8Array.from(bgCache.back);
     faces = JSON.parse(bgCache.faces); nameFaces = JSON.parse(bgCache.nameFaces);
+  } else if (bgDown) {
+    // 큰 그림은 줄여서 배경 찾기(설정): 긴 변 bgDown px로 줄인 그림에서 배경 · 되돌린 캐릭터 부분 · 얼굴을 찾아 이 크기로 키운다
+    ({ bgMask, back, faces, nameFaces } = downscaledBackground(R, Gc, B, A, W, H, bgDown, inMask, userOpts, progress));
+    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
   } else {
     bgMask = auto ? detectBackground(U, known, W, H) : null;
     // 얼굴은 배경과 상관없이 한 번 찾는다(배경 판별 · 파츠 이름 · 캐릭터 나누기에 쓴다)
@@ -2059,6 +2113,7 @@ function process(img, opts, progress) {
     }
     bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
   }
+  if (opts.bgOnly) return { W, H, bgMask, back, faces, nameFaces };   // downscaledBackground가 부른 경우: 배경 단계까지만
   // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
   const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
   const forceChar = opts.forceChar && opts.forceChar.length === N ? opts.forceChar : null;
@@ -3740,7 +3795,7 @@ function toast(msg, ms = 2600) {
 /* ---------- 옵션 ---------- */
 const OPT_LABELS = {
   lineSens: v => v, lineWidth: v => v == 0 ? autoLabel('lineWidth') : v + ' px', colors: v => v, merge: v => v, shadow: v => v,
-  sparkle: v => v == 0 ? autoLabel('sparkle') : v + ' px', maxParts: v => v + '개'
+  sparkle: v => v == 0 ? autoLabel('sparkle') : v + ' px', maxParts: v => v + '개', bgDown: v => v + ' px'
 };
 // 자동(0)일 때: 마지막 결과에서 실제로 쓴 값
 const autoLabel = k => state.result ? `자동 · ${state.result.stats[k]} px` : '자동';
@@ -3751,7 +3806,44 @@ function refreshOptLabels() {
 }
 for (const k of Object.keys(OPT_LABELS)) $('o_' + k).addEventListener('input', () => { refreshOptLabels(); markDirty(); });
 refreshOptLabels();
-for (const k of ['maxSize', 'lineColor', 'splitColors', 'clip', 'bg', 'rough', 'roughColor']) $('o_' + k).addEventListener('change', markDirty);
+for (const k of ['maxSize', 'lineColor', 'splitColors', 'clip', 'bg', 'rough', 'roughColor', 'bgDownOn']) $('o_' + k).addEventListener('change', markDirty);
+// "큰 그림은 줄여서 나누기": 방식 · 크기는 켰을 때만 움직인다. 켜거나 방식을 바꾸면 설명을 보이고, 확인하면 바로 다시 나눈다
+const syncBgDown = () => { const on = $('o_bgDownOn').checked; $('o_bgDown').disabled = $('o_bgDownMode').disabled = !on; };
+const BG_DOWN_INFO = {
+  all: size => ({
+    title: `전부 줄여서 나누기 (긴 변 ${size}px)`,
+    body: `<p>긴 변이 ${size}px보다 큰 그림을 ${size}px로 줄여서 모든 단계를 처리합니다. <b>레이어와 PSD도 줄인 크기로</b> 나옵니다(처리 해상도를 ${size}px로 낮춘 것과 같습니다).</p>
+      <ul><li>고화질 그림 114장을 1200px로 줄여 원래 크기 결과와 어느 쪽인지 모르게 비교: 줄임이 나음 25 · 원래 크기가 나음 29 · 비슷 60으로 <b>차이가 없었습니다</b>.</li>
+      <li>처리 시간은 약 <b>절반</b>(2048px 그림 17.4초 → 9.1초)입니다.</li>
+      <li>배경을 아예 못 찾는 그림이 조금 늘 수 있습니다(114장 중 1장 → 4장).</li></ul>
+      <p class="muted">검증은 1200px에서 했습니다. 다른 크기는 재지 않았습니다.</p>`
+  }),
+  bg: size => ({
+    title: `배경 · 얼굴만 줄여서 찾기 (긴 변 ${size}px)`,
+    body: `<p>배경 · 얼굴만 긴 변 ${size}px로 줄인 그림에서 찾고, <b>레이어와 PSD는 처리 해상도 그대로</b> 만듭니다.</p>
+      <ul><li>고화질 그림 114장을 1200px로 비교: 원래 크기가 나음 51 · 줄임이 나음 14 · 비슷 49로 <b>캐릭터를 더 잃는 그림이 많았습니다</b>.</li>
+      <li>배경 찾기는 전체 시간의 일부라 처리 시간은 약 5%만 줄어듭니다(17.4초 → 16.6초).</li></ul>
+      <p class="muted">권하지 않습니다. 빠르게 하려면 "전부 줄여서 나누기"가 결과가 더 낫습니다.</p>`
+  })
+};
+let bgDownPrev = { on: false, mode: 'all' };
+function confirmBgDown() {
+  const on = $('o_bgDownOn').checked, mode = $('o_bgDownMode').value;
+  if (!on) { bgDownPrev = { on, mode }; syncBgDown(); markDirty(); return; }
+  const info = BG_DOWN_INFO[mode](+$('o_bgDown').value), dlg = $('bgDownDlg');
+  $('bgDownDlgTitle').textContent = info.title; $('bgDownDlgBody').innerHTML = info.body;
+  const close = ok => {
+    dlg.close(); $('bgDownOk').onclick = $('bgDownCancel').onclick = dlg.oncancel = null;
+    if (ok) { bgDownPrev = { on, mode }; syncBgDown(); markDirty(); if (state.original) run(); }
+    else { $('o_bgDownOn').checked = bgDownPrev.on; $('o_bgDownMode').value = bgDownPrev.mode; syncBgDown(); }
+  };
+  $('bgDownOk').onclick = () => close(true); $('bgDownCancel').onclick = () => close(false);
+  dlg.oncancel = e => { e.preventDefault(); close(false); };
+  if (dlg.showModal) dlg.showModal(); else close(window.confirm(info.title));
+}
+$('o_bgDownOn').addEventListener('change', confirmBgDown);
+$('o_bgDownMode').addEventListener('change', confirmBgDown);
+syncBgDown();
 function markDirty() { if (state.result) $('runBtn').textContent = '다시 분리'; }
 function readOpts() {
   return {
@@ -3759,7 +3851,8 @@ function readOpts() {
     colors: +$('o_colors').value, merge: +$('o_merge').value / 100, shadow: +$('o_shadow').value / 100, sparkle: +$('o_sparkle').value,
     maxParts: +$('o_maxParts').value,
     splitColors: $('o_splitColors').checked, clip: $('o_clip').checked, bg: $('o_bg').checked,
-    rough: $('o_rough').checked, roughColor: $('o_roughColor').value
+    rough: $('o_rough').checked, roughColor: $('o_roughColor').value,
+    bgDown: $('o_bgDownOn').checked && $('o_bgDownMode').value === 'bg' ? +$('o_bgDown').value : 0
   };
 }
 
@@ -3800,7 +3893,10 @@ function setSource(imgOrCanvas, name) {
 }
 function prepareSource() {
   const im = state.original, w0 = im.naturalWidth || im.width, h0 = im.naturalHeight || im.height;
-  const max = +$('o_maxSize').value, s = max > 0 && Math.max(w0, h0) > max ? max / Math.max(w0, h0) : 1;
+  // "전부 줄여서 나누기"를 켰으면 처리 해상도와 줄일 크기 중 작은 쪽으로
+  let max = +$('o_maxSize').value;
+  if ($('o_bgDownOn').checked && $('o_bgDownMode').value === 'all') max = max > 0 ? Math.min(max, +$('o_bgDown').value) : +$('o_bgDown').value;
+  const s = max > 0 && Math.max(w0, h0) > max ? max / Math.max(w0, h0) : 1;
   const w = Math.max(1, Math.round(w0 * s)), h = Math.max(1, Math.round(h0 * s));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const cx = c.getContext('2d', { willReadFrequently: true });
