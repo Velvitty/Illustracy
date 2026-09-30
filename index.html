@@ -1792,6 +1792,86 @@ function faceCutBg(bg, G, crisp, keep, faces, W, H, enc) {
   return n ? add : null;
 }
 
+/* 캐릭터 사이로 보이는 배경(틈)
+ * 배경이 거의 한 색이면(배경 픽셀의 60% 이상이 대표색 ΔE 10 안) 팔과 몸 사이 · 머리카락 가닥 사이 · 다리 사이로 보이는 배경도 그 색이다.
+ * 이런 곳은 사방이 캐릭터 윤곽선이라 배경 채우기가 닿지 못하고, 선으로 둘러싸여 있어 색 모델도 가져가지 않는다.
+ * 캐릭터 쪽의 칠한 픽셀 중 배경 대표색(배경 Lab 중앙값)과 ΔE 5 안인 픽셀을 이어 조각으로 나누고, 다음을 모두 만족하는 조각을 배경으로 보낸다.
+ *  - 둘레(8-이웃)가 선 · 배경 · 같은 조건의 픽셀뿐이다(다른 색 칠에 닿은 둘레가 10% 이하): 흰 옷 · 흰 머리카락은 대개 그림자 · 음영에 닿아 있다
+ *  - 얼굴 자리(가로 2.2d · 세로 2d 타원) 밖이다: 흰자위 · 이는 둘레가 선뿐이라도 캐릭터다
+ *  - 넓이가 30px 이상, 그림의 2% 이하다
+ * 조건에 맞는 조각을 다 합쳐 캐릭터 칠의 5%를 넘으면(흰 배경 위의 흰 옷 · 흰 칠 흑백 선화처럼 캐릭터 자체가 배경색) 하나도 보내지 않는다.
+ * 캐릭터 쪽 픽셀의 30% 이상이 선인 그림(입자 · 망점 · 촘촘한 해칭이 선으로 잡힘)도 하지 않는다. 이런 그림은 영역 · 톤을 나눌 때 선 픽셀이
+ * 가까운 번호를 받으며 배경 번호가 넓게 번지는데, 틈이 캐릭터 안에 배경을 만들면 그 번짐이 캐릭터 쪽으로 크게 흔들린다.
+ * 결과: 배경으로 보낼 픽셀(없으면 null) */
+const GAP = { T: 5, ring: 0.1, cap: 0.02, tot: 0.05, flat: 0.6, line: 0.3 };
+function bgGaps(bg, E, known, lineMask, alpha, keep, faces, W, H) {
+  const N = W * H, { L, A, B } = E;
+  let nb = 0, nl = 0, nc = 0;
+  for (let p = 0; p < N; p++) {
+    if (bg[p]) { if (known[p]) nb++; }
+    else if (alpha[p] > 0.02) { nc++; if (lineMask[p]) nl++; }
+  }
+  if (nb < N * 0.02 || nl >= GAP.line * nc) return null;
+  const st = Math.max(1, Math.floor(nb / 20000)), Ls = [], As = [], Bs = [];
+  for (let p = 0, k = 0; p < N; p++) if (bg[p] && known[p] && (k++ % st) === 0) { Ls.push(L[p]); As.push(A[p]); Bs.push(B[p]); }
+  const med = a => { const s = Float64Array.from(a).sort(); return s[s.length >> 1]; };
+  const mL = med(Ls), mA = med(As), mB = med(Bs);
+  let near = 0;
+  for (let i = 0; i < Ls.length; i++) if ((Ls[i] - mL) ** 2 + (As[i] - mA) ** 2 + (Bs[i] - mB) ** 2 < 100) near++;
+  if (near < GAP.flat * Ls.length) return null;
+  const cand = new Uint8Array(N), T2 = GAP.T * GAP.T;
+  let nch = 0;
+  for (let p = 0; p < N; p++) {
+    if (bg[p] || !known[p]) continue;
+    nch++;
+    if ((L[p] - mL) ** 2 + (A[p] - mA) ** 2 + (B[p] - mB) ** 2 <= T2 && !(keep && keep[p])) cand[p] = 1;
+  }
+  const cc = components(new Int32Array(N), cand, W, H), n = cc.count;
+  if (!n) return null;
+  const area = new Float64Array(n), ring = new Float64Array(n), bad = new Float64Array(n), head = new Uint8Array(n), mark = new Int32Array(N).fill(-1);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x, r = cc.rid[p];
+    if (r < 0) continue;
+    area[r]++;
+    for (let k = 0; k < 8; k++) {
+      const xx = x + NB8X[k], yy = y + NB8Y[k];
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      const q = yy * W + xx;
+      if (cand[q] || mark[q] === r) continue;
+      mark[q] = r; ring[r]++;
+      if (!bg[q] && known[q]) bad[r]++;
+    }
+    if (!head[r]) for (const f of faces) {
+      const dx = x - f.cx, dy = y - f.cy, u = (dx * f.ex + dy * f.ey) / f.d, v = (dx * f.fx + dy * f.fy) / f.d;
+      if ((u / 2.2) ** 2 + ((v + 0.3) / 2) ** 2 <= 1) { head[r] = 1; break; }
+    }
+  }
+  const ok = new Uint8Array(n);
+  let tot = 0;
+  for (let r = 0; r < n; r++) if (area[r] >= 30 && area[r] <= GAP.cap * N && !head[r] && bad[r] <= GAP.ring * ring[r]) { ok[r] = 1; tot += area[r]; }
+  if (!tot || tot > GAP.tot * nch) return null;
+  const out = new Uint8Array(N);
+  for (let p = 0; p < N; p++) if (cc.rid[p] >= 0 && ok[cc.rid[p]]) out[p] = 1;
+  return out;
+}
+// 틈에서 번진 배경 번호 되돌리기: 선 · 잔조각 픽셀은 영역 · 톤을 나눌 때 가장 가까운 번호를 받는다. 입자 · 망점이 선으로 잡힌 거친 칠에서는
+// 틈의 배경 번호가 선을 타고 캐릭터 안으로 멀리 번지므로, 배경 판정이 캐릭터로 둔 픽셀 중 가장 가까운 배경이 틈이고 틈에서 2.5px 넘게 떨어진 곳은
+// 배경 번호 대신 가장 가까운 캐릭터 번호를 준다(틈이 아닌 배경 쪽은 그대로)
+function unleakGaps(lab, bgLab, bgMask, gapMask, A, W, H) {
+  const N = W * H, g = new Uint8Array(N), o = new Uint8Array(N);
+  let any = false;
+  for (let p = 0; p < N; p++) if (bgMask[p]) { if (gapMask[p]) { g[p] = 1; any = true; } else o[p] = 1; }
+  if (!any) return;
+  const dG = chamfer(g, W, H), dO = chamfer(o, W, H), hit = p => !bgMask[p] && A[p] > 0.02 && lab[p] === bgLab && dG[p] > 2.5 && dG[p] < dO[p];
+  let leak = false;
+  for (let p = 0; p < N && !leak; p++) if (hit(p)) leak = true;
+  if (!leak) return;
+  const c = new Int32Array(N);
+  for (let p = 0; p < N; p++) c[p] = lab[p] === bgLab ? -1 : lab[p];
+  fillLabels(c, W, H);
+  for (let p = 0; p < N; p++) if (c[p] >= 0 && hit(p)) lab[p] = c[p];
+}
+
 // mask=1 픽셀까지의 거리(px, 체임퍼 1-√2 근사)
 function chamfer(mask, W, H) {
   const N = W * H, d = new Float32Array(N), D = Math.SQRT2;
@@ -1894,7 +1974,7 @@ function downscaledBackground(R, G, B, A, W, H, size, inMask, userOpts, progress
     return o;
   };
   const sc = f => Object.assign({}, f, { cx: f.cx / k, cy: f.cy / k, d: f.d / k, a: { x: f.a.x / k, y: f.a.y / k }, b: { x: f.b.x / k, y: f.b.y / k } });
-  return { bgMask: up(r.bgMask), back: up(r.back), faces: r.faces.map(sc), nameFaces: r.nameFaces.map(sc) };
+  return { bgMask: up(r.bgMask), back: up(r.back), gapMask: up(r.gapMask), faces: r.faces.map(sc), nameFaces: r.nameFaces.map(sc) };
 }
 function process(img, opts, progress) {
   const t0 = Date.now(), userOpts = opts;
@@ -2088,17 +2168,18 @@ function process(img, opts, progress) {
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
   const auto = opts.bg && !hasAlpha;
-  let bgMask = null, back = null, faces = [], nameFaces = [];
+  let bgMask = null, back = null, gapMask = null, faces = [], nameFaces = [];
   const bgDown = auto && opts.bgDown > 0 && Math.max(W, H) > opts.bgDown ? opts.bgDown : 0;
   const bgKey = [W, H, hashBytes(src), opts.lineWidth, opts.lineSens, opts.lineColor, opts.bg, bgDown].join('|');
   if (bgCache && bgCache.key === bgKey) {
     bgMask = bgCache.bgMask && Uint8Array.from(bgCache.bgMask);
     back = bgCache.back && Uint8Array.from(bgCache.back);
+    gapMask = bgCache.gapMask && Uint8Array.from(bgCache.gapMask);
     faces = JSON.parse(bgCache.faces); nameFaces = JSON.parse(bgCache.nameFaces);
   } else if (bgDown) {
     // 큰 그림은 줄여서 배경 찾기(설정): 긴 변 bgDown px로 줄인 그림에서 배경 · 되돌린 캐릭터 부분 · 얼굴을 찾아 이 크기로 키운다
-    ({ bgMask, back, faces, nameFaces } = downscaledBackground(R, Gc, B, A, W, H, bgDown, inMask, userOpts, progress));
-    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
+    ({ bgMask, back, gapMask, faces, nameFaces } = downscaledBackground(R, Gc, B, A, W, H, bgDown, inMask, userOpts, progress));
+    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), gapMask: gapMask && Uint8Array.from(gapMask), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
   } else {
     // 액자(가장자리를 두른 테두리 선)가 있으면 배경 찾기가 테두리에서 출발하지 못한다.
     // 배경 단계 동안만 액자 두께만큼의 바깥 고리를 그 안쪽 첫 고리의 값으로 채우고, 끝나면 되돌린다
@@ -2165,6 +2246,9 @@ function process(img, opts, progress) {
         // 배경이 거의 한 색이면 이미 찾은 배경으로 충분하고, 얼굴 기준 넓히기는 같은 색의 캐릭터 부분(흰 드레스 · 검은 머리)을 가져가기 쉬워 하지 않는다
         const more = faces.length && bgFlatness(bgMask, R, Gc, B, N) < 0.6 ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H, enc) : null;
         if (more) for (let p = 0; p < N; p++) if (more[p]) bgMask[p] = 1;
+        // 캐릭터 사이로 보이는 단색 배경(틈)
+        const gaps = bgGaps(bgMask, edges(), known, lineMask, A, back, faces, W, H);
+        if (gaps) { gapMask = gaps; for (let p = 0; p < N; p++) if (gaps[p]) bgMask[p] = 1; }
       }
     }
     // 배경을 찾지 않았거나 못 찾은 그림도 얼굴로 파츠 이름을 붙이고 캐릭터를 나눈다(투명한 곳은 배경으로 본다)
@@ -2175,9 +2259,9 @@ function process(img, opts, progress) {
       nameFaces = plausibleFaces(allFaces().named, clear, W, H);
     }
     if (frameSave) frameSave.arrs.forEach((a, k) => frameSave.idx.forEach((p, j) => { a[p] = frameSave.vals[k][j]; }));
-    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
+    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), gapMask: gapMask && Uint8Array.from(gapMask), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
   }
-  if (opts.bgOnly) return { W, H, bgMask, back, faces, nameFaces };   // downscaledBackground가 부른 경우: 배경 단계까지만
+  if (opts.bgOnly) return { W, H, bgMask, back, gapMask, faces, nameFaces };   // downscaledBackground가 부른 경우: 배경 단계까지만
   // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
   const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
   const forceChar = opts.forceChar && opts.forceChar.length === N ? opts.forceChar : null;
@@ -2347,6 +2431,7 @@ function process(img, opts, progress) {
       fillLabels(cr, W, H);
       for (let p = 0; p < N; p++) if (valid[p] && reg[p] === bgId && dB[p] > 2.5) reg[p] = cr[p];
     }
+    if (gapMask) unleakGaps(reg, bgId, bgMask, gapMask, A, W, H);
   }
   if (!nR && !bgMask) nR = 1;
 
@@ -2515,6 +2600,7 @@ function process(img, opts, progress) {
   let anyTone = false;
   for (let p = 0; p < N && !anyTone; p++) if (tone[p] >= 0) anyTone = true;
   if (anyTone) fillLabels(tone, W, H); else tone.fill(0);
+  if (anyTone && bgMask && gapMask) unleakGaps(tone, bgTone, bgMask, gapMask, A, W, H);
 
   /* 8) 톤 통계 → 재질별 밑색 선택 → 그림자/하이라이트 톤 분류 */
   progress(0.64, '밑색 · 그림자 판정');
