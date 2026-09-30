@@ -239,7 +239,7 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
       <div class="field">
         <label class="row">선 색상</label>
         <select id="o_lineColor" style="width:100%">
-          <option value="trace" selected>선화 + 색트레스 (작가식)</option>
+          <option value="trace" selected>선화 + 색 트레이스 (작가식)</option>
           <option value="original">원본 선 색 그대로 (한 장)</option>
           <option value="black">검정 단색</option>
         </select>
@@ -289,7 +289,7 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
       <b>오프라인 동작</b> — 이 파일 하나만 있으면 인터넷 없이 실행됩니다. 외부 라이브러리·서버·유료 API를 쓰지 않고,
       이미지는 어디에도 업로드되지 않습니다.<br><br>
       <b>레이어 구성</b> — 작업 파일처럼 [캐릭터] · [배경] 폴더로 나누고, 파츠마다 <b>밑색 → 1차·2차 그림자(곱하기) → 하이라이트</b>를
-      클리핑으로 쌓습니다. 그 위에 그라데이션 · 명암 · 반사광 · 림라이트, [효과](빛, 반짝임), [선화](선화 + 색트레스)를 두고,
+      클리핑으로 쌓습니다. 그 위에 그라데이션 · 명암 · 반사광 · 림라이트, [효과](빛, 반짝임), [선화](선화 + 색 트레이스)를 두고,
       배경 위 입자는 배경 효과로 나눕니다. 내용이 거의 없는 레이어는 만들지 않으며, 다시 합치면 원본이 재현되도록 계산합니다.
       러프는 완성본에서 역으로 만든 <b>추정 스케치</b>이며 기본적으로 숨김 상태입니다.
     </div>
@@ -315,7 +315,7 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
       <div class="canvas-wrap" id="wrap" hidden><canvas id="view"></canvas></div>
       <div class="empty" id="empty">
         <div class="big">일러스트를 넣어 주세요</div>
-        <div>선화 · 색트레스 · 채색(파츠별 밑색) · 그림자 · 하이라이트 · 그라데이션 · 명암 · 반사광 · 림라이트 · 빛 · 반짝임 · 배경 효과 · 러프로 분리해 PSD로 저장합니다.</div>
+        <div>선화 · 색 트레이스 · 채색(파츠별 밑색) · 그림자 · 하이라이트 · 그라데이션 · 명암 · 반사광 · 림라이트 · 빛 · 반짝임 · 배경 효과 · 러프로 분리해 PSD로 저장합니다.</div>
       </div>
       <div class="progress" id="progress">
         <div class="label" id="progLabel">준비 중…</div>
@@ -2156,7 +2156,7 @@ function process(img, opts, progress) {
     lineA[p] = a;
   }
 
-  /* 2-1) 선화 + 색트레스: 작가처럼 한 가지 색의 선화를 그리고, 색이 다른 부분만 위에 클리핑한 색트레스로 */
+  /* 2-1) 선화 + 색 트레이스: 작가처럼 한 가지 색의 선화를 그리고, 색이 다른 부분만 위에 클리핑한 색 트레이스로 */
   let lineK0 = null, traceMask = null;
   if (opts.lineColor === 'trace') {
     const solve = (p, C) => {                          // 선 색 C가 정해졌을 때의 알파(최소제곱)
@@ -2202,14 +2202,14 @@ function process(img, opts, progress) {
         const cl = labOf(Cs[0][p], Cs[1][p], Cs[2][p]);
         let tr = Math.hypot(cl[0] - k0[0], cl[1] - k0[1], cl[2] - k0[2]) > 6;
         let a;
-        if (!tr) {                                     // 기본 선 색으로 맞춰 보고, 많이 어긋나면 색트레스로
+        if (!tr) {                                     // 기본 선 색으로 맞춰 보고, 많이 어긋나면 색 트레이스로
           a = solve(p, lineK0);
           let r = 0;
           for (let c = 0; c < 3; c++) r = Math.max(r, Math.abs(O[c][p] - (a * lineK0[c] + (1 - a) * U[c][p])));
           if (r <= 8 / 255) for (let c = 0; c < 3; c++) col[c] = lineK0[c];
           else tr = true;
         }
-        if (tr) {                                      // 색트레스: 부드러운 선 색에서 출발해 정확히 재현되는 색으로
+        if (tr) {                                      // 색 트레이스: 부드러운 선 색에서 출발해 정확히 재현되는 색으로
           a = Math.max(solve(p, [Cs[0][p], Cs[1][p], Cs[2][p]]), aMin(p));
           if (a > 0.02) for (let c = 0; c < 3; c++) col[c] = clamp01((O[c][p] - (1 - a) * U[c][p]) / a);
         }
@@ -2219,7 +2219,7 @@ function process(img, opts, progress) {
         if (tr && a > 0) { traceMask[p] = 1; tw += a; }
         aw += a;
       }
-      if (tw < aw * 0.003) {                           // 색트레스가 거의 없으면 선화 한 장으로
+      if (tw < aw * 0.003) {                           // 색 트레이스가 거의 없으면 선화 한 장으로
         for (let p = 0; p < N; p++) if (traceMask[p]) {
           lineA[p] = solve(p, lineK0); for (let c = 0; c < 3; c++) lineC[c][p] = lineK0[c];
         }
@@ -3210,7 +3210,7 @@ function assignCharacters(chars, part, lineA, W, H) {
 /* 레이어 구성 — 실제 작가의 작업 파일처럼:
  *   러프(숨김)
  *   [캐릭터]
- *     [선화]  색트레스(클리핑) / 선화(단색)
+ *     [선화]  색 트레이스(클리핑) / 선화(단색)
  *     [효과]  반짝임 / 빛
  *     [채색]  림라이트 / 반사광 / 명암 / 그라데이션
  *             [파츠(피부, 머리카락 …)]  하이라이트 / 2차 그림자 / 1차 그림자(클리핑) / 밑색
@@ -3460,7 +3460,7 @@ function buildLayers(ctx) {
   const meaningful = buf => { let n = 0; for (let i = 3; i < buf.length; i += 4) if (buf[i] > 8 && ++n >= 24) return true; return false; };
   for (const b of [gradB, shadeB, sparkB, fxB, rimB, reflB, bgFxB, ...namedFxB]) if (b && !meaningful(b)) b.fill(0);
 
-  /* 선화 / 색트레스 */
+  /* 선화 / 색 트레이스 */
   const lineB = new Uint8ClampedArray(N * 4), traceB = traceMask ? new Uint8ClampedArray(N * 4) : null;
   const black = opts.lineColor === 'black', K0 = lineK0 ? lineK0.map(v => Math.round(v * 255)) : null;
   for (let p = 0; p < N; p++) {
@@ -3507,7 +3507,7 @@ function buildLayers(ctx) {
   /* 레이어 트리 조립 (작업 파일 구성)
    *   러프
    *   [캐릭터]
-   *     [선화]  색트레스(클리핑) / 선화
+   *     [선화]  색 트레이스(클리핑) / 선화
    *     [효과]  반짝임 / 빛
    *     [채색]  림라이트 / 반사광 / 명암 / 그라데이션 / [파츠…] / 실루엣(숨김)
    *   [배경]    배경 효과 / 배경 */
@@ -3584,7 +3584,7 @@ function buildLayers(ctx) {
     colorKids.push(fullLayer('그라데이션', 'gradient', 'mul ', gradB), fullLayer('명암', 'shade', 'mul ', shadeB),
       fullLayer('반사광', 'reflect', 'scrn', reflB), fullLayer('림라이트', 'rim', 'scrn', rimB));
     const fxKids = [fullLayer('빛', 'effect', 'scrn', fxB), fullLayer('반짝임', 'sparkle', 'scrn', sparkB)].filter(Boolean);
-    const lineKids = [layer('선화', 'line', 'norm', lineB, W, H, null, sel), fullLayer('색트레스', 'trace', 'norm', traceB, { clipping: true })].filter(Boolean);
+    const lineKids = [layer('선화', 'line', 'norm', lineB, W, H, null, sel), fullLayer('색 트레이스', 'trace', 'norm', traceB, { clipping: true })].filter(Boolean);
     const charKids = [group('채색', colorKids.filter(Boolean))];
     if (fxKids.length) charKids.push(group('효과', fxKids));
     charKids.push(group('선화', lineKids));
