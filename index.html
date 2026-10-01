@@ -225,6 +225,10 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: #ff
         <input type="range" id="o_bgDown" min="800" max="2000" step="100" value="1200" disabled>
         <div class="hint">긴 변이 이 크기보다 큰 그림만 줄입니다. "전부"는 PSD도 줄인 크기, "배경 · 얼굴만"은 PSD가 처리 해상도 그대로. 켜거나 방식을 바꾸면 설명을 보고 확인한 뒤 실행합니다</div>
       </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" id="o_tilted"> 기울어진 그림</label>
+        <div class="hint">그림 전체가 크게(45° 넘게) 기울었거나 옆으로 누웠으면 켜세요. 얼굴을 여러 각도(0 · ±30 · ±60 · ±90°)로 찾아 가장 얼굴다운 각도로 이름 · 캐릭터 폴더 · 배경 규칙을 맞춥니다. 똑바른 그림에 켜면 가짜 얼굴이 늘 수 있습니다. 돌려서 저장해 모서리가 흰색 · 투명으로 채워진 그림은 켜지 않아도 기울기를 알아봅니다</div>
+      </div>
     </div>
 
     <div class="section">
@@ -623,6 +627,15 @@ function shadeRelated(c1, c2, hueTol, simTol) {
 /* 픽셀 사이 색 걸음 문턱의 크기 비율: 문턱은 긴 변 1200px 그림에서 맞췄다. 더 큰 그림은 같은 경계의 색 변화가 더 많은 픽셀에 나뉘므로
  * 한 걸음 문턱을 1200/긴 변 배로 줄인다(더 작은 그림은 키우면 경계를 넘어가 그대로 둔다) */
 const stepScale = (W, H) => Math.min(1, 1200 / Math.max(W, H));
+/* 그림의 "아래" 방향(단위 벡터): 돌린 그림에서 얼굴로 구한다. null이면 그림 아래쪽(기본).
+ * 아래 테두리 규칙(아래 테두리에서만 닿는 조각은 거의 한 색일 때만 배경, 장면 배경은 아래 테두리를 씨앗으로 쓰지 않음)과
+ * 위쪽 두 모서리 규칙(방 모서리 · 기둥)을 이 방향에 맞춘 테두리 · 모서리에 쓴다 */
+let IMG_DOWN = null;
+const TILT_TRY = [0, -30, 30, -60, 60, -90, 90];     // 설정 "기울어진 그림"에서 볼 기울기 가설(도)
+function bottomSide(x, y, W, H) {                     // 이 테두리 픽셀이 "아래" 테두리인가(바깥쪽 방향과 아래 방향의 내적 0.5 이상)
+  const [dx, dy] = IMG_DOWN;
+  return (y === H - 1 && dy >= 0.5) || (y === 0 && -dy >= 0.5) || (x === W - 1 && dx >= 0.5) || (x === 0 && -dx >= 0.5);
+}
 function detectBackground(U, known, W, H) {
   const s = stepScale(W, H);
   let st = 0.035 * s, bg = detectBackgroundAt(U, known, W, H, st);
@@ -696,7 +709,7 @@ function detectBackgroundAt(U, known, W, H, stepMax, gapR) {
   };
   // 위 · 오른쪽 · 왼쪽 테두리에서 먼저 채운다. 아래 테두리에서만 닿는 조각은 거의 한 색일 때(기준색에서 0.04 넘게 벗어난 픽셀 5% 미만)만 배경:
   // 그림 아래 끝에 걸친 흰 옷 · 치마는 배경과 같은 흰색이어도 명암 · 주름이 있다
-  const bottom0 = W + H - 2, isBottom = k => k >= bottom0 && k < bottom0 + W - 1;
+  const bottom0 = W + H - 2, isBottom = IMG_DOWN ? k => bottomSide(path[k] % W, (path[k] / W) | 0, W, H) : k => k >= bottom0 && k < bottom0 + W - 1;
   const seedPath = low => path.forEach((p, k) => { if (isBottom(k) === low && known[p] && !bg[p] && diff(p, ref[0], ref[1], ref[2]) < 0.12) seed(p, ref[0], ref[1], ref[2]); });
   seedPath(false);
   flood(0.3);
@@ -743,8 +756,12 @@ function detectBackgroundAt(U, known, W, H, stepMax, gapR) {
  *        "진하고 선명한 선"은 없고 흐린 자국만 빽빽한 곳(선반, 글씨, 무늬)으로만 넓힌다.
  *        아래 테두리는 캐릭터가 잘려 있는 경우가 많아 씨앗으로 쓰지 않는다.
  * 두 단계 모두 좁은 틈으로 새지 않게 후보를 침식한 뒤 채우고 다시 복원한다. */
+/* 장면 배경을 채울 때 단색 배경(1단계 앞에서 찾은 배경) 가장자리의 선명한 색 경계는 건너지 않는다: 윤곽선이 옷과 같은 색이라 선으로 보이지 않는
+ * 검은 스타킹 · 검은 옷이 단색 배경과 맞닿으면, 선 밀도만 보는 장면 배경이 그대로 들어가 버리기 때문. p → q 걸음에서 p 또는 그 한 칸 앞(2p − q)이
+ * "배경 같은 픽셀"(단색 배경과, 그 둘레 3px 안에서 이어진 같은 색)이고 그 픽셀과 q의 색 차(채널 최대)가 0.1 이상이면 막는다(1 ~ 2px 섞인 가장자리까지) */
+let SCENE_BLOCK = null;
 function floodCand(cand, seeds, W, H, r) {
-  const N = W * H, core = erode(cand, W, H, r), bg = new Uint8Array(N);
+  const N = W * H, core = erode(cand, W, H, r), bg = new Uint8Array(N), blk = SCENE_BLOCK;
   let front = [];
   for (const p of seeds) if (core[p] > 0.5 && !bg[p]) { bg[p] = 1; front.push(p); }
   while (front.length) {
@@ -752,7 +769,7 @@ function floodCand(cand, seeds, W, H, r) {
     for (const p of front) {
       const x = p % W;
       for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
-        if (q >= 0 && !bg[q] && core[q] > 0.5) { bg[q] = 1; next.push(q); }
+        if (q >= 0 && !bg[q] && core[q] > 0.5 && !(blk && blk(p, q))) { bg[q] = 1; next.push(q); }
       }
     }
     front = next;
@@ -764,7 +781,7 @@ function floodCand(cand, seeds, W, H, r) {
     for (const p of front) {
       const x = p % W;
       for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
-        if (q >= 0 && !bg[q] && cand[q] > 0.5) { bg[q] = 1; next.push(q); }
+        if (q >= 0 && !bg[q] && cand[q] > 0.5 && !(blk && blk(p, q))) { bg[q] = 1; next.push(q); }
       }
     }
     front = next;
@@ -789,8 +806,15 @@ function croppedParts(bg, crisp, U, W, H) {
   skip[largest] = 1;
   // 위쪽 두 모서리 근처(테두리를 따라 가로 · 세로 5% 안)에 닿은 조각은 방 모서리 · 기둥 같은 배경으로 본다
   const cw = Math.max(3, Math.round(W * 0.05)), ch = Math.max(3, Math.round(H * 0.05));
-  for (let x = 0; x < cw; x++) for (const q of [x, W - 1 - x]) if (cc.rid[q] >= 0) skip[cc.rid[q]] = 1;
-  for (let y = 0; y < ch; y++) for (const q of [y * W, y * W + W - 1]) if (cc.rid[q] >= 0) skip[cc.rid[q]] = 1;
+  if (!IMG_DOWN) {
+    for (let x = 0; x < cw; x++) for (const q of [x, W - 1 - x]) if (cc.rid[q] >= 0) skip[cc.rid[q]] = 1;
+    for (let y = 0; y < ch; y++) for (const q of [y * W, y * W + W - 1]) if (cc.rid[q] >= 0) skip[cc.rid[q]] = 1;
+  } else for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {   // 아래 방향과 반대쪽 모서리(모서리 방향과의 내적 < -0.4)
+    if ((sx * IMG_DOWN[0] + sy * IMG_DOWN[1]) / Math.SQRT2 >= -0.4) continue;
+    const x0 = sx < 0 ? 0 : W - 1, y0 = sy < 0 ? 0 : H - 1;
+    for (let i = 0; i < cw; i++) { const q = y0 * W + (sx < 0 ? i : W - 1 - i); if (cc.rid[q] >= 0) skip[cc.rid[q]] = 1; }
+    for (let i = 0; i < ch; i++) { const q = (sy < 0 ? i : H - 1 - i) * W + x0; if (cc.rid[q] >= 0) skip[cc.rid[q]] = 1; }
+  }
   for (let r = 0; r < n; r++) if (area[r] > N * 0.15) skip[r] = 1;
   // 테두리 경로(시계 방향). 아주 작은 조각(0.3% 미만)은 틈으로 본다
   const path = [];
@@ -856,6 +880,88 @@ function lineEnclosure(lineMask, W, H) {
   return out;
 }
 
+/* 돌린 캔버스의 모서리: 그림을 기울여 저장하면 캔버스가 넓어지고 네 모서리가 한 색(흰색 등)이나 투명으로 채워진다.
+ * 1) 모서리 네 곳 중 셋 이상이 같은 채움(투명: 알파 0.02 이하, 색: 불투명이고 RGB 차 4/255 이하)이면, 그 채움을 모서리에서부터 4-이웃으로 따라간다.
+ * 2) 줄마다 채움이 아닌 첫 · 끝 픽셀(왼쪽 · 오른쪽 끝), 칸마다 위 · 아래 끝을 모아, 끝마다 "꺾인 곳 한 번의 두 직선"을 맞춘다
+ *    (1.5 + 긴 변의 0.2%px 넘게 벗어난 점을 빼고 두 번 다시 맞춤, 맞는 점이 85% 이상이어야 함. 끝에 닿은 흰 칠은 채움과 이어져 벗어난 점이 된다).
+ * 3) 네 끝의 직선 안쪽을 그림 내용, 바깥을 채움 영역으로 두고, 채움 영역이 그림의 1~70%이며 그 97% 이상이 실제로 채움 색일 때만 채움으로 본다.
+ * 흰 배경 그림의 흰 모서리는 배경과 이어져 끝이 캐릭터 윤곽을 따라가므로 직선에 맞지 않는다.
+ * 결과: 채움 영역(Uint8Array, .angle = 내용의 기울기 -45~45°, 시계 방향 양수. 직사각형 변만으로는 90° 주기로만 안다) 또는 null */
+function canvasFill(R, G, B, A, W, H) {
+  const N = W * H;
+  if (Math.min(W, H) < 32) return null;
+  const corners = [0, W - 1, (H - 1) * W, N - 1];
+  const clear = p => A[p] <= 0.02;
+  const near = (p, q) => A[p] >= 0.98 && A[q] >= 0.98 && Math.max(Math.abs(R[p] - R[q]), Math.abs(G[p] - G[q]), Math.abs(B[p] - B[q])) <= 4 / 255;
+  let isFill = null;
+  if (corners.filter(clear).length >= 3) isFill = clear;
+  else for (const c of corners) if (corners.filter(d => near(c, d)).length >= 3) { isFill = p => near(p, c); break; }
+  if (!isFill) return null;
+  const F0 = new Uint8Array(N), stack = [];
+  for (const c of corners) if (isFill(c) && !F0[c]) { F0[c] = 1; stack.push(c); }
+  while (stack.length) {
+    const p = stack.pop(), x = p % W;
+    for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) if (q >= 0 && !F0[q] && isFill(q)) { F0[q] = 1; stack.push(q); }
+  }
+  const xl = new Float64Array(H).fill(-1), xr = new Float64Array(H).fill(-1), yt = new Float64Array(W).fill(-1), yb = new Float64Array(W).fill(-1);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!F0[y * W + x]) { if (xl[y] < 0) xl[y] = x; xr[y] = x; if (yt[x] < 0) yt[x] = y; yb[x] = y; }
+  const tol = 1.5 + 0.002 * Math.max(W, H);
+  // v[i]가 꺾인 곳 한 번의 두 직선인가. lo: 볼록(가장 작은 곳에서 꺾임, 끝 = 두 직선 중 큰 값) / 오목(가장 큰 곳, 작은 값). 결과: i → 끝 좌표 함수 또는 null
+  const vee = (v, lo) => {
+    const idx = []; for (let i = 0; i < v.length; i++) if (v[i] >= 0) idx.push(i);
+    if (idx.length < 16) return null;
+    // 꺾인 곳: 양쪽 직선 맞춤의 어긋남 합이 가장 작은 곳(후보는 가장 작은 · 큰 곳 둘레와 고른 간격)
+    const line = pts => {
+      let sx = 0, sy = 0, sxx = 0, sxy = 0; const n = pts.length;
+      for (const i of pts) { sx += i; sy += v[i]; sxx += i * i; sxy += i * v[i]; }
+      const den = n * sxx - sx * sx, m = den ? (n * sxy - sx * sy) / den : 0;
+      return [m, (sy - m * sx) / n];
+    };
+    const robust = pts => {                          // 벗어난 점을 빼고 두 번 다시 맞춤. 결과: [직선, 맞는 점 수]
+      let use = pts, L = line(use);
+      for (let r = 0; r < 2 && use.length >= 4; r++) {
+        const keep = pts.filter(i => Math.abs(v[i] - (L[0] * i + L[1])) <= tol);
+        if (keep.length < 4) break;
+        use = keep; L = line(use);
+      }
+      return [L, pts.filter(i => Math.abs(v[i] - (L[0] * i + L[1])) <= tol).length];
+    };
+    let ext = idx[0]; for (const i of idx) if (lo ? v[i] < v[ext] : v[i] > v[ext]) ext = i;
+    const cands = new Set([ext]);
+    for (let t = 1; t < 16; t++) cands.add(idx[Math.floor(t * (idx.length - 1) / 16)]);
+    let best = null;
+    for (const k of cands) {
+      const p1 = idx.filter(i => i <= k), p2 = idx.filter(i => i >= k);
+      if (p1.length < 2 && p2.length < 2) continue;
+      const r1 = p1.length >= 2 ? robust(p1) : [[0, v[k]], p1.length], r2 = p2.length >= 2 ? robust(p2) : [[0, v[k]], p2.length];
+      const inl = r1[1] + r2[1] - (p1.includes(k) && p2.includes(k) ? 1 : 0);
+      if (!best || inl > best.inl) best = { inl, L1: r1[0], L2: r2[0] };
+    }
+    if (!best || best.inl < 0.85 * idx.length) return null;
+    const { L1, L2 } = best;
+    const fn = i => lo ? Math.max(L1[0] * i + L1[1], L2[0] * i + L2[1]) : Math.min(L1[0] * i + L1[1], L2[0] * i + L2[1]);
+    fn.slopes = [L1[0], L2[0]];
+    return fn;
+  };
+  const fl = vee(xl, true), fr = vee(xr, false), ft = vee(yt, true), fb = vee(yb, false);
+  if (!fl || !fr || !ft || !fb) return null;
+  const F = new Uint8Array(N);
+  let nF = 0, match = 0;
+  for (let y = 0; y < H; y++) {
+    const a = fl(y) - 0.5, b = fr(y) + 0.5;
+    for (let x = 0; x < W; x++) {
+      if (x >= a && x <= b && y >= ft(x) - 0.5 && y <= fb(x) + 0.5) continue;
+      const p = y * W + x; F[p] = 1; nF++; if (isFill(p)) match++;
+    }
+  }
+  if (nF < 0.01 * N || nF > 0.7 * N || match < 0.97 * nF) return null;
+  // 기울기: 네 끝 직선의 방향(90° 주기)을 4배 각의 평균으로. 줄 끝(왼쪽 · 오른쪽)은 기울기가 dx/dy, 칸 끝(위 · 아래)은 dy/dx
+  let cx = 0, cy = 0;
+  for (const f of [fl, fr]) for (const m of f.slopes) { const a = Math.atan2(1, m); cx += Math.cos(4 * a); cy += Math.sin(4 * a); }
+  for (const f of [ft, fb]) for (const m of f.slopes) { const a = Math.atan2(m, 1); cx += Math.cos(4 * a); cy += Math.sin(4 * a); }
+  F.angle = Math.atan2(cy, cx) / 4 * 180 / Math.PI;    // -45 ~ 45도(시계 방향이 양수)
+  return F;
+}
 /* 그림 가장자리를 두른 테두리 선(액자)의 두께: 바깥 고리(테두리를 한 바퀴 도는 픽셀)의 5% 미만이 선이 아닌 칠한 픽셀이면,
  * 안쪽으로 한 고리씩 들어가며 칠한 픽셀이 절반 이상인 첫 고리의 깊이(최대 max(3, 긴 변의 1%))를 돌려준다. 액자가 없으면 0 */
 function frameDepth(known, W, H) {
@@ -891,9 +997,14 @@ function detectSceneBg(U, known, lineMask, crisp, W, H, scale, fix, enc) {
   };
   const tauA = median(Da, lineMask, nl) * 0.25, tauC = nc ? median(Dc, crisp, nc) * 0.25 : 0;
   const r = Math.max(2, Math.round(3 * scale));
-  const upper = [];                                   // 위 · 왼쪽 · 오른쪽 테두리
-  for (let x = 0; x < W; x++) upper.push(x);
-  for (let y = 1; y < H - 1; y++) { upper.push(y * W, y * W + W - 1); }
+  const upper = [];                                   // 위 · 왼쪽 · 오른쪽 테두리(아래 방향을 알면 "아래" 테두리를 뺀 나머지)
+  if (!IMG_DOWN) {
+    for (let x = 0; x < W; x++) upper.push(x);
+    for (let y = 1; y < H - 1; y++) { upper.push(y * W, y * W + W - 1); }
+  } else {
+    for (let x = 0; x < W; x++) for (const y of [0, H - 1]) if (!bottomSide(x, y, W, H)) upper.push(y * W + x);
+    for (let y = 1; y < H - 1; y++) for (const x of [0, W - 1]) if (!bottomSide(x, y, W, H)) upper.push(y * W + x);
+  }
   // 1단계(선으로 둘러싸인 곳은 선이 드물어도 뺀다: 안에 선이 없는 흰 옷 · 치마 · 단색 머리)
   const cand1 = new Float32Array(N);
   for (let p = 0; p < N; p++) cand1[p] = known[p] && Da[p] < tauA && !(enc && enc[p] >= ENCLOSED) ? 1 : 0;
@@ -1500,12 +1611,13 @@ function faceKit(R, G, B, A, W, H) {
   const pl = [R, G, B].map(P => { const o = new Float32Array(W * H); for (let i = 0; i < W * H; i++) o[i] = P[i] * A[i] + 1 - A[i]; return resizePlane(o, W, H, w, h); });
   const [L, a, b] = toLab(pl[0], pl[1], pl[2], n);
   const X = new Float64Array(512), Y = new Float64Array(512);
-  // 두 눈(왼쪽이 a) → 얼굴 틀
-  const frame = (ax, ay, bx, by) => {
+  // 두 눈(왼쪽이 a) → 얼굴 틀. flip이면 180° 돌린 틀(옆으로 누운 얼굴은 아래가 어느 쪽인지 두 가지를 다 본다). ang = 눈을 잇는 방향의 각도
+  const frame = (ax, ay, bx, by, flip) => {
     if (ax > bx) { let t = ax; ax = bx; bx = t; t = ay; ay = by; by = t; }
-    const dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy), ex = dx / d, ey = dy / d;
-    let fx = -ey, fy = ex; if (fy < 0) { fx = -fx; fy = -fy; }
-    return { cx: (ax + bx) / 2, cy: (ay + by) / 2, ex, ey, fx, fy, d, tilt: Math.abs(dy) / Math.max(Math.abs(dx), 1e-6) };
+    const dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy);
+    let ex = dx / d, ey = dy / d, fx = -ey, fy = ex; if (fy < 0) { fx = -fx; fy = -fy; }
+    if (flip) { ex = -ex; ey = -ey; fx = -fx; fy = -fy; }
+    return { cx: (ax + bx) / 2, cy: (ay + by) / 2, ex, ey, fx, fy, d, tilt: Math.abs(dy) / Math.max(Math.abs(dx), 1e-6), ang: Math.atan2(ey, ex) };
   };
   // 얼굴 틀 격자(u0..u1 × v0..v1, 행 = v)의 표본 좌표. 반환: 그림 안에 든 비율
   const grid = (f, u0, u1, v0, v1, nu, nv) => {
@@ -1588,9 +1700,18 @@ const FACE_TF = Float32Array.from([
   -.66,-1.38,-1.10,-.20,.12,-.09,.67,.77,.22,.45,.04,-.06,-.81,-.50,-.50,-.15,
   -.27,-.59,-.80,0,-.57,-.12,-.49,-.66,-1.08,-.55,-.88,-.83,-.48,-.06,.03,-.21,
   -.44,-.44,-.72,-.15,-.04,-.85,-.08,-1.22,-.52,-1.21,-.95,-.95,-1.12,-1.28,-.48,-.54]);
+/* 기울기 가설: 그림 전체가 phi도(시계 방향 양수) 기울었다고 보고 얼굴을 찾는다. 가설마다 짝 거르기(눈을 잇는 선이 phi에서 tan 0.8 안 = ±38.7°)와
+ * 기울기 항(phi와의 차의 tan)을 그 각도 기준으로 매긴다. phi = 0은 지금까지의 찾기와 같다 */
+function gateOK(dx, dy, flip, phi) {
+  if (phi === 0) return !flip && Math.abs(dy) <= 0.8 * dx;
+  let t = Math.atan2(dy, dx) + (flip ? Math.PI : 0) - phi; t = Math.atan2(Math.sin(t), Math.cos(t));
+  return Math.abs(t) < Math.PI / 2 && Math.abs(Math.tan(t)) <= 0.8;
+}
+function relTilt(ang, phi) { let t = ang - phi; t = Math.atan2(Math.sin(t), Math.cos(t)); return Math.abs(t) >= Math.PI / 2 - 1e-9 ? 99 : Math.abs(Math.tan(t)); }
 function findFaces(R, G, B, A, W, H, opt) {
   opt = opt || {};
   const K = faceKit(R, G, B, A, W, H), { w, h, L, frame, grid, samp } = K, n = w * h;
+  const PHIS = (opt.phis || [0]).map(v => v * Math.PI / 180), MULTI = PHIS.length > 1 || PHIS[0] !== 0;
   const TE = opt.TE || FACE_TE, TF = opt.TF || FACE_TF, WT = Object.assign({}, FACE_WT, opt.weights || {});
   const thr = opt.thr != null ? opt.thr : FACE_THR;
   // 1) 눈 후보: 박스 블러 3회(가우시안 근사) 뒤 헤세 행렬식 × σ⁴. 가운데가 둘레보다 어두운 것만
@@ -1623,15 +1744,16 @@ function findFaces(R, G, B, A, W, H, opt) {
     Dm = D0; D0 = Dp; Dp = k + 2 < NK ? doh(k + 2) : null;
   }
   cand.sort((p, q) => q.v - p.v); if (cand.length > 3000) cand.length = 3000;
-  // 2) 짝
+  // 2) 짝(어느 가설의 짝 거르기든 통과하는 것. 가파른 짝은 180° 뒤집은 틀도 따로)
   const pairs = [];
   for (let i = 0; i < cand.length; i++) for (let j = i + 1; j < cand.length; j++) {
     let p = cand[i], q = cand[j];
     if (p.x > q.x) { const t = p; p = q; q = t; }
     const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy), rr = (p.r + q.r) / 2;
-    if (d < 16 || d / rr < 4 || d / rr > 24 || Math.abs(dy) > 0.8 * dx) continue;
+    if (d < 16 || d / rr < 4 || d / rr > 24) continue;
     if (Math.max(p.r, q.r) / Math.min(p.r, q.r) > 1.7) continue;
-    pairs.push({ a: { x: p.x, y: p.y }, b: { x: q.x, y: q.y } });
+    for (const flip of MULTI ? [false, true] : [false])
+      if (PHIS.some(ph => gateOK(dx, dy, flip, ph))) pairs.push({ a: { x: p.x, y: p.y }, b: { x: q.x, y: q.y }, dx0: dx, dy0: dy, flip });
   }
   // 3) 얼굴 틀 특징
   const lab3 = (f, u0, u1, v0, v1, nu, nv) => { grid(f, u0, u1, v0, v1, nu, nv); const c = nu * nv; return { L: samp(L, c), A: samp(K.a, c), B: samp(K.b, c) }; };
@@ -1679,12 +1801,11 @@ function findFaces(R, G, B, A, W, H, opt) {
   };
   const score = m => { let s = 0; for (const k in FACE_EV) s += (WT[k] != null ? WT[k] : 1) * clamp01(FACE_EV[k](m)); return s; };
   const adj = m => { let s = 0; for (const k in FACE_ADJ) s += FACE_ADJ[k](m); return s; };
-  for (const P of pairs) { P.f = frame(P.a.x, P.a.y, P.b.x, P.b.y); P.m = measure(P.f); P.score = score(P.m); }
-  pairs.sort((p, q) => q.score - p.score);
-  // 4) 상위 40개: 눈 위치를 ±0.12d 안에서 옮겨 얼굴 무늬 상관이 가장 큰 곳으로(두 번 번갈아)
-  for (const P of pairs.slice(0, 40)) {
+  for (const P of pairs) { P.f = frame(P.a.x, P.a.y, P.b.x, P.b.y, P.flip); P.m = measure(P.f); P.score = score(P.m); }
+  // 4) 다듬기: 눈 위치를 ±0.12d 안에서 옮겨 얼굴 무늬 상관이 가장 큰 곳으로(두 번 번갈아)
+  const refine = P => {
     let Pa = [P.a.x, P.a.y], Pb = [P.b.x, P.b.y];
-    const d0 = Math.hypot(Pb[0] - Pa[0], Pb[1] - Pa[1]), fc = (p, q) => corrOf(K.facePatch(frame(p[0], p[1], q[0], q[1])), TF);
+    const d0 = Math.hypot(Pb[0] - Pa[0], Pb[1] - Pa[1]), fc = (p, q) => corrOf(K.facePatch(frame(p[0], p[1], q[0], q[1], P.flip)), TF);
     let best = fc(Pa, Pb);
     for (let rnd = 0; rnd < 2; rnd++) for (let which = 0; which < 2; which++) {
       const P0 = which ? Pb : Pa; let bp = P0;
@@ -1695,9 +1816,8 @@ function findFaces(R, G, B, A, W, H, opt) {
       if (which) Pb = bp; else Pa = bp;
     }
     P.a = { x: Pa[0], y: Pa[1] }; P.b = { x: Pb[0], y: Pb[1] };
-    P.f = frame(Pa[0], Pa[1], Pb[0], Pb[1]); P.m = measure(P.f); P.score = score(P.m); P.refined = true;
-  }
-  pairs.sort((p, q) => q.score - p.score);
+    P.f = frame(Pa[0], Pa[1], Pb[0], Pb[1], P.flip); P.m = measure(P.f); P.score = score(P.m); P.refined = true;
+  };
   // 5) 문턱 이상, 이미 고른 얼굴과 겹치면(가운데가 d 안, 또는 한 눈이 그 얼굴 눈의 0.5d 안) 뺀다
   const near = (e, q, r) => Math.min(Math.hypot(e.x - q.a.x, e.y - q.a.y), Math.hypot(e.x - q.b.x, e.y - q.b.y)) < r;
   const pick = (list, t) => {
@@ -1711,14 +1831,27 @@ function findFaces(R, G, B, A, W, H, opt) {
     }
     return sel;
   };
-  const sel = pick(pairs, thr);
-  // 6) 이름 · 캐릭터 폴더용: 조정 항(FACE_ADJ)을 더한 점수로 같은 방법으로 다시 고른다
-  const Q = pairs.map(P => Object.assign({}, P, { score: P.score + adj(P.m) })).sort((p, q) => q.score - p.score);
-  const selN = pick(Q, opt.thrName != null ? opt.thrName : FACE_THR_NAME);
+  // 가설마다: 그 가설의 짝만, 기울기 항을 phi 기준으로 바꾼 점수로 위 40개를 다듬고, 고르고,
+  // 6) 이름 · 캐릭터 폴더용은 조정 항(FACE_ADJ)을 더한 점수로 같은 방법으로 다시 고른다. phi = 0이면 짝을 그대로 쓴다(지금까지와 같음)
+  const thrN = opt.thrName != null ? opt.thrName : FACE_THR_NAME;
+  const perPhi = PHIS.map(phi => {
+    let L = pairs.filter(P => gateOK(P.dx0, P.dy0, P.flip, phi));
+    if (phi !== 0) L = L.map(P => Object.assign({}, P, { a: { ...P.a }, b: { ...P.b } }));
+    const at = P => phi === 0 ? P.score : P.score - clamp01(FACE_EV.tilt(P.m)) + clamp01((0.7 - relTilt(P.f.ang, phi)) / 0.5);
+    L.forEach(P => { P.sc = at(P); });
+    L.sort((p, q) => q.sc - p.sc);
+    for (const P of L.slice(0, 40)) { refine(P); P.sc = at(P); }
+    L.sort((p, q) => q.sc - p.sc);
+    const sel = pick(L.map(P => Object.assign({}, P, { score: P.sc })), thr);
+    const Q = L.map(P => Object.assign({}, P, { score: P.sc + adj(P.m) })).sort((p, q) => q.score - p.score);
+    return { phi, sel, selN: pick(Q, thrN), Q };
+  });
+  const { sel, selN, Q } = perPhi[0];
   const s = K.sc, out = list => list.map(P => ({ cx: P.f.cx / s, cy: P.f.cy / s, d: P.f.d / s, ex: P.f.ex, ey: P.f.ey, fx: P.f.fx, fy: P.f.fy,
     a: { x: P.a.x / s, y: P.a.y / s }, b: { x: P.b.x / s, y: P.b.y / s }, score: +P.score.toFixed(2) }));
   const faces = out(sel);
   faces.named = out(selN);
+  if (MULTI) faces.perPhi = perPhi.map(r => ({ deg: +(r.phi * 180 / Math.PI).toFixed(2), faces: out(r.sel), named: out(r.selN) }));
   return opt.debug ? { faces, sel, selN, pairs, Q, cand, kit: K } : faces;
 }
 
@@ -1726,14 +1859,24 @@ function findFaces(R, G, B, A, W, H, opt) {
  * (가운데 사이가 두 눈 사이 d 안)에 얼굴이 나온 것만 남긴다(자리 · 점수는 원래 그림 쪽 값). 진짜 얼굴은 좌우로 뒤집어도 얼굴이지만,
  * 옷 주름 · 무늬 · 글자에서 우연히 나온 가짜 얼굴은 평균 얼굴 무늬 · 속눈썹 띠 같은 비대칭 단서 때문에 한쪽에서만 문턱을 넘는 일이 많다.
  * 배경 판정용 얼굴은 그대로 둔다(가짜 얼굴이라도 그 둘레를 캐릭터로 지키는 쪽이 캐릭터를 잃는 것보다 나았다) */
-function findFacesMirror(R, G, B, A, W, H) {
+function findFacesMirror(R, G, B, A, W, H, phis) {
   const N = W * H, M = [R, G, B, A].map(() => new Float32Array(N));
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const p = y * W + x, q = y * W + (W - 1 - x);
     M[0][q] = R[p]; M[1][q] = G[p]; M[2][q] = B[p]; M[3][q] = A[p];
   }
-  const o = findFaces(R, G, B, A, W, H), m = findFaces(M[0], M[1], M[2], M[3], W, H);
+  const o = findFaces(R, G, B, A, W, H, phis && { phis }), m = findFaces(M[0], M[1], M[2], M[3], W, H, phis && { phis: phis.map(v => -v) });
   const both = (list, ref) => list.filter(f => ref.some(g => Math.hypot(f.cx - (W - 1 - g.cx), f.cy - g.cy) < Math.max(f.d, g.d)));
+  if (phis) {
+    // 가설마다 배경용 = 원래 그림의 결과, 이름용 = 원래(phi)와 뒤집은 그림(-phi)에 모두 나온 얼굴. 이름용 얼굴의 가장 큰 점수가 큰 가설(같으면 앞의 것)
+    const per = o.perPhi.map((r, k) => ({ deg: r.deg, faces: r.faces, named: both(r.named, m.perPhi[k].named) }));
+    const top = r => r.named.length ? Math.max(...r.named.map(f => f.score)) : 0;
+    let best = per[0];
+    for (const r of per) if (top(r) > top(best)) best = r;
+    const faces = best.faces.slice();
+    faces.named = best.named; faces.tilt = best.deg;
+    return faces;
+  }
   const faces = o.slice();                            // 배경 판정용 얼굴은 그대로(얼굴이 지키는 캐릭터 부분을 잃지 않게)
   faces.named = both(o.named, m.named);
   return faces;
@@ -2039,7 +2182,7 @@ function downscaledBackground(R, G, B, A, W, H, size, inMask, userOpts, progress
     return o;
   };
   const sc = f => Object.assign({}, f, { cx: f.cx / k, cy: f.cy / k, d: f.d / k, a: { x: f.a.x / k, y: f.a.y / k }, b: { x: f.b.x / k, y: f.b.y / k } });
-  return { bgMask: up(r.bgMask), back: up(r.back), gapMask: up(r.gapMask), faces: r.faces.map(sc), nameFaces: r.nameFaces.map(sc) };
+  return { bgMask: up(r.bgMask), back: up(r.back), gapMask: up(r.gapMask), faces: r.faces.map(sc), nameFaces: r.nameFaces.map(sc), tilt: r.tilt };
 }
 function process(img, opts, progress) {
   const t0 = Date.now(), userOpts = opts;
@@ -2056,6 +2199,10 @@ function process(img, opts, progress) {
     Lw[i] = lumOf(r * a + 1 - a, g * a + 1 - a, b * a + 1 - a);
   }
   const hasAlpha = transparent > N * 0.001;
+  // 기울여 저장해 넓어진 캔버스의 모서리(한 색 · 투명): 그림 내용만 보고 배경을 찾고, 모서리는 배경으로 둔다(투명 모서리여도 배경을 찾는다).
+  // 내용이 1° 넘게 기울었을 때만(기울지 않은 여백 · 레터박스는 지금까지처럼 둔다)
+  let canvas = opts.bg ? canvasFill(R, Gc, B, A, W, H) : null;
+  if (canvas && Math.abs(canvas.angle) < 1) canvas = null;
   // 그림에 맞춘 자동 설정: 최대 선 굵기가 0(자동)이면 그림에서 선 굵기를 재서 정한다
   const autoInfo = opts.lineWidth > 0 ? null : autoLineWidth(Lw, W, H, scale);
   if (autoInfo) opts = Object.assign({}, opts, { lineWidth: autoInfo.lineWidth });
@@ -2232,22 +2379,47 @@ function process(img, opts, progress) {
 
   /* 3) 단색 배경 분리 */
   progress(0.24, '배경 판별');
-  const auto = opts.bg && !hasAlpha;
-  let bgMask = null, back = null, gapMask = null, faces = [], nameFaces = [];
+  const auto = opts.bg && (!hasAlpha || !!canvas);
+  let bgMask = null, back = null, gapMask = null, faces = [], nameFaces = [], tilt = 0;
   const bgDown = auto && opts.bgDown > 0 && Math.max(W, H) > opts.bgDown ? opts.bgDown : 0;
-  const bgKey = [W, H, hashBytes(src), opts.lineWidth, opts.lineSens, opts.lineColor, opts.bg, bgDown].join('|');
+  const bgKey = [W, H, hashBytes(src), opts.lineWidth, opts.lineSens, opts.lineColor, opts.bg, bgDown, !!opts.tilted].join('|');
   if (bgCache && bgCache.key === bgKey) {
     bgMask = bgCache.bgMask && Uint8Array.from(bgCache.bgMask);
     back = bgCache.back && Uint8Array.from(bgCache.back);
     gapMask = bgCache.gapMask && Uint8Array.from(bgCache.gapMask);
-    faces = JSON.parse(bgCache.faces); nameFaces = JSON.parse(bgCache.nameFaces);
+    faces = JSON.parse(bgCache.faces); nameFaces = JSON.parse(bgCache.nameFaces); tilt = bgCache.tilt || 0;
   } else if (bgDown) {
     // 큰 그림은 줄여서 배경 찾기(설정): 긴 변 bgDown px로 줄인 그림에서 배경 · 되돌린 캐릭터 부분 · 얼굴을 찾아 이 크기로 키운다
-    ({ bgMask, back, gapMask, faces, nameFaces } = downscaledBackground(R, Gc, B, A, W, H, bgDown, inMask, userOpts, progress));
-    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), gapMask: gapMask && Uint8Array.from(gapMask), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
+    ({ bgMask, back, gapMask, faces, nameFaces, tilt } = downscaledBackground(R, Gc, B, A, W, H, bgDown, inMask, userOpts, progress));
+    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), gapMask: gapMask && Uint8Array.from(gapMask), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces), tilt };
   } else {
     // 액자(가장자리를 두른 테두리 선)가 있으면 배경 찾기가 테두리에서 출발하지 못한다.
     // 배경 단계 동안만 액자 두께만큼의 바깥 고리를 그 안쪽 첫 고리의 값으로 채우고, 끝나면 되돌린다
+    // 얼굴은 배경과 상관없이 한 번 찾는다(배경 판별 · 파츠 이름 · 캐릭터 나누기에 쓴다).
+    // 돌린 캔버스면 그 각도와 ±90°를 기울기 가설로 준다(각도는 직사각형 변에서 90° 주기로만 알 수 있다)
+    let rawFaces = null;
+    const tilts = canvas ? [canvas.angle, canvas.angle > 0 ? canvas.angle - 90 : canvas.angle + 90] : opts.tilted ? TILT_TRY : undefined;
+    const allFaces = () => rawFaces || (rawFaces = findFacesMirror(R, Gc, B, A, W, H, tilts));
+    let canvasSave = null;
+    if (auto && canvas) {
+      allFaces();                                      // 얼굴은 모서리를 채우기 전 그림으로
+      // 배경 단계 동안만 모서리와 그 안쪽 3px(돌릴 때 생긴 경계의 섞인 색 · 튄 값)를 더 안쪽의 가장 가까운 내용 픽셀 값으로 채운다(액자와 같은 방식)
+      const arrs = [U[0], U[1], U[2], R, Gc, B, A, known, lineMask, crisp, inMask], from = new Int32Array(N).fill(-1);
+      const band = dilate(Float32Array.from(canvas), W, H, 3);
+      let front = [];
+      for (let p = 0; p < N; p++) if (!band[p]) { from[p] = p; front.push(p); }
+      while (front.length) {
+        const next = [];
+        for (const p of front) {
+          const x = p % W;
+          for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) if (q >= 0 && from[q] < 0) { from[q] = from[p]; next.push(q); }
+        }
+        front = next;
+      }
+      const idx = []; for (let p = 0; p < N; p++) if (band[p]) idx.push(p);
+      canvasSave = { arrs, idx, vals: arrs.map(a => idx.map(p => a[p])) };
+      for (const p of idx) for (const a of arrs) a[p] = a[from[p]];
+    }
     const fk = auto ? frameDepth(known, W, H) : 0;
     let frameSave = null;
     if (fk) {
@@ -2259,10 +2431,16 @@ function process(img, opts, progress) {
         for (const a of arrs) a[p] = a[q];
       }
     }
+    // 그림의 아래 방향: 이름용 얼굴(좌우 합의)의 얼굴 아래 방향을 (점수 − 10)²로 무게 매겨 평균. 얼굴들이 서로 맞고(평균 벡터 길이 0.8 이상)
+    // 세로에서 40° 넘게 기울었을 때만 쓴다. 기울기 가설(돌린 캔버스 · 설정 "기울어진 그림")이 있을 때만 보므로 똑바로 둔 그림에는 쓰이지 않는다
+    IMG_DOWN = null;
+    if (auto && tilts) {
+      let sx = 0, sy = 0, sw = 0;
+      for (const f of allFaces().named) { const w = Math.max(0, f.score - 10) ** 2; sx += w * f.fx; sy += w * f.fy; sw += w; }
+      const len = sw > 0 ? Math.hypot(sx, sy) / sw : 0;
+      if (len >= 0.8 && Math.abs(Math.atan2(sx, sy)) > 40 * Math.PI / 180) IMG_DOWN = [sx / (len * sw), sy / (len * sw)];
+    }
     bgMask = auto ? detectBackground(U, known, W, H) : null;
-    // 얼굴은 배경과 상관없이 한 번 찾는다(배경 판별 · 파츠 이름 · 캐릭터 나누기에 쓴다)
-    let rawFaces = null;
-    const allFaces = () => rawFaces || (rawFaces = findFacesMirror(R, Gc, B, A, W, H));
     if (auto) {
       let swal = null;
       const E = {}, edgesAt = thr => E[thr] || (E[thr] = crispEdges(U, W, H, thr)), edges = () => edgesAt(20);
@@ -2278,8 +2456,31 @@ function process(img, opts, progress) {
       // 선 없이 칠한 장면 배경도 배경으로. 둘러싸인 곳을 빼면 넓이 기준에 못 미치는 그림(선이 촘촘한 그림)은 빼지 않고 다시 찾는다
       let sceneRaw = null;
       const sceneFix = bg => { sceneRaw = Uint8Array.from(bg); unswallow(bg); };
+      // 단색 배경과 그 둘레 3px 안에서 이어진 같은 색(채널 최대 차 < 0.06, 단색 배경이 선명한 경계 앞 2px에서 멈춘 자리) = "배경 같은 픽셀"
+      let bgLike = null;
+      if (bgMask) {
+        bgLike = Uint8Array.from(bgMask); const ref = new Int32Array(N).fill(-1); let front = [];
+        for (let p = 0; p < N; p++) if (bgMask[p]) { ref[p] = p; front.push(p); }
+        for (let d = 0; d < 3 && front.length; d++) {
+          const next = [];
+          for (const p of front) { const x = p % W;
+            for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+              if (q < 0 || bgLike[q]) continue; const r = ref[p];
+              if (Math.max(Math.abs(U[0][q] - U[0][r]), Math.abs(U[1][q] - U[1][r]), Math.abs(U[2][q] - U[2][r])) < 0.06) { bgLike[q] = 1; ref[q] = r; next.push(q); }
+            } }
+          front = next;
+        }
+      }
+      SCENE_BLOCK = bgLike ? (p, q) => {
+        if (bgLike[q]) return false;
+        const d = (a, b) => Math.max(Math.abs(U[0][a] - U[0][b]), Math.abs(U[1][a] - U[1][b]), Math.abs(U[2][a] - U[2][b]));
+        if (bgLike[p] && d(p, q) >= 0.1) return true;
+        const p2 = 2 * p - q;
+        return p2 >= 0 && p2 < N && Math.abs((p2 % W) - (p % W)) <= 1 && bgLike[p2] && d(p2, q) >= 0.1;
+      } : null;
       let scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, sceneFix, enc);
       if (!scene) { swal = null; sceneRaw = null; scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, sceneFix, null); }
+      SCENE_BLOCK = null;
       if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
       // 선 없이 칠해 배경에 딸려 들어간 팔 · 손 · 소매(색 모델 단계 뒤에 캐릭터로 되돌린다).
       // 색 비교는 삼켜진 캐릭터를 되돌리기 전의 배경으로 한다(되돌린 부분이 캐릭터 색 분포를 바꿔 다른 조각의 판정이 흔들리지 않게)
@@ -2323,12 +2524,19 @@ function process(img, opts, progress) {
       faces = plausibleFaces(allFaces(), clear, W, H);
       nameFaces = plausibleFaces(allFaces().named, clear, W, H);
     }
+    IMG_DOWN = null;
     if (frameSave) frameSave.arrs.forEach((a, k) => frameSave.idx.forEach((p, j) => { a[p] = frameSave.vals[k][j]; }));
-    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), gapMask: gapMask && Uint8Array.from(gapMask), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces) };
+    if (canvasSave) {
+      canvasSave.arrs.forEach((a, k) => canvasSave.idx.forEach((p, j) => { a[p] = canvasSave.vals[k][j]; }));
+      if (!bgMask) bgMask = new Uint8Array(N);
+      for (let p = 0; p < N; p++) if (canvas[p]) { bgMask[p] = 1; if (back) back[p] = 0; }
+    }
+    tilt = rawFaces && rawFaces.tilt || 0;
+    bgCache = { key: bgKey, bgMask: bgMask && Uint8Array.from(bgMask), back: back && Uint8Array.from(back), gapMask: gapMask && Uint8Array.from(gapMask), faces: JSON.stringify(faces), nameFaces: JSON.stringify(nameFaces), tilt };
   }
-  if (opts.bgOnly) return { W, H, bgMask, back, gapMask, faces, nameFaces };   // downscaledBackground가 부른 경우: 배경 단계까지만
+  if (opts.bgOnly) return { W, H, bgMask, back, gapMask, faces, nameFaces, tilt };   // downscaledBackground가 부른 경우: 배경 단계까지만
   // 사용자가 칠한 보정(배경으로 보내기 / 캐릭터로 되돌리기)이 자동 판정보다 우선
-  const forceBg = !hasAlpha && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
+  const forceBg = (!hasAlpha || canvas) && opts.forceBg && opts.forceBg.length === N ? opts.forceBg : null;
   const forceChar = opts.forceChar && opts.forceChar.length === N ? opts.forceChar : null;
   // (보정 마스크는 화면에서 늘 넘어오므로, 칠한 픽셀이 하나도 없으면 배경 없는 그림에 빈 배경 층을 만들지 않는다)
   if (forceBg) for (let p = 0; p < N; p++) if (forceBg[p] && A[p] > 0.02) { if (!bgMask) bgMask = new Uint8Array(N); bgMask[p] = 1; }
@@ -2891,7 +3099,7 @@ function process(img, opts, progress) {
   }
 
   return buildLayers({
-    W, H, N, scale, rnd, opts, progress, t0, hasAlpha,
+    W, H, N, scale, rnd, opts, progress, t0, hasAlpha, tilt,
     R, G: Gc, B, A, U, lineA, lineC, lineK0, traceMask, inMask, bgMask, bgFx, bgBase, tone, nT, bgTone, toneGroup, nG: nGroups, base, partExtra,
     fxId, fxNames,
     toneG, toneHi, toneCol: tMean, tCnt, sparkPix, sparkR, sparkArea,
@@ -3446,7 +3654,7 @@ function buildLayers(ctx) {
     if (isBg(p)) {
       const fx = bgFx && bgFx[p];
       for (let c = 0; c < 3; c++) bgB[i + c] = Math.round((fx ? bgBase[c][p] : U[c][p]) * 255);
-      bgB[i + 3] = 255;
+      bgB[i + 3] = Math.round(255 * a0);
       if (fx && fxId && fxId[p]) { const F = namedFxB[fxId[p] - 1]; for (let c = 0; c < 3; c++) F[i + c] = Math.round(clamp01(U[c][p]) * 255); F[i + 3] = 255; }
       else if (fx && sMax[p] > 1e-4) putMinAlpha(bgFxB, i, S[0][p], S[1][p], S[2][p], a0);
       continue;
@@ -3633,7 +3841,7 @@ function buildLayers(ctx) {
       ms: Date.now() - t0, psnr, regions: ctx.counts.regions, tones: ctx.counts.tones, parts: parts.filter(k => !pal[k].extra).length,
       smallParts: parts.filter(k => pal[k].extra).length, hasAlpha: ctx.hasAlpha,
       background: !!bgMask, lineWidth: opts.lineWidth > 0 ? opts.lineWidth : Math.max(3, Math.round(4 * scale)), sparkle: sparkR, auto: ctx.autoInfo || null,
-      faces: ctx.faces ? ctx.faces.length : 0, characters: charLab ? chars.length : 1,
+      faces: ctx.faces ? ctx.faces.length : 0, tilt: ctx.tilt || 0, characters: charLab ? chars.length : 1,
       faceList: (ctx.faces || []).map(f => [Math.round(f.cx), Math.round(f.cy), Math.round(f.d), f.score])
     }
   };
@@ -4166,7 +4374,7 @@ function refreshOptLabels() {
 }
 for (const k of Object.keys(OPT_LABELS)) $('o_' + k).addEventListener('input', () => { refreshOptLabels(); markDirty(); });
 refreshOptLabels();
-for (const k of ['maxSize', 'lineColor', 'splitColors', 'clip', 'bg', 'rough', 'roughColor', 'bgDownOn']) $('o_' + k).addEventListener('change', markDirty);
+for (const k of ['maxSize', 'lineColor', 'splitColors', 'clip', 'bg', 'rough', 'roughColor', 'bgDownOn', 'tilted']) $('o_' + k).addEventListener('change', markDirty);
 // "큰 그림은 줄여서 나누기": 방식 · 크기는 켰을 때만 움직인다. 켜거나 방식을 바꾸면 설명을 보이고, 확인하면 바로 다시 나눈다
 const syncBgDown = () => { const on = $('o_bgDownOn').checked; $('o_bgDown').disabled = $('o_bgDownMode').disabled = !on; };
 const BG_DOWN_INFO = {
@@ -4210,7 +4418,7 @@ function readOpts() {
     lineSens: +$('o_lineSens').value / 100, lineWidth: +$('o_lineWidth').value, lineColor: $('o_lineColor').value,
     colors: +$('o_colors').value, merge: +$('o_merge').value / 100, shadow: +$('o_shadow').value / 100, sparkle: +$('o_sparkle').value,
     maxParts: +$('o_maxParts').value,
-    splitColors: $('o_splitColors').checked, clip: $('o_clip').checked, bg: $('o_bg').checked,
+    splitColors: $('o_splitColors').checked, clip: $('o_clip').checked, bg: $('o_bg').checked, tilted: $('o_tilted').checked,
     rough: $('o_rough').checked, roughColor: $('o_roughColor').value,
     bgDown: $('o_bgDownOn').checked && $('o_bgDownMode').value === 'bg' ? +$('o_bgDown').value : 0
   };
@@ -4370,7 +4578,7 @@ async function run() {
 const countLayers = ls => ls.reduce((n, l) => n + (l.group ? countLayers(l.children) : 1), 0);
 function showStat(res) {
   const s = res.stats;
-  $('stat').textContent = `${res.width}×${res.height} · ${(s.ms / 1000).toFixed(1)}초 · 파츠 ${s.parts}개${s.smallParts ? ` (+작은 ${s.smallParts})` : ''} · 재현 PSNR ${s.psnr >= 99 ? '∞' : s.psnr.toFixed(1)} dB`;
+  $('stat').textContent = `${res.width}×${res.height} · ${(s.ms / 1000).toFixed(1)}초 · 파츠 ${s.parts}개${s.smallParts ? ` (+작은 ${s.smallParts})` : ''}${s.tilt ? ` · 기울기 ${Math.round(s.tilt)}°` : ''} · 재현 PSNR ${s.psnr >= 99 ? '∞' : s.psnr.toFixed(1)} dB`;
 }
 // 사용자가 칠한 보정 마스크(배경으로 보내기 / 캐릭터로 되돌리기). 같은 그림 · 같은 크기면 옵션을 바꿔 다시 분리해도 유지된다
 function ensureMasks() {
