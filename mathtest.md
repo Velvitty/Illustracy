@@ -1,49 +1,50 @@
-# math test
+# math test 2
 
-Inline backtick math $`A < 0.98`$ and $`x_1`$ here.
+T7 list: other item has backtick inline math, this item has fence:
 
-T1 list fenced:
-
-- item one text
+- first item with $`x_1`$ math
+- second item text
 
   ```math
   U(p)=\frac{1}{|\mathcal N_p|}\sum_{q\in\mathcal N_p}U(q)
   ```
 
-- item two
+- third item
 
-T2 list dollars block:
+T8 list: same item has inline math then fence:
 
-- item one text
+- item with $`y`$ inline
 
-  $$
-  \pi_f=\begin{cases}0.9 & -1.2\le v\le 8\\ 0.45 & \text{그 밖}\end{cases},\qquad \{a\}<b \;\&\; c_{x}
-  $$
+  ```math
+  E(x)=\sum_r \theta_r\,[x_r=0]
+  ```
 
-- item two
+T9 list: plain dollar inline elsewhere:
 
-T3 numbered fenced 3 spaces:
+- first item with $z$ math
+- second item
 
-1. first
+  ```math
+  O_c=a\,K_c+(1-a)\,U_c
+  ```
+
+T10 numbered with inline in item text:
+
+1. **Pieces**: components $`k`$ of stage background.
+2. **Color**: Lab bins
 
    ```math
-   E(x)=\sum_r \theta_r\,[x_r=0]
+   \bar\ell_k=\frac1{|k|}\sum_{p\in k} x_p
    ```
 
-2. second
+3. **Conditions**: area.
 
-T4 top fenced:
+T11 list item fence followed by text with inline math:
 
-```math
-O_c=a\,K_c+(1-a)\,U_c
-```
+- item text
 
-T5 top dollars:
+  ```math
+  w_{rq}=8\,o\,\exp(-\Delta E^2)
+  ```
 
-$$
-\mathrm{flat}=\frac{1}{n}\left|\left\{\,i:(L_i-m_L)^2<10^2\,\right\}\right|
-$$
-
-T6 list dollars inline-start:
-
-- text $$\bar\ell_k=\frac1{|k|}\sum_{p\in k} x_p$$ end
+  after text with $`\theta_r > 0`$ inline.
