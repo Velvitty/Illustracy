@@ -457,7 +457,7 @@ and pixels are divided starting from each face's head · body zone, using outlin
 
 ### 3.13 Preview and PSD saving
 
-The preview stacks the layers with the blend modes of the browser canvas (multiply, screen) and imitates clipping the same way Photoshop does.
+The preview stacks the layers with the blend modes of the browser canvas (`multiply`, `screen`) and imitates clipping the same way Photoshop does.
 The PSD is written directly without external libraries (RGB 8-bit, folders, clipping, blend modes, Korean layer names, merged image).
 
 ### 3.14 Manual correction
@@ -3339,7 +3339,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 - In pictures whose background is also drawn with lines, like fireworks · food stalls · graffiti, the background and character colors are learned per picture to widen the background (graph cut).
   Character region overlap (IoU): graffiti 0.72 → 0.90, fireworks 0.71 → 0.79, night view 0.68 → 0.77.
 - The "content hint" approach, where a person marks character outlines and part names, needed human hands, so it was removed and replaced by the automatic approach above.
-- The README was rewritten from easy explanations to algorithms · formulas.
+- This document was rewritten from easy explanations to algorithms · formulas.
 - Commit `230ab4f`
 
 ### 0.6 (2026-09-27) Automatic decision for cut-off parts, loop, maximum number of parts
