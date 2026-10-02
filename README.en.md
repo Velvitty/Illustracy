@@ -3031,7 +3031,7 @@ As same-picture pairs, 0.37 → 0.38 gained 4 · lost 0 in "no major loss" (`p` 
 0.36 → 0.38 is 5 · 0 (`p` = 0.063) and 8 · 0 (`p` = 0.0078).
 Version 0.1 found no background in 33 pictures and leaves them as they are, so it has few major losses (2); 0.1 → 0.38 gained 16 · lost 6 in "no major loss" (`p` = 0.052).
 This grading drew the line between "small pieces lost" and "major loss" more strictly than the 642-picture grading in the 0.38 entry (with the stored grades of the same 60 pictures, 0.37 has 41 and 0.38 has 47 with no major loss), so read it as the difference between four versions graded together by the same standard rather than as the size of the rates.
-The table at the end of the 0.38 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate for the four versions side by side.
+The table at the end of the 0.38 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
@@ -3055,9 +3055,13 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 | | Version 0.1 | Version 0.36 | Version 0.37 | Version 0.38 |
 |---|---|---|---|---|
 | Resolving power | 100% | 133% | 153% | 178% |
+| Resolving power 95% CI | — | 111–161% | 129–184% | 150–214% |
+| Resolving power 80% CI | — | 118–151% | 136–173% | 159–200% |
 | Blind test | 42% | 50% | 52% | 58% |
+| Blind test 95% CI | 30–54% | 38–62% | 39–64% | 46–70% |
+| Blind test 80% CI | 34–50% | 42–58% | 43–60% | 50–66% |
 
-Resolving power is relative to version 0.1 (= 100%); the blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures (11).
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a bootstrap resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with Wilson intervals (11).
 
 ### 0.37 (2026-10-01) Tilted pictures, keeping black clothes from leaking into the background
 
