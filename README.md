@@ -539,17 +539,13 @@ C=\begin{cases}12.92\,C_{lin} & C_{lin}\le 0.0031308\\ 1.055\,C_{lin}^{1/2.4}-0.
   $`r = \max(1, \mathrm{round}((\sqrt{4\sigma^2 + 1} - 1)/2))`$입니다. $`\sigma < 0.3`$이면 흐리지 않습니다.
 - **인페인팅**: 모르는 픽셀을 아는 픽셀과의 거리 순서(바깥 겹부터)로 방문해, 한 겹 안쪽까지 확정된 8-이웃의 평균으로 채웁니다.
 
-  ```math
-  U(p)=\frac{1}{|\mathcal N_p|}\sum_{q\in\mathcal N_p}U(q),\qquad \mathcal N_p=\{q\in 8\text{-이웃}(p):\ \text{겹}(q)<\text{겹}(p)\}
-  ```
+  $`\displaystyle U(p)=\frac{1}{|\mathcal N_p|}\sum_{q\in\mathcal N_p}U(q),\qquad \mathcal N_p=\{q\in 8\text{-이웃}(p):\ \text{겹}(q)<\text{겹}(p)\}`$
 
 - **라벨 채우기**: 라벨 없는 픽셀을 거리 순서로 방문해, 확정된 8-이웃 라벨의 다수결(4-이웃은 2표, 대각선은 1표)로 채웁니다.
 - **연결 성분**: 같은 값끼리 4-이웃으로 이어진 덩어리입니다. **둘레**는 성분의 픽셀마다 4-이웃 중 다른 성분(또는 그림 밖)인 변의 수를 더한 값입니다.
 - **거리 변환**(체임퍼): 가로 · 세로 한 칸 1, 대각선 한 칸 $`\sqrt{2}`$인 두 번 훑기(위 → 아래, 아래 → 위)로 가장 가까운 표시 픽셀까지의 거리를 근사합니다.
 
-  ```math
-  d(p)=\min\big(d(p),\ d(q)+w_{pq}\big),\qquad w_{pq}\in\{1,\sqrt2\}
-  ```
+  $`\displaystyle d(p)=\min\big(d(p),\ d(q)+w_{pq}\big),\qquad w_{pq}\in\{1,\sqrt2\}`$
 
   "몇 걸음 안"이라고 쓴 곳은 4-이웃 너비 우선 탐색의 걸음 수(맨해튼 거리)입니다.
 - **k-평균**(Lab 제곱 거리): 표본 $`M = \min(n, M_\max)`$개를 뽑고($`n > M_\max`$이면 복원 추출), **k-means++** 방식으로 첫 중심은 고르게, 다음 중심은 지금까지의 가장 가까운 중심까지 거리의 제곱 $`D(x)^2`$에 비례하는 확률로 뽑습니다.
@@ -559,9 +555,7 @@ C=\begin{cases}12.92\,C_{lin} & C_{lin}\le 0.0031308\\ 1.055\,C_{lin}^{1/2.4}-0.
   $`s \gets s + \mathtt{0x6D2B79F5}`$, $`t = (s \oplus s \gg 15) \cdot(s \mathbin{\vert} 1)`$, $`t \gets t \oplus(t + (t \oplus t \gg 7) \cdot(t \mathbin{\vert} 61))`$, 난수 $`= (t \oplus t \gg 14)/2^{32}`$입니다($`\gg`$는 부호 없는 오른쪽 시프트).
 - **값 잡음**(러프의 흔들림): 간격 $`\mathrm{cell}`$인 격자점마다 $`[-1, 1]`$의 난수 $`g`$를 두고, 격자 칸 안에서 $`s_x = \mathrm{smoothstep}(0, 1, t_x)`$, $`s_y = \mathrm{smoothstep}(0, 1, t_y)`$로 섞습니다.
 
-  ```math
-  n(x,y)=\big(g_{00}+(g_{10}-g_{00})s_x\big)(1-s_y)+\big(g_{01}+(g_{11}-g_{01})s_x\big)s_y
-  ```
+  $`\displaystyle n(x,y)=\big(g_{00}+(g_{10}-g_{00})s_x\big)(1-s_y)+\big(g_{01}+(g_{11}-g_{01})s_x\big)s_y`$
 
 - **쌍선형 보간**: $`x_0 = \lfloor x\rfloor, t_x = x - x_0`$(세로도 같게)일 때 $`f = f_{00}(1 - t_x)(1 - t_y) + f_{10}t_x(1 - t_y) + f_{01}(1 - t_x)t_y + f_{11}t_x t_y`$.
 - **크기 바꾸기**(얼굴 찾기용, 가로 · 세로 따로): 비율 $`r = n / m`$(원래 칸 수 / 새 칸 수)이 1 이상이면 새 칸 $`i`$가 덮는 원래 구간 $`[ir, (i + 1)r)`$의 **면적 평균**,
@@ -625,17 +619,13 @@ O_c=a\,K_c+(1-a)\,U_c
   1. 기본 선 색 $`K^0`$ = 알파 0.85 이상인 선 픽셀의 원본 색 채널별 중앙값(8비트 256칸 히스토그램에서 누적이 절반 이상이 되는 첫 칸)
   2. 선 색 $`K`$가 주어졌을 때의 최소제곱 알파($`\sum_c (O_c - (aK_c + (1 - a)U_c))^2`$을 가장 작게 하는 $`a`$, 분모가 $`10^{-5}`$ 이하이면 0)
 
-     ```math
-     a(K)=\mathrm{clamp}\!\left(\frac{\sum_c (U_c-O_c)(U_c-K_c)}{\sum_c (U_c-K_c)^2}\right)
-     ```
+     $`\displaystyle a(K)=\mathrm{clamp}\!\left(\frac{\sum_c (U_c-O_c)(U_c-K_c)}{\sum_c (U_c-K_c)^2}\right)`$
 
   3. $`a(K^0) \ge 0.5`$인 픽셀에서 실제 선 색 $`K_c = \mathrm{clamp}((O_c - (1 - a)U_c)/a)`$를 구하고, 선 영역($`\mathrm{inMask}`$) 전체로 인페인팅해 부드러운 선 색 $`\tilde{K}`$를 얻습니다.
   4. $`\Delta E(\tilde{K}, K^0) \le 6`$이고 $`K^0`$로 합성한 잔차가 채널별 8/255 이하이면 선화(기본 선 색), 아니면 색 트레이스입니다.
   5. 색 트레이스 알파는 원본이 0~1 범위 안의 선 색으로 정확히 재현되는 **최소 알파** 이상으로 잡습니다.
 
-     ```math
-     a_{min}=\max_c\left\{\,1-\frac{O_c}{U_c}\ (U_c>0.004),\ \ \frac{O_c-U_c}{1-U_c}\ (O_c>U_c,\ U_c<0.996)\right\},\qquad a=\max(a(\tilde K),a_{min})
-     ```
+     $`\displaystyle a_{min}=\max_c\left\{\,1-\frac{O_c}{U_c}\ (U_c>0.004),\ \ \frac{O_c-U_c}{1-U_c}\ (O_c>U_c,\ U_c<0.996)\right\},\qquad a=\max(a(\tilde K),a_{min})`$
 
      그 픽셀의 색 트레이스 색은 $`K_c = \mathrm{clamp}((O_c - (1 - a)U_c)/a)`$입니다. $`1 - O_c/U_c`$는 선 색이 0 아래로 내려가지 않을 최소 알파, $`(O_c - U_c)/(1 - U_c)`$는 1 위로 올라가지 않을 최소 알파입니다.
   6. 색 트레이스 픽셀의 알파 합이 전체 선 알파 합의 0.3% 미만이면 색 트레이스 층을 만들지 않고, 그 픽셀들도 $`a(K^0)`$와 $`K^0`$로 선화 한 장에 둡니다.
@@ -753,9 +743,7 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
    하나라도 선명한 선이면 선명한 선 길이 $`k`$에도 1을 더합니다.
 4. **색 분포**: Lab을 $`13 \times 32 \times 32`$칸($`\lfloor L/8\rfloor`$, $`\lfloor(a + 128)/8\rfloor`$, $`\lfloor(b + 128)/8\rfloor`$, 범위 밖은 끝 칸)으로 세고, 이웃 $`3 \times 3 \times 3`$칸을 합쳐 부드럽게 한 뒤 정규화합니다.
 
-   ```math
-   p(i)=\frac{\tilde h(i)}{\sum_j \tilde h(j)},\qquad \tilde h(l,a,b)=\sum_{|\delta_l|,|\delta_a|,|\delta_b|\le1}h(l+\delta_l,\,a+\delta_a,\,b+\delta_b)
-   ```
+   $`\displaystyle p(i)=\frac{\tilde h(i)}{\sum_j \tilde h(j)},\qquad \tilde h(l,a,b)=\sum_{|\delta_l|,|\delta_a|,|\delta_b|\le1}h(l+\delta_l,\,a+\delta_a,\,b+\delta_b)`$
 
 5. **초기값**: 배경 $`B^0 = \{\beta_r > 0.5\} \cup \{F_r > 0 \land \rho_r < 1\}`$, 캐릭터 핵심 $`F^0 = \{\rho_r > 3 \land F_r = 0\} \setminus B^0`$.
    $`F^0`$는 아래 겹침 검사에만 쓰고, 첫 번째 컷의 캐릭터 분포는 $`B^0`$ 밖의 모든 영역에서 배웁니다.
@@ -764,23 +752,14 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
    - 기존 배경이 위 · 왼쪽 · 오른쪽 테두리의 90% 이상을 덮으면 하지 않습니다.
 7. **에너지**: 캐릭터를 1, 배경을 0으로 둔 라벨 $`x_r`$에 대해
 
-   ```math
-   E(x)=\sum_r \theta_r\,[x_r=0]\;+\;\sum_{(r,q)} w_{rq}\,[x_r\ne x_q]
-   ```
+   $`\displaystyle E(x)=\sum_r \theta_r\,[x_r=0]\;+\;\sum_{(r,q)} w_{rq}\,[x_r\ne x_q]`$
 
-   ```math
-   \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}}
-   +A_r\,\mathrm{clip}_{[0,2]}\ln\frac{\max(\rho_r,\,10^{-3})}{2}
-   -A_r\,\beta_r-20F_r
-   +A_r\,\mathrm{clip}_{[0,2]}\frac{\kappa_r-0.3}{0.15}
-   ```
+   $`\displaystyle \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}} +A_r\,\mathrm{clip}_{[0,2]}\ln\frac{\max(\rho_r,\,10^{-3})}{2} -A_r\,\beta_r-20F_r +A_r\,\mathrm{clip}_{[0,2]}\frac{\kappa_r-0.3}{0.15}`$
 
    첫째 항은 색, 둘째 항은 선명한 선 밀도가 $`2\tau_c`$(선명한 선 위 밀도 중앙값의 절반)를 넘는 정도($`\rho_r = 2e^2 \approx 14.8`$에서 최대 2),
    셋째 · 넷째 항은 기존 배경과 테두리, 다섯째 항은 선명한 선으로 둘러싸인 정도($`\kappa_r`$ 30%에서 0, 60%에서 2)입니다.
 
-   ```math
-   w_{rq}=8\,o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{2\cdot 12^2}\right)+0.3\,l
-   ```
+   $`\displaystyle w_{rq}=8\,o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{2\cdot 12^2}\right)+0.3\,l`$
 
    $`\theta_r > 0`$이면 캐릭터 쪽 비용입니다. $`\beta_r > 0.5`$인 영역은 배경으로 고정($`\theta = -\infty`$), 평균 $`L^* < 30`$이고 $`C^* < 12`$인 영역(검정에 가까운 무채색)과
    영역 평균 $`\bar{\varepsilon}_r \ge 0.9`$인 영역(선으로 둘러싸인 곳)은 캐릭터로 고정($`\theta = +\infty`$)합니다.
@@ -799,9 +778,7 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
 3. **색 로그 우도비**: Lab을 $`10 \times 16 \times 16 = 2560`$칸($`\lfloor L/10\rfloor`$, $`\lfloor(a + 128)/16\rfloor`$, $`\lfloor(b + 128)/16\rfloor`$, 범위 밖은 끝 칸)으로 세어, 캐릭터(배경이 아닌 $`\mathrm{known}`$, $`n_C`$개) 분포 $`h_C`$와
    배경($`\mathrm{known}`$, $`n_B`$개) 분포 $`h_B`$에서 조각 자신 $`h_k`$를 뺀 분포를 비교합니다(칸마다 1을 더하는 라플라스 평활, $`n_B - \lvert k\rvert`$는 1 이상으로).
 
-   ```math
-   \bar\ell_k=\frac1{|k|}\sum_{p\in k,\,known}\mathrm{clip}_{[-4,4]}\ln\frac{(h_C(c_p)+1)/(n_C+2560)}{(h_B(c_p)-h_k(c_p)+1)/(n_B-|k|+2560)}
-   ```
+   $`\displaystyle \bar\ell_k=\frac1{|k|}\sum_{p\in k,\,known}\mathrm{clip}_{[-4,4]}\ln\frac{(h_C(c_p)+1)/(n_C+2560)}{(h_B(c_p)-h_k(c_p)+1)/(n_B-|k|+2560)}`$
 
 4. **조건**: 넓이가 전체의 0.1% 이상, 위 · 왼쪽 · 오른쪽 테두리에 닿지 않음, 캐릭터와 맞닿은 길이가 전체 맞닿은 길이의 0.8배 이상, $`\bar{\ell}_k \ge 0.8`$.
 5. 고른 조각과, 그 조각 쪽 경계 · 선 띠, 캐릭터 쪽 경계 띠(3px까지)를 배경에서 뺍니다.
@@ -816,14 +793,9 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
 
 1. **눈 후보**: $`\ell = L^*/100`$을 상자 흐림 3회(반지름 $`\rho \in \{1, 2, 3, 4, 5, 7, 9, 12, 15, 20\}`$, $`\sigma^2 = \rho^2 + \rho`$: 4.2의 상자 흐림 분산식을 거꾸로 푼 값)로 흐리고 2차 차분으로 헤세 행렬을 구해,
 
-   ```math
-   L_{xx}=\ell_{x-1,y}-2\ell_{x,y}+\ell_{x+1,y},\quad L_{yy}=\ell_{x,y-1}-2\ell_{x,y}+\ell_{x,y+1},\quad
-   L_{xy}=\tfrac14\left(\ell_{x+1,y+1}-\ell_{x-1,y+1}-\ell_{x+1,y-1}+\ell_{x-1,y-1}\right)
-   ```
+   $`\displaystyle L_{xx}=\ell_{x-1,y}-2\ell_{x,y}+\ell_{x+1,y},\quad L_{yy}=\ell_{x,y-1}-2\ell_{x,y}+\ell_{x,y+1},\quad L_{xy}=\tfrac14\left(\ell_{x+1,y+1}-\ell_{x-1,y+1}-\ell_{x+1,y-1}+\ell_{x-1,y-1}\right)`$
 
-   ```math
-   D_\sigma=\sigma^4\left(L_{xx}L_{yy}-L_{xy}^2\right)\quad(L_{xx}+L_{yy}>0)
-   ```
+   $`\displaystyle D_\sigma=\sigma^4\left(L_{xx}L_{yy}-L_{xy}^2\right)\quad(L_{xx}+L_{yy}>0)`$
 
    헤세 행렬식이 양수이면 둥근 덩어리이고, $`L_{xx} + L_{yy} > 0`$(가운데가 둘레보다 어두움)인 것만 봅니다. $`\sigma^4`$는 크기가 달라도 값을 견줄 수 있게 하는 크기 정규화입니다.
    이웃한 두 크기와 5×5 안에서 가장 크고 $`D > 0.004`$인 점을 반지름 $`r = 1.414\sigma`$의 후보로, 큰 순서로 3000개까지 둡니다.
@@ -835,10 +807,7 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
    둘 다 아니면 $`\varphi = 0`$ 하나이고 0.36과 같습니다.
 3. **얼굴 틀**: 두 눈 가운데를 원점, 눈 방향을 $`u`$, 그에 수직인 아래 방향을 $`v`$로 두고 $`d`$를 단위로 격자 표본(쌍선형 보간, 그림 밖은 가장자리로)을 잽니다.
 
-   ```math
-   \mathbf c=\tfrac12(\mathbf a+\mathbf b),\quad d=|\mathbf b-\mathbf a|,\quad \mathbf e=\frac{\mathbf b-\mathbf a}{d},\quad \mathbf f=\pm(-e_y,\,e_x)\ (f_y\ge0),\qquad
-   \mathbf x(u,v)=\mathbf c+d\,(u\,\mathbf e+v\,\mathbf f)
-   ```
+   $`\displaystyle \mathbf c=\tfrac12(\mathbf a+\mathbf b),\quad d=|\mathbf b-\mathbf a|,\quad \mathbf e=\frac{\mathbf b-\mathbf a}{d},\quad \mathbf f=\pm(-e_y,\,e_x)\ (f_y\ge0),\qquad \mathbf x(u,v)=\mathbf c+d\,(u\,\mathbf e+v\,\mathbf f)`$
 
    거꾸로 픽셀 $`x`$의 틀 좌표는 $`u = (x - c)\cdot e / d`$, $`v = (x - c)\cdot f / d`$입니다. 기울기는 $`t = \lvert b_y - a_y\rvert/ \max(\lvert b_x - a_x\rvert, 10^{-6})`$입니다.
    격자는 범위 양 끝을 포함해 고르게 나눈 $`n_u \times n_v`$점입니다.
@@ -921,9 +890,7 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
 2. **조각**: 딸려 들어간 캐릭터 부분과 같은 방법(선명한 경계 $`\Delta E \ge 20`$, 선)으로 지금의 배경을 조각 $`k`$로 나눕니다.
 3. **색이 드묾**: 위 · 왼쪽 · 오른쪽 테두리에 닿은 조각들의 픽셀 $`n_B`$개로 센 색 분포 $`h_B`$(Lab $`10 \times 16 \times 16 = 2560`$칸)에서, 테두리에 닿지 않은 조각 $`k`$마다
 
-   ```math
-   \nu_k=\sum_{p\in k}\mathrm{clip}_{[-4,4]}\ln\frac{1/2560}{(h_B(c_p)+1)/(n_B+2560)}
-   ```
+   $`\displaystyle \nu_k=\sum_{p\in k}\mathrm{clip}_{[-4,4]}\ln\frac{1/2560}{(h_B(c_p)+1)/(n_B+2560)}`$
 
    분자는 균등 분포, 분모는 테두리 쪽 배경 분포(라플라스 평활)라, 색이 균등 분포보다 테두리 쪽 배경에서 드물수록 양수로 커집니다.
 4. **되돌리기**: 넓이의 절반 이상이 삼켜진 얼굴 중 하나의 머리 타원이나 몸 기둥(얼굴 기준 넓히기의 자리 확률과 같은 모양)에 들고,
@@ -945,29 +912,20 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
 0. **배경이 거의 한 색이면 하지 않기**: 지금까지 찾은 배경 픽셀 $`n_b`$개(100개 미만이면 평평도 0)에서 픽셀 순서대로 $`t = \max(1, \lfloor n_b / 20000\rfloor)`$개마다 하나씩 뽑아
    원본 Lab $`(L_i, a_i, b_i)`$의 채널별 중앙값 $`(m_L, m_a, m_b)`$(정렬한 $`n`$개 중 $`\lfloor n/2\rfloor`$번째, 0부터)을 구합니다.
 
-   ```math
-   \mathrm{flat}=\frac{1}{n}\left|\left\{\,i:(L_i-m_L)^2+(a_i-m_a)^2+(b_i-m_b)^2<10^2\,\right\}\right|
-   ```
+   $`\displaystyle \mathrm{flat}=\frac{1}{n}\left|\left\{\,i:(L_i-m_L)^2+(a_i-m_a)^2+(b_i-m_b)^2<10^2\,\right\}\right|`$
 
    $`\mathrm{flat} \ge 0.6`$이면(흰 배경 · 단색 배경) 이 단계를 하지 않습니다. 666장에서 얼굴 단계 전의 배경으로 재면 흰 · 단색 배경 211장 중 171장(81%)이 0.6 이상이고,
    선이나 칠로 그린 장면 배경은 173장 중 13장(8%)만 0.6 이상입니다(11).
 1. 색 모델과 같은 영역 그래프(24색 영역, 맞닿은 길이 $`o, l`$, 색 분포)를 씁니다. 두 단계가 한 번 만든 그래프를 같이 씁니다.
 2. **자리 확률**(캐릭터일 확률) $`\pi(p)`$: 얼굴마다 원래 해상도의 $`(u, v)`$에서
 
-   ```math
-   \pi_f=\begin{cases}0.9 & -1.2\le v\le 8,\ |u|\le 1.2+0.35\max(v-1.5,\,0)\quad(\text{몸})\\
-   0.85 & (u/2.2)^2+((v+0.3)/2)^2\le 1\quad(\text{머리})\\
-   0.45 & \text{그 밖}\end{cases},\qquad \pi(p)=\max_f \pi_f(p)
-   ```
+   $`\displaystyle \pi_f=\begin{cases}0.9 & -1.2\le v\le 8,\ |u|\le 1.2+0.35\max(v-1.5,\,0)\quad(\text{몸})\\ 0.85 & (u/2.2)^2+((v+0.3)/2)^2\le 1\quad(\text{머리})\\ 0.45 & \text{그 밖}\end{cases},\qquad \pi(p)=\max_f \pi_f(p)`$
 
    영역 평균을 $`\bar{\pi}_r`$로 둡니다. 자리 항의 로그 오즈는 $`\ln(0.9/0.1) = 2.197`$, $`\ln(0.85/0.15) = 1.735`$, $`\ln(0.45/0.55) = -0.201`$입니다.
 3. **처음 나누기**: 캐릭터는 $`\bar{\pi}_r \ge 0.8 \land \beta_r < 0.5`$인 영역(머리 · 몸 자리), 배경은 $`\beta_r > 0.5`$인 영역(기존 배경)입니다. 그다음부터는 앞 컷의 결과(캐릭터 / 나머지 전부)로 배웁니다.
 4. **에너지**와 최소 컷(색 모델과 같은 Dinic)을 4번 되풀이하며 색 분포를 다시 배웁니다.
 
-   ```math
-   \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}}+\sum_{p\in r}\ln\frac{\pi(p)}{1-\pi(p)}-2A_r\beta_r,\qquad
-   w_{rq}=o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{288}\right)+0.0375\,l
-   ```
+   $`\displaystyle \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}}+\sum_{p\in r}\ln\frac{\pi(p)}{1-\pi(p)}-2A_r\beta_r,\qquad w_{rq}=o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{288}\right)+0.0375\,l`$
 
 5. **확실한 곳만**: 배경 쪽이 된 영역 중 색 항의 평균($`\mathrm{known}`$ 픽셀당)이 $`-1`$ 미만이고 $`\bar{\pi}_r \le 0.5`$인 영역이 후보입니다(되돌린 캐릭터 부분이 넓이의 절반을 넘는 영역과 $`\bar{\varepsilon}_r \ge 0.9`$인 영역은 빼고).
    기존 배경($`\beta_r > 0.5`$)에서 출발해 $`o \ge 0.5(o + l)`$인 경계만 건너 후보 안으로 이어진 영역의 픽셀을 배경에 더합니다
@@ -982,22 +940,16 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
    얼굴 기준 넓히기의 0과 같은 식으로 평평도 $`\mathrm{flat}`$(중앙값에서 $`\Delta E`$ 10 안인 비율)을 잽니다. $`\mathrm{flat} < 0.6`$이면 하지 않습니다(장면 배경은 틈으로 보이는 곳의 색도 제각각이라 이 규칙으로 가를 수 없음).
 2. **후보**: 배경이 아닌 칠한 픽셀 중 배경 대표색과 거의 같은 색인 픽셀(되돌린 캐릭터 부분은 빼고)을 4-연결 조각 $`r`$로 나눕니다.
 
-   ```math
-   (L_p-m_L)^2+(a_p-m_a)^2+(b_p-m_b)^2\le 5^2
-   ```
+   $`\displaystyle (L_p-m_L)^2+(a_p-m_a)^2+(b_p-m_b)^2\le 5^2`$
 
 3. **조각 조건**: 조각 밖의 8-이웃 중 후보가 아닌 픽셀을 둘레 $`R_r`$, 그중 배경이 아닌 칠한 픽셀을 $`R^c_r`$라 할 때
 
-   ```math
-   30\le A_r\le 0.02N,\qquad |R^c_r|\le 0.1\,|R_r|,\qquad \forall p\in r,\ \forall f:\ (u/2.2)^2+((v+0.3)/2)^2>1
-   ```
+   $`\displaystyle 30\le A_r\le 0.02N,\qquad |R^c_r|\le 0.1\,|R_r|,\qquad \forall p\in r,\ \forall f:\ (u/2.2)^2+((v+0.3)/2)^2>1`$
 
    둘레가 거의 선과 배경뿐이고(다른 색 칠에 닿은 흰 옷 · 흰 머리카락은 대개 그림자 · 음영에 닿아 있음), 얼굴의 머리 타원(배경 판정에 쓰는 얼굴) 밖이어야 합니다(흰자위 · 이).
 4. **그림 조건**: 조건에 맞는 조각의 넓이 합이 캐릭터 쪽 칠한 픽셀 수 $`n_c`$의 5% 이하일 때만 그 조각을 모두 배경에 더합니다.
 
-   ```math
-   \sum_{r\ \text{조건 만족}} A_r\le 0.05\,n_c
-   ```
+   $`\displaystyle \sum_{r\ \text{조건 만족}} A_r\le 0.05\,n_c`$
 
    흰 배경 위의 흰 옷, 흰 칠 흑백 선화처럼 캐릭터 자체가 배경색인 그림은 합이 커서 걸러집니다. 두 문턱(0.05 · 0.02)과 평평도 0.6은 조각을 느슨하게 모은 판(합 제한 없음, 조각 5%)이
    바꾼 161장을 하나씩 보고 정했습니다(11). 보낸 픽셀은 틈 지도로 따로 기억해 영역 · 톤 채우기(4.6)에 씁니다.
@@ -1096,18 +1048,12 @@ D_a=G_\sigma(\mathbb{1}_{line}),\quad D_c=G_\sigma(\mathbb{1}_{crisp}),\quad D_s
   톤 지도는 그대로이므로 배경 · 캐릭터 판정은 바뀌지 않습니다.
 - **그림자 톤**: 그림자 판정 기준 $`\eta_s`$(기본 0.5)에 대해(밑색이 아닌 톤, $`\mathrm{lum}(F) > 0.01`$)
 
-  ```math
-  \frac{\mathrm{lum}(\bar t)}{\mathrm{lum}(F)}<0.86+0.12\,\eta_s
-  \quad\Rightarrow\quad g_c=\min\!\left(1,\frac{t^{up}_c}{F_c}\right)\quad(F_c\le0.004\text{이면 }g_c=1)
-  ```
+  $`\displaystyle \frac{\mathrm{lum}(\bar t)}{\mathrm{lum}(F)}<0.86+0.12\,\eta_s \quad\Rightarrow\quad g_c=\min\!\left(1,\frac{t^{up}_c}{F_c}\right)\quad(F_c\le0.004\text{이면 }g_c=1)`$
 
   $`g`$가 그 톤의 곱하기 색입니다. 밝은 쪽 평균으로 나누는 것은, 톤 안의 더 어두운 픽셀을 명암 층(4.10)에 남기기 위해서입니다.
 - **1차 / 2차**: 파츠의 그림자 톤($`g_c < 0.998`$인 채널이 있는 톤)을 $`\mathrm{lum}(g)`$ 내림차순으로 놓고, 처음과 끝의 차이가 0.07 이상이고 이웃 사이 가장 큰 틈이 0.04 이상이면 거기서 나눕니다.
 
-  ```math
-  sh^1_c=q_8\!\left(\frac{\sum_{t\in\text{1차}}n_t\,g_{t,c}}{\sum_{t\in\text{1차}}n_t}\right),\qquad
-  sh^2_c=q_8\!\left(\frac{\sum_{t\in\text{2차}}n_t\min\!\big(1,\ g_{t,c}/\max(sh^1_c,10^{-3})\big)}{\sum_{t\in\text{2차}}n_t}\right),\qquad q_8(x)=\frac{\mathrm{round}(255\,\mathrm{clamp}(x))}{255}
-  ```
+  $`\displaystyle sh^1_c=q_8\!\left(\frac{\sum_{t\in\text{1차}}n_t\,g_{t,c}}{\sum_{t\in\text{1차}}n_t}\right),\qquad sh^2_c=q_8\!\left(\frac{\sum_{t\in\text{2차}}n_t\min\!\big(1,\ g_{t,c}/\max(sh^1_c,10^{-3})\big)}{\sum_{t\in\text{2차}}n_t}\right),\qquad q_8(x)=\frac{\mathrm{round}(255\,\mathrm{clamp}(x))}{255}`$
 
   $`n_t`$는 톤의 넓이(최소 1)입니다.
 - **하이라이트**: 그림자가 아닌 톤 중 $`\mathrm{lum}(F) < 0.995`$이고 $`1 - (1 - \mathrm{lum}(t^{lo}))/(1 - \mathrm{lum}(F)) > 0.12`$(어두운 쪽조차 밑색보다 스크린으로 12% 넘게 밝음).
@@ -1181,9 +1127,7 @@ $`\mathrm{minPart} = \max(64, 0.0015N)`$. 처음에는 재질 하나가 파츠 �
    - "피부"는 따뜻한 색일 때만, "머리카락"은 옷 표시가 없을 때만 붙입니다. 이름은 피부 → 머리카락 → 눈 순서로 봅니다.
      밑색 $`(r, g, b)`$(0~1)에서 $`\mathrm{mx} = \max`$, $`\mathrm{mn} = \min`$일 때 따뜻한 색($`\mathrm{skinLike}`$)은
 
-     ```math
-     mx=r\ \wedge\ mx\ge0.55\ \wedge\ \big(mx-mn\ge0.07\,mx\ \vee\ \text{옅은 피부}\big)\ \wedge\ \big(g\ge b-0.02\ \vee\ b-g<0.35\,(r-\min(g,b))\big)
-     ```
+     $`\displaystyle mx=r\ \wedge\ mx\ge0.55\ \wedge\ \big(mx-mn\ge0.07\,mx\ \vee\ \text{옅은 피부}\big)\ \wedge\ \big(g\ge b-0.02\ \vee\ b-g<0.35\,(r-\min(g,b))\big)`$
 
      입니다(빨강 채널이 가장 밝음, 채도 7% 이상, 마지막 항은 분홍까지 받고 보라 · 파랑은 뺌).
      **옅은 피부**($`\mathrm{mx} \ge 0.85`$, $`\mathrm{mx} - \mathrm{mn} \ge 0.025\mathrm{mx}`$)는 파츠 넓이가 $`12 d_\max^2`$(가장 큰 캐릭터 얼굴의 $`d`$) 이하이고 $`0.13N`$ 이하일 때만 "피부"라고 부릅니다.
@@ -1274,9 +1218,7 @@ a=S\,w,\qquad S'=\mathrm{clamp}\!\left(1-\frac{1-S}{1-a}\right)\quad(a\ge0.9999\
   배경도 투명한 곳도 없는 그림은 실루엣이 없어 림라이트를 만들지 않습니다.
 - $`\bar{O}`$는 가장자리보다 안쪽($`e > R_r`$) 밝아짐의 지역 평균입니다. $`m`$ = (캐릭터이고 $`e > R_r`$)의 표시일 때
 
-  ```math
-  \bar O=\begin{cases}\dfrac{G_{1.5R_r}(m\,S_{max})}{G_{1.5R_r}(m)} & G_{1.5R_r}(m)>0.02\\[4pt] 0 & \text{otherwise}\end{cases}
-  ```
+  $`\displaystyle \bar O=\begin{cases}\dfrac{G_{1.5R_r}(m\,S_{max})}{G_{1.5R_r}(m)} & G_{1.5R_r}(m)>0.02\\[4pt] 0 & \text{otherwise}\end{cases}`$
 
   가장자리에서만 밝으면($`S_\max \gg \bar{O}`$) 림라이트, 안쪽도 비슷하게 밝으면 넓은 빛입니다.
 - $`T = \mathrm{lum}(U) - \mathrm{open}(\mathrm{lum}(U))`$(화이트 탑햇, $`\mathrm{open}`$ = 반지름 $`r_s`$의 침식 뒤 팽창): 반짝임 크기보다 가는 밝은 구조만 남습니다.
@@ -1339,9 +1281,7 @@ $`n`$은 불투명 픽셀(알파 $`> 0.98`$) 수입니다. $`\mathrm{MSE} \le 10
      선화가 있는지는 $`\text{선 알파} \ge 0.25`$인 픽셀 수 $`\ge 0.03 \times \max(1, \text{캐릭터 칠 픽셀 수})`$로 정합니다.
    - 배경은 밝기 $`\mathrm{lum}(U)`$를 $`\sigma = 1.5 \cdot \max(1, s)`$로 흐린 뒤 소벨 기울기, 기울기 방향 최대만 남기기, 히스테리시스($`0.045 / 0.02`$)로 한 줄짜리 윤곽을 찾아 더합니다(캐니 방식).
 
-     ```math
-     g_x=\tfrac18\big(\ell_{x+1,y-1}+2\ell_{x+1,y}+\ell_{x+1,y+1}-\ell_{x-1,y-1}-2\ell_{x-1,y}-\ell_{x-1,y+1}\big),\quad g_y=(\text{세로로 같게}),\quad |g|=\sqrt{g_x^2+g_y^2}
-     ```
+     $`\displaystyle g_x=\tfrac18\big(\ell_{x+1,y-1}+2\ell_{x+1,y}+\ell_{x+1,y+1}-\ell_{x-1,y-1}-2\ell_{x-1,y}-\ell_{x-1,y+1}\big),\quad g_y=(\text{세로로 같게}),\quad |g|=\sqrt{g_x^2+g_y^2}`$
 
      방향 $`\theta = \mathrm{atan2}(g_y, g_x) \bmod 180^\circ`$를 네 방향($`< 22.5^\circ\ \text{또는}\ \ge 157.5^\circ`$ 가로, $`< 67.5^\circ`$ 대각선 ↘, $`< 112.5^\circ`$ 세로, 그 밖 대각선 ↙)으로 묶어,
      그 방향 앞뒤 두 이웃보다 작지 않은 배경 픽셀만 남깁니다. $`\lvert g\rvert \ge 0.045`$인 점에서 출발해 $`\lvert g\rvert \ge 0.02`$인 8-이웃 점으로 잇습니다.
@@ -1354,9 +1294,7 @@ $`n`$은 불투명 픽셀(알파 $`> 0.98`$) 수입니다. $`\mathrm{MSE} \le 10
 3. **부스러기 빼기**: 두꺼운 면을 채운 재료 중 중심선에서 5×5(2px) 안에 닿는 픽셀에서 출발해 4-이웃으로 이어진 조각만 남깁니다($`\mathrm{keep}`$).
 4. **획의 바탕**:
 
-   ```math
-   b=\max\Big(\min\big(1,\;1.4\,G_{1.2}(\ell)\big),\;0.6\,\min\big(1,\;\sqrt{2\pi}\,\sigma_k\cdot 1.2\;G_{\sigma_k}(k)\big)\Big),\qquad \ell=\mathbb{1}_{keep}\max(\alpha_{line},\,0.5\,B),\quad \sigma_k=0.9\max(1,s)
-   ```
+   $`\displaystyle b=\max\Big(\min\big(1,\;1.4\,G_{1.2}(\ell)\big),\;0.6\,\min\big(1,\;\sqrt{2\pi}\,\sigma_k\cdot 1.2\;G_{\sigma_k}(k)\big)\Big),\qquad \ell=\mathbb{1}_{keep}\max(\alpha_{line},\,0.5\,B),\quad \sigma_k=0.9\max(1,s)`$
 
    첫째 항은 원래 선의 굵기 · 진하기를 따르는 부드러운 획, 둘째 항은 중심선 $`k`$를 따라 최소 진하기(0.6)를 보장하는 바닥입니다.
    1px 선을 $`\sigma`$로 흐리면 가운데 값이 $`1/(\sqrt{2\pi}\sigma)`$가 되므로, $`\sqrt{2\pi}\sigma_k \cdot 1.2`$를 곱하면 중심선 위가 약 1.2가 되어 $`\min(1, \cdot)`$에서 1이 됩니다.
@@ -1364,9 +1302,7 @@ $`n`$은 불투명 픽셀(알파 $`> 0.98`$) 수입니다. $`\mathrm{MSE} \le 10
 5. **세 번 겹쳐 그리기**: $`j = 0, 1, 2`$에 대해 칸 크기 $`(35 + 25j) \cdot \max(1, s) / f`$, 변위 $`(2 + 1.6j) \cdot \max(1, s) / f`$인 값 잡음 두 장($`n_x`$, $`n_y`$)으로 $`b`$를 비틀어
    가중치 $`\omega_j = 0.85 \cdot 0.55 \cdot 0.4`$로 스크린 합성합니다($`v_0 = 0`$).
 
-   ```math
-   v_{j+1}(x,y)=1-\big(1-v_j(x,y)\big)\Big(1-\omega_j\,b\big(x+\mathrm{amp}_j\,n_x(x,y),\ y+\mathrm{amp}_j\,n_y(x,y)\big)\Big)
-   ```
+   $`\displaystyle v_{j+1}(x,y)=1-\big(1-v_j(x,y)\big)\Big(1-\omega_j\,b\big(x+\mathrm{amp}_j\,n_x(x,y),\ y+\mathrm{amp}_j\,n_y(x,y)\big)\Big)`$
 
    ($`b`$는 쌍선형 보간, 그림 밖은 0.) 절반 해상도였으면 $`((x + 0.5)/2 - 0.5, (y + 0.5)/2 - 0.5)`$에서 쌍선형 보간해 원래 크기로 되돌립니다.
 6. **알파**: $`a = \mathrm{smoothstep}(0.1, 0.65, v \cdot(0.82 + 0.18\xi))`$($`\xi`$는 픽셀마다 새 난수, 연필 결). $`a < 0.02`$인 픽셀은 비우고, 8비트 알파는 $`\mathrm{round}(255a)`$입니다.
@@ -1955,11 +1891,7 @@ h_2\leftarrow (h_2\oplus v_i)\cdot 2246822519+i,\quad h_2^{(0)}=\mathtt{0x9747b2
 - **픽셀 정답과의 비교**: 프로그램이 캐릭터 쪽으로 둔 픽셀 $`C`$, 정답 캐릭터 $`G`$, 정답의 경계에서 3px 띠를 뺀 곳 $`I`$(윤곽을 그린 실제 그림은 정답을 3번 넓힌 것과 3번 좁힌 것의 차,
   합성 그림은 정답 지도가 바뀌는 곳을 3번 넓힌 것을 뺌. 합성 그림의 배경 정답에서는 글로우 자리도 뺌)일 때
 
-  ```math
-  \mathrm{IoU}=\frac{|C\cap G|}{|C\cup G|},\qquad
-  \text{지킨 캐릭터}=\frac{|C\cap G\cap I|}{|G\cap I|},\qquad
-  \text{찾은 배경}=\frac{|\bar C\cap\bar G\cap I|}{|\bar G\cap I|}
-  ```
+  $`\displaystyle \mathrm{IoU}=\frac{|C\cap G|}{|C\cup G|},\qquad \text{지킨 캐릭터}=\frac{|C\cap G\cap I|}{|G\cap I|},\qquad \text{찾은 배경}=\frac{|\bar C\cap\bar G\cap I|}{|\bar G\cap I|}`$
 
   "픽셀 합계"는 여러 그림의 분자 · 분모를 각각 더해 나눈 값, "평균"은 그림별 값의 평균입니다. "24색 영역 단위, 넓이 가중"은 픽셀 대신 색 모델의 영역을 넓이로 가중해 센 값입니다.
 - **정밀도 · 재현율**: 찾은 것 $`P`$, 정답 $`T`$일 때 정밀도 $`\lvert P \cap T\rvert/ \lvert P\rvert`$, 재현율 $`\lvert P \cap T\rvert/ \lvert T\rvert`$입니다. 선은 정답 선에서 1px 안이면 맞은 것으로, 이름은 재질 경계 3px 띠를 빼고 픽셀로 셉니다.
@@ -1967,24 +1899,17 @@ h_2\leftarrow (h_2\oplus v_i)\cdot 2246822519+i,\quad h_2^{(0)}=\mathtt{0x9747b2
 - **덮음 · 순도**(붓 그림 밑색): 재질 $`m`$마다 가장 많이 차지한 파츠의 비율 $`\max_k \lvert m \cap k\rvert/ \lvert m\rvert`$(덮음), 파츠 $`k`$마다 가장 많은 재질의 비율 $`\max_m \lvert m \cap k\rvert/ \lvert k\rvert`$(순도)의 평균입니다.
 - **색감**(시험 그림의 색채도, Hasler–Süsstrunk): 긴 변 300px로 줄인 그림의 0~255 값에서 $`\mathrm{rg} = R - G`$, $`\mathrm{yb} = (R + G)/2 - B`$일 때
 
-  ```math
-  M=\sqrt{\sigma_{rg}^2+\sigma_{yb}^2}+0.3\sqrt{\mu_{rg}^2+\mu_{yb}^2}
-  ```
+  $`\displaystyle M=\sqrt{\sigma_{rg}^2+\sigma_{yb}^2}+0.3\sqrt{\mu_{rg}^2+\mu_{yb}^2}`$
 
   더한 픽시브 342장의 $`M`$을 세 등분한 경계(33.4, 52.2)로 단조로움 · 중간 · 컬러풀을 나눴습니다.
 - **비율의 흩어짐**: $`n`$장 중 $`k`$장이 통과하면 $`p = k/n`$, 그림 단위 표준편차 $`\sqrt{p(1 - p)}`$, 표준오차 $`\mathrm{SE} = \sqrt{p(1 - p)/n}`$, 오차범위 $`z \cdot \mathrm{SE}`$($`z`$는 90 · 95 · 99%에서 1.645 · 1.960 · 2.576)입니다.
 - **윌슨 점수 구간**:
 
-  ```math
-  \frac{p+\frac{z^2}{2n}}{1+\frac{z^2}{n}}\ \pm\ \frac{z}{1+\frac{z^2}{n}}\sqrt{\frac{p(1-p)}{n}+\frac{z^2}{4n^2}}
-  ```
+  $`\displaystyle \frac{p+\frac{z^2}{2n}}{1+\frac{z^2}{n}}\ \pm\ \frac{z}{1+\frac{z^2}{n}}\sqrt{\frac{p(1-p)}{n}+\frac{z^2}{4n^2}}`$
 
 - **클로퍼–피어슨 정확 구간**(신뢰수준 $`1 - \alpha`$): 이항 분포를 뒤집은 구간이라 정규 근사보다 넓고, 실제 포함 확률이 $`1 - \alpha`$ 아래로 내려가지 않습니다. $`B(q; a, b)`$는 베타 분포의 $`q`$ 분위수입니다.
 
-  ```math
-  p_L=B\!\left(\tfrac{\alpha}{2};\,k,\,n-k+1\right)\ (k=0\text{이면 }0),\qquad
-  p_U=B\!\left(1-\tfrac{\alpha}{2};\,k+1,\,n-k\right)\ (k=n\text{이면 }1)
-  ```
+  $`\displaystyle p_L=B\!\left(\tfrac{\alpha}{2};\,k,\,n-k+1\right)\ (k=0\text{이면 }0),\qquad p_U=B\!\left(1-\tfrac{\alpha}{2};\,k+1,\,n-k\right)\ (k=n\text{이면 }1)`$
 
   **한쪽 95% 하한**은 $`B(0.05; k, n - k + 1)`$, **본페로니**는 세 기준을 함께 볼 때 전체 95%가 되도록 기준마다 $`1 - 0.05/3 \approx 98.3\%`$ 구간을 씁니다.
 - **평균의 $`t`$ 구간**: 그림별 값 $`x_1 \dots x_n`$의 평균 $`\bar{x}`$, 표본 표준편차 $`s = \sqrt{\sum(x_i - \bar{x})^2/(n - 1)}`$에서 $`\bar{x} \pm t_{n-1}(1 - \alpha/2) \cdot s/\sqrt{n}`$($`t_{n-1}(q)`$는 자유도 $`n - 1`$인 $`t`$ 분포의 $`q`$ 분위수, 100%를 넘으면 100%로)입니다.
@@ -1997,21 +1922,13 @@ h_2\leftarrow (h_2\oplus v_i)\cdot 2246822519+i,\quad h_2^{(0)}=\mathtt{0x9747b2
 - **두 비율의 차이 · 배율 · 오즈비**: 묶음 1이 $`n_1`$장 중 $`k_1`$장, 묶음 2가 $`n_2`$장 중 $`k_2`$장 통과하면 차이 $`p_1 - p_2`$의 95% 구간은 두 윌슨 구간 $`[l_1, u_1]`$, $`[l_2, u_2]`$를 합친 뉴컴 구간,
   배율 $`\mathrm{RR} = p_1/p_2`$와 오즈비 $`\mathrm{OR} = k_1(n_2 - k_2) / ((n_1 - k_1)k_2)`$의 구간은 로그 척도의 정규 근사입니다.
 
-  ```math
-  \bigl[(p_1-p_2)-\sqrt{(p_1-l_1)^2+(u_2-p_2)^2},\ (p_1-p_2)+\sqrt{(u_1-p_1)^2+(p_2-l_2)^2}\bigr]
-  ```
+  $`\displaystyle \bigl[(p_1-p_2)-\sqrt{(p_1-l_1)^2+(u_2-p_2)^2},\ (p_1-p_2)+\sqrt{(u_1-p_1)^2+(p_2-l_2)^2}\bigr]`$
 
-  ```math
-  \mathrm{RR}\cdot e^{\pm1.96\sqrt{\frac{1}{k_1}-\frac{1}{n_1}+\frac{1}{k_2}-\frac{1}{n_2}}},\qquad
-  \mathrm{OR}\cdot e^{\pm1.96\sqrt{\frac{1}{k_1}+\frac{1}{n_1-k_1}+\frac{1}{k_2}+\frac{1}{n_2-k_2}}}
-  ```
+  $`\displaystyle \mathrm{RR}\cdot e^{\pm1.96\sqrt{\frac{1}{k_1}-\frac{1}{n_1}+\frac{1}{k_2}-\frac{1}{n_2}}},\qquad \mathrm{OR}\cdot e^{\pm1.96\sqrt{\frac{1}{k_1}+\frac{1}{n_1-k_1}+\frac{1}{k_2}+\frac{1}{n_2-k_2}}}`$
 
 - **조건을 맞춘 비교(맨텔–헨젤)**: 그림을 한 조건의 값(예: 가림 없음 · 얼굴 가림 · 몸 가림)과 출처로 층 $`i`$로 나누고, 층마다 2×2 표 $`a_i, b_i, c_i, d_i`$(합 $`n_i`$)를 만들면
 
-  ```math
-  \mathrm{OR}_{MH}=\frac{\sum_i a_i d_i/n_i}{\sum_i b_i c_i/n_i},\qquad
-  \chi^2_{CMH}=\frac{\bigl(\bigl|\sum_i a_i-\sum_i E[a_i]\bigr|-0.5\bigr)^2}{\sum_i \mathrm{Var}(a_i)}
-  ```
+  $`\displaystyle \mathrm{OR}_{MH}=\frac{\sum_i a_i d_i/n_i}{\sum_i b_i c_i/n_i},\qquad \chi^2_{CMH}=\frac{\bigl(\bigl|\sum_i a_i-\sum_i E[a_i]\bigr|-0.5\bigr)^2}{\sum_i \mathrm{Var}(a_i)}`$
 
   이고, $`E[a_i] = (a_i + b_i)(a_i + c_i)/n_i`$, $`\mathrm{Var}(a_i) = (a_i + b_i)(c_i + d_i)(a_i + c_i)(b_i + d_i) / (n_i^2(n_i - 1))`$입니다(자유도 1). 오즈비의 구간은 로빈스–브레슬로–그린랜드 분산으로 구합니다.
   한 칸이 비어 표가 성립하지 않는 층은 뺍니다. 층 안에서는 조건이 같으므로, 조건의 차이 때문에 생긴 겉보기 차이를 걸러 냅니다.
