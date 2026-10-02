@@ -1060,6 +1060,66 @@ function detectSceneBg(U, known, lineMask, crisp, W, H, scale, fix, enc) {
   return area >= N * 0.02 && area <= N * 0.9 ? bg : null;
 }
 
+/* 장면 배경 속 섬 되돌리기(단색 배경이 있는 그림): 장면 배경 중 "배경 같은 픽셀"이 아닌 덩어리(4-이웃, 섬)가 위 · 옆 테두리(돌린 그림이면
+ * 아래 방향에 맞춘 테두리)에 닿지 않으면, 장면 배경이 단색 배경을 거쳐서만 그 자리에 들어간 것이다 — 선 없이 칠한 옷 · 다리 · 머리카락이
+ * 단색 배경 가장자리의 약한 경계를 넘어 장면 배경이 된 경우. 섬을 배경이 아닌 픽셀과 합친 덩어리(4-이웃)가 가장 큰 덩어리의 1/4 이상이거나
+ * 찾은 얼굴의 가운데를 품으면 캐릭터로 되돌린다. 캐릭터에서 떨어져 떠 있는 글자 · 문양 · 반짝이는 덩어리가 작아(가장 큰 덩어리의 4% 이하)
+ * 배경으로 남는다. faces() = 찾은 얼굴(필요할 때만 부른다). 결과: 되돌릴 픽셀(없으면 null) */
+function sceneIslands(scene, flat, bgLike, faces, W, H) {
+  const N = W * H, lab = new Int32Array(N).fill(-1), st = [], isl = [];
+  const nb = q => { const x = q % W; return [x > 0 ? q - 1 : -1, x < W - 1 ? q + 1 : -1, q >= W ? q - W : -1, q < N - W ? q + W : -1]; };
+  const upper = p => {                                 // 위 · 옆 테두리 픽셀인가(아래 테두리는 캐릭터가 잘려 닿는 곳이라 뺀다)
+    const x = p % W, y = (p - x) / W;
+    if (!(y === 0 || y === H - 1 || x === 0 || x === W - 1)) return false;
+    return IMG_DOWN ? !bottomSide(x, y, W, H) : y !== H - 1 || x === 0 || x === W - 1;
+  };
+  for (let s = 0; s < N; s++) {
+    if (!scene[s] || bgLike[s] || lab[s] >= 0) continue;
+    const comp = [];
+    let touch = false;
+    st.push(s); lab[s] = s;
+    while (st.length) {
+      const q = st.pop();
+      comp.push(q);
+      if (!touch && upper(q)) touch = true;
+      for (const r of nb(q)) if (r >= 0 && scene[r] && !bgLike[r] && lab[r] < 0) { lab[r] = s; st.push(r); }
+    }
+    if (!touch) isl.push(comp);
+  }
+  if (!isl.length) return null;
+  // 캐릭터 덩어리: 배경(단색 · 장면)이 아닌 픽셀 + 섬들
+  const body = new Uint8Array(N), cl = new Int32Array(N).fill(-1), size = [];
+  for (let p = 0; p < N; p++) body[p] = flat[p] || scene[p] ? 0 : 1;
+  for (const c of isl) for (const q of c) body[q] = 1;
+  let big = 0;
+  for (let s = 0; s < N; s++) {
+    if (!body[s] || cl[s] >= 0) continue;
+    const k = size.length;
+    let n = 0;
+    st.push(s); cl[s] = k;
+    while (st.length) {
+      const q = st.pop();
+      n++;
+      for (const r of nb(q)) if (r >= 0 && body[r] && cl[r] < 0) { cl[r] = k; st.push(r); }
+    }
+    size.push(n);
+    if (n > big) big = n;
+  }
+  const withFace = new Set();
+  for (const f of faces()) {
+    const fx = Math.round(f.cx), fy = Math.round(f.cy);
+    if (fx >= 0 && fy >= 0 && fx < W && fy < H && cl[fy * W + fx] >= 0) withFace.add(cl[fy * W + fx]);
+  }
+  let keep = null;
+  for (const c of isl) {
+    const k = cl[c[0]];
+    if (size[k] / big < 0.25 && !withFace.has(k)) continue;
+    if (!keep) keep = new Uint8Array(N);
+    for (const q of c) keep[q] = 1;
+  }
+  return keep;
+}
+
 /* 색 모델로 배경 넓히기(GrabCut 방식, 영역 단위 그래프 컷)
  * 선으로 그린 배경(불꽃놀이, 포장마차, 그래피티 …)은 선 밀도로는 캐릭터와 구분되지 않는다. 대신 그림마다
  * "이미 찾은 배경"과 "선이 촘촘한 캐릭터 핵심"의 색 분포를 배워, 색이 확연히 다른 그림에서만 배경을 넓힌다.
@@ -2481,6 +2541,11 @@ function process(img, opts, progress) {
       let scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, sceneFix, enc);
       if (!scene) { swal = null; sceneRaw = null; scene = detectSceneBg(U, known, lineMask, crisp, W, H, scale, sceneFix, null); }
       SCENE_BLOCK = null;
+      // 단색 배경을 거쳐서만 들어간 장면 배경 속 섬이 캐릭터 덩어리에 붙어 있으면 캐릭터로 되돌린다
+      if (scene && bgLike) {
+        const keep = sceneIslands(scene, bgMask, bgLike, allFaces, W, H);
+        if (keep) for (let p = 0; p < N; p++) if (keep[p]) { scene[p] = 0; if (sceneRaw) sceneRaw[p] = 0; }
+      }
       if (scene) { if (bgMask) for (let p = 0; p < N; p++) bgMask[p] |= scene[p]; else bgMask = scene; }
       // 선 없이 칠해 배경에 딸려 들어간 팔 · 손 · 소매(색 모델 단계 뒤에 캐릭터로 되돌린다).
       // 색 비교는 삼켜진 캐릭터를 되돌리기 전의 배경으로 한다(되돌린 부분이 캐릭터 색 분포를 바꿔 다른 조각의 판정이 흔들리지 않게)
