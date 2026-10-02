@@ -2979,6 +2979,29 @@ function process(img, opts, progress) {
   }
   let base = new Float64Array(nGroups * 3).fill(0.5);
   for (let t = 0; t < nT; t++) { const g = toneGroup[t]; if (baseTone[g] < 0) baseTone[g] = t; }
+  // 색 있는 재질(밑색 채도 12 이상)에서 가장 넓은 톤이 그림자이면 밑색은 빛을 받은 쪽이다(그림자 면이 더 넓게 칠해진 옷 · 망토 · 머리카락).
+  // 넓이가 가장 넓은 톤의 35% 이상이고, 지금 밑색이 그 톤에 곱하기로 만들 수 있는 색(어느 채널도 0.03 넘게 밝지 않고 밝기 비 0.45~0.93)이며,
+  // 색상이 30° 안 · 채도가 크게 빠지지 않은(0.8배 이상) 더 밝은 톤이 있으면 그중 가장 밝은 톤을 밑색으로 한다.
+  // 흰색 · 회색 재질은 옅은 쪽이 빛인지 다른 재질(흰 옷 옆 회색 머리카락)인지 가를 수 없어 그대로 둔다
+  {
+    const sat = t => { const r = tUp[t * 3], g = tUp[t * 3 + 1], b = tUp[t * 3 + 2], mx = Math.max(r, g, b); return mx > 1e-3 ? (mx - Math.min(r, g, b)) / mx : 0; };
+    for (let g = 0; g < nGroups; g++) {
+      const b0 = baseTone[g]; if (b0 < 0) continue;
+      const cb = lch([tUp[b0 * 3], tUp[b0 * 3 + 1], tUp[b0 * 3 + 2]]), lb = lumOf(tUp[b0 * 3], tUp[b0 * 3 + 1], tUp[b0 * 3 + 2]);
+      if (cb.C < 12) continue;
+      let best = -1, bestL = cb.L;
+      for (let t = 0; t < nT; t++) {
+        if (toneGroup[t] !== g || t === b0 || tCnt[t] < gMax[g] * 0.35) continue;
+        const ct = lch([tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2]]); if (ct.L <= bestL) continue;
+        let ok = true; for (let c = 0; c < 3; c++) if (tUp[b0 * 3 + c] > tUp[t * 3 + c] + 0.03) ok = false;
+        const r = lb / Math.max(1e-3, lumOf(tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2]));
+        if (!ok || r < 0.45 || r > 0.93) continue;
+        if (ct.C < 12 || hueDiff(cb.h, ct.h) >= 30 || sat(t) < 0.8 * sat(b0) - 0.02) continue;
+        best = t; bestL = ct.L;
+      }
+      if (best >= 0) baseTone[g] = best;
+    }
+  }
   // 선으로 나뉜 같은 재질(예: 앞머리/뒷머리): 더 넓은 재질의 밑색과 같은 톤이 있으면 그 톤을 밑색으로
   {
     const gTot = new Float64Array(nGroups);
@@ -3007,6 +3030,35 @@ function process(img, opts, progress) {
     }
   }
   for (let g = 0; g < nGroups; g++) if (baseTone[g] >= 0) for (let c = 0; c < 3; c++) base[g * 3 + c] = tUp[baseTone[g] * 3 + c];
+  // 무채색(채도 12 미만) 밑색 재질 안의 진한 색(채도 25 이상) 톤은 그 밑색의 그림자 · 하이라이트가 아니라 다른 재질이다
+  // (흰 몸과 선 없이 이어진 빨간 꼬리, 흰 털의 주황 무늬: 흰색이 "하이라이트"로 묶여 색 있는 재질이 흰 밑색 아래로 사라지던 것).
+  // 그런 톤을 떼어 명암 관계로 이어진 것끼리 새 재질로 둔다. 톤 지도는 그대로라 배경 · 캐릭터 판정은 바뀌지 않는다
+  {
+    const minTone = Math.max(50, N * 0.0002), toneLch = t => lch([tMean[t * 3], tMean[t * 3 + 1], tMean[t * 3 + 2]]);
+    const groups = [];
+    for (let g = 0; g < nGroups; g++) {
+      if (baseTone[g] < 0 || lch([base[g * 3], base[g * 3 + 1], base[g * 3 + 2]]).C >= 12) continue;
+      const out = [];
+      for (let t = 0; t < nT; t++) if (toneGroup[t] === g && t !== baseTone[g] && tCnt[t] >= minTone && toneLch(t).C >= 25) out.push(t);
+      if (!out.length) continue;
+      const cs = out.map(toneLch), uf2 = makeUF(out.length), by = new Map();
+      for (let i = 0; i < out.length; i++) for (let k = i + 1; k < out.length; k++) if (shadeRelated(cs[i], cs[k], hueTol, simTol)) uf2.parent[uf2.find(k)] = uf2.find(i);
+      out.forEach((t, i) => { const r = uf2.find(i); if (!by.has(r)) by.set(r, []); by.get(r).push(t); });
+      groups.push(...by.values());
+    }
+    if (groups.length) {
+      const nOld = nGroups; nGroups += groups.length;
+      const base2 = new Float64Array(nGroups * 3), bt2 = new Int32Array(nGroups);
+      base2.set(base); bt2.set(baseTone);
+      groups.forEach((ts, i) => {                      // 새 재질의 밑색도 같은 방법(가장 넓은 톤의 75% 이상 중 가장 밝은 톤의 밝은 쪽 평균)
+        const g = nOld + i; let mx = 0, bt = ts[0], bl = -1;
+        for (const t of ts) { toneGroup[t] = g; if (tCnt[t] > mx) mx = tCnt[t]; }
+        for (const t of ts) { if (tCnt[t] < mx * 0.75) continue; const L = labOf(tUp[t * 3], tUp[t * 3 + 1], tUp[t * 3 + 2])[0]; if (L > bl) { bl = L; bt = t; } }
+        bt2[g] = bt; for (let c = 0; c < 3; c++) base2[g * 3 + c] = tUp[bt * 3 + c];
+      });
+      base = base2; baseTone = bt2;
+    }
+  }
 
   let partExtra = null;
   /* 7-2) 파츠 정리: 실제 작업 파일처럼 파츠 수를 줄인다
@@ -3051,7 +3103,7 @@ function process(img, opts, progress) {
       if (a.C < 25 && b.C < 25) return Math.abs(a.C - b.C) < 18 && r >= 0.55 && (a.C < 4 || hueDiff(a.h, b.h) < 50);
       return a.C >= 12 && b.C >= 12 && hueDiff(a.h, b.h) < 30 && b.C / a.C > 0.5 && b.C / a.C < 2;
     };
-    const minPart = Math.max(64, N * 0.0015);
+    const minPart = Math.max(64, N * 0.0015), minKeep = Math.max(64, N * 0.0001);
     const roots = () => { const r = new Set(); for (let g = 0; g < nGroups; g++) r.add(uf.find(g)); return [...r]; };
     const mergeSame = () => {                          // ② 거의 같은 밑색
       const rs = roots().filter(r => rArea[r] >= minPart).sort((x, y) => rArea[y] - rArea[x]);
@@ -3105,7 +3157,9 @@ function process(img, opts, progress) {
           let bd = 20;
           for (const q of roots()) if (q !== r && rArea[q] >= minPart) { const d = dE(rRep[r], rRep[q]); if (d < bd) { bd = d; best = q; } }
         }
-        if (best < 0) best = any;
+        // 색이 비슷한 파츠가 없으면 아주 작은 조각만 가장 길게 맞닿은 파츠에 합친다. 그보다 큰 것(눈동자, 머리끈, 단추)은
+        // 따로 두어 밑색이 다른 색 아래로 사라지지 않게 한다(파츠 수 상한을 넘으면 아래 ④에서 "작은 파츠"로)
+        if (best < 0 && rArea[r] < minKeep) best = any;
         if (best >= 0) join(best, r);
       }
     }
