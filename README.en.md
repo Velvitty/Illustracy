@@ -7,6 +7,7 @@ A program that takes a single finished illustration and **splits it back into ma
 - One file (`index.html`): open it in a browser and it works.
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
+- Resolving power: **1.78× version 0.1** (0.38, 95% CI 1.50–2.14×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth, 11).
 
 ---
 
@@ -2958,6 +2959,80 @@ Over all 642 (the 401 unchanged use the stored 0.37 grades, the 241 changed use 
 As same-picture pairs, "no major loss" gained 39 · lost 1. The values from grading 0.37 separately were 300: 78.0% · 342: 67.2% · all 72.2% (without loss 21.1%);
 the boundary between "small pieces lost" and "without loss" is a criterion on which grading wavers (*Strict separation rate* above), so the without-loss share came out higher in this grading. The difference between the two versions should be read from the paired comparison above, graded the same way.
 
+**Resolving power by version**: every version from 0.1 to 0.38 was measured again with the same pictures and the same scoring.
+Each version's `index.html` at its commit was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
+Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
+For each picture the balanced error rate
+
+```math
+\mathrm{BER}=\frac{(1-\text{character kept})+(1-\text{background found})}{2},\qquad \text{resolving power}=\frac{1}{\overline{\mathrm{BER}}},\qquad \text{× version 0.1}=\frac{\overline{\mathrm{BER}}_{0.1}}{\overline{\mathrm{BER}}_{v}}
+```
+
+is measured (`BER` is 0.5 when nothing is split and 0 when perfect), and the reciprocal of the mean `BER` over the 185 pictures is the resolving power. The 95% interval is the 2.5 · 97.5 percentiles of a bootstrap resampling the same pictures in pairs (10,000 draws, seed 20261002).
+Rough generation does not change the background layer (confirmed pixel-identical background maps on 8 versions · 2–3 pictures each), so some versions were run with the rough turned off to save time.
+The posed synthetic pictures are the most numerous and weigh the most, so the multiplier per group (synthetic · real · posed) is also given. There are only 8 real pictures, so their values vary a lot.
+
+| Version | What changed | Character kept % | Background found % | Mean BER | Resolving power | × version 0.1 | 95% CI | Synthetic · real · posed (×) |
+|---|---|---|---|---|---|---|---|---|
+| 0.1 | First version | 96.5 | 72.8 | 0.1533 | 6.52 | **1 (reference)** | — | 1.00 · 1.00 · 1.00 |
+| 0.2 | Illustrator-style layer structure, running without internet | 96.5 | 72.8 | 0.1533 | 6.52 | **1.00** | 1.00–1.00 | 1.00 · 1.00 · 1.00 |
+| 0.3 | Refining with real pictures, work-file layers | 95.2 | 75.4 | 0.1473 | 6.79 | **1.04** | 1.01–1.08 | 1.07 · 1.00 · 1.04 |
+| 0.4 | Scene backgrounds and exact lines | 80.8 | 85.1 | 0.1704 | 5.87 | **0.90** | 0.77–1.05 | 1.00 · 1.59 · 0.78 |
+| 0.5 | Correction tools | 81.1 | 85.0 | 0.1696 | 5.90 | **0.90** | 0.77–1.06 | 1.01 · 1.67 · 0.78 |
+| 0.6 | Automatic decision for cut-off parts, loop, maximum number of parts | 81.1 | 84.6 | 0.1714 | 5.83 | **0.89** | 0.76–1.04 | 1.01 · 1.52 · 0.77 |
+| 0.7 | Automatic separation of backgrounds drawn with lines | 79.9 | 88.0 | 0.1605 | 6.23 | **0.95** | 0.80–1.15 | 0.96 · 1.90 · 0.85 |
+| 0.8 | Turning all layers off | 79.9 | 88.0 | 0.1605 | 6.23 | **0.95** | 0.80–1.15 | 0.96 · 1.90 · 0.85 |
+| 0.9 | A rough without breaks | 79.9 | 88.0 | 0.1605 | 6.23 | **0.95** | 0.80–1.15 | 0.96 · 1.90 · 0.85 |
+| 0.10 | Returning attached character parts, full re-verification | 82.1 | 87.9 | 0.1498 | 6.67 | **1.02** | 0.85–1.23 | 0.96 · 1.91 · 0.95 |
+| 0.11 | Line width set by measuring the picture | 81.6 | 88.5 | 0.1496 | 6.69 | **1.02** | 0.85–1.24 | 1.00 · 1.91 · 0.93 |
+| 0.12 | Finding faces to widen the background | 80.7 | 88.8 | 0.1522 | 6.57 | **1.01** | 0.84–1.21 | 1.02 · 1.98 · 0.89 |
+| 0.13 | Filtering fake faces | 80.7 | 88.9 | 0.1522 | 6.57 | **1.01** | 0.84–1.21 | 1.02 · 2.01 · 0.89 |
+| 0.14 | Eye · skin · hair names | 80.7 | 88.9 | 0.1522 | 6.57 | **1.01** | 0.84–1.21 | 1.02 · 2.01 · 0.89 |
+| 0.15 | Per-character folders | 80.7 | 88.9 | 0.1522 | 6.57 | **1.01** | 0.84–1.21 | 1.02 · 2.01 · 0.89 |
+| 0.16 | Outer glow layer | 80.7 | 88.9 | 0.1522 | 6.57 | **1.01** | 0.84–1.21 | 1.02 · 2.02 · 0.89 |
+| 0.17 | Cleaning up base colors of brush paintings | 80.7 | 88.9 | 0.1522 | 6.57 | **1.01** | 0.84–1.21 | 1.02 · 2.02 · 0.89 |
+| 0.18 | Re-verifying naming | 80.7 | 88.7 | 0.1530 | 6.54 | **1.00** | 0.83–1.21 | 1.00 · 2.02 · 0.89 |
+| 0.19 | Re-verifying background · faces · characters · glow · brush painting cleanup | 85.7 | 89.8 | 0.1225 | 8.16 | **1.25** | 1.03–1.52 | 3.05 · 2.02 · 0.90 |
+| 0.20 | Verification with 300 unseen pictures | 85.7 | 89.8 | 0.1226 | 8.16 | **1.25** | 1.03–1.52 | 3.05 · 2.02 · 0.90 |
+| 0.21 | White clothes on white backgrounds | 86.3 | 89.7 | 0.1196 | 8.36 | **1.28** | 1.06–1.55 | 3.04 · 2.02 · 0.93 |
+| 0.22 | Fewer names · folders from fake faces | 86.3 | 89.7 | 0.1196 | 8.36 | **1.28** | 1.06–1.55 | 3.04 · 2.02 · 0.93 |
+| 0.23 | Faster re-splitting after corrections | 86.3 | 89.7 | 0.1196 | 8.36 | **1.28** | 1.06–1.55 | 3.04 · 2.02 · 0.93 |
+| 0.24 | Folders of two-person pictures, names for pale skin | 86.3 | 89.7 | 0.1196 | 8.36 | **1.28** | 1.06–1.55 | 3.04 · 2.02 · 0.93 |
+| 0.25 | Removing the "skin" color name in pictures without faces | 86.3 | 89.7 | 0.1196 | 8.36 | **1.28** | 1.06–1.55 | 3.04 · 2.02 · 0.93 |
+| 0.26 | Verification on 342 new pictures, empty background layer in pictures without background, the relation between faces and background results | 86.3 | 89.7 | 0.1196 | 8.36 | **1.28** | 1.06–1.55 | 3.04 · 2.02 · 0.93 |
+| 0.27 | Skipping face-based widening on flat backgrounds, results by detailed condition | 87.0 | 89.6 | 0.1167 | 8.57 | **1.31** | 1.09–1.59 | 3.04 · 2.02 · 0.96 |
+| 0.28 | Removing names from separated hair pieces | 87.0 | 89.6 | 0.1167 | 8.57 | **1.31** | 1.09–1.59 | 3.04 · 2.02 · 0.96 |
+| 0.29 | The color step threshold of large pictures in proportion to picture size | 87.1 | 89.6 | 0.1164 | 8.59 | **1.32** | 1.09–1.59 | 3.04 · 2.02 · 0.96 |
+| 0.30 | Splitting large pictures at a reduced size (setting) | 87.1 | 89.6 | 0.1164 | 8.59 | **1.32** | 1.09–1.59 | 3.04 · 2.02 · 0.96 |
+| 0.31 | Not taking places enclosed by lines into the background | 87.1 | 89.1 | 0.1188 | 8.42 | **1.29** | 1.08–1.55 | 3.05 · 1.70 · 0.96 |
+| 0.32 | Fewer pictures with no background found | 87.1 | 89.1 | 0.1188 | 8.42 | **1.29** | 1.08–1.55 | 3.05 · 1.70 · 0.96 |
+| 0.33 | Verifying the character layer, background seen between character parts (gaps) | 87.1 | 89.2 | 0.1186 | 8.43 | **1.29** | 1.08–1.55 | 3.05 · 1.70 · 0.96 |
+| 0.34 | Tackling limitations again: narrow gaps on white backgrounds, mirror-agreed faces, returning black hair | 87.8 | 89.2 | 0.1150 | 8.70 | **1.33** | 1.11–1.61 | 3.73 · 1.70 · 0.97 |
+| 0.35 | Layer name "색 트레이스", a tool to rename layers in old PSDs | 87.8 | 89.2 | 0.1150 | 8.70 | **1.33** | 1.11–1.61 | 3.73 · 1.70 · 0.97 |
+| 0.36 | Fixing layer names of old PSDs inside the program | 87.8 | 89.2 | 0.1150 | 8.70 | **1.33** | 1.11–1.61 | 3.73 · 1.70 · 0.97 |
+| 0.37 | Tilted pictures, keeping black clothes from leaking into the background | 91.0 | 89.0 | 0.0999 | 10.01 | **1.53** | 1.29–1.84 | 3.46 · 1.70 · 1.18 |
+| 0.38 | Returning lineless clothes · legs that went into the scene background | 94.6 | 88.2 | 0.0862 | 11.60 | **1.78** | 1.50–2.14 | 3.43 · 1.70 · 1.44 |
+
+From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
+0.19 recovered the synthetic pictures' characters (82.0 → 97.7%), and in 0.37 · 0.38 the posed pictures' character kept rose 81.6 → 86.7 → 91.9%, taking the posed group's multiplier 0.97 → 1.18 → 1.44×.
+
+**Blind test (0.1 · 0.36 · 0.37 · 0.38)**: to compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the three latest versions were run on them.
+For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the four versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), and then the key was opened.
+"No major loss" is perfect separation · character intact · small pieces lost, "character without loss" is perfect separation · character intact, and the parentheses give picture counts and 95% Wilson intervals.
+
+| Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
+|---|---|---|---|---|---|
+| 0.1 | **41.7%** (25/60, 30.1–54.3) | 35.0% | 3.3% | 55.0% | 15/30 · 10/30 |
+| 0.36 | **50.0%** (30/60, 37.7–62.3) | 35.0% | 50.0% | 0.0% | 20/30 · 10/30 |
+| 0.37 | **51.7%** (31/60, 39.3–63.8) | 36.7% | 48.3% | 0.0% | 20/30 · 11/30 |
+| 0.38 | **58.3%** (35/60, 45.7–69.9) | 48.3% | 41.7% | 0.0% | 23/30 · 12/30 |
+
+As same-picture pairs, 0.37 → 0.38 gained 4 · lost 0 in "no major loss" (`p` = 0.13) and 7 · 0 in "character without loss" (`p` = 0.016), with 7 pictures graded higher and 0 lower.
+0.36 → 0.38 is 5 · 0 (`p` = 0.063) and 8 · 0 (`p` = 0.0078).
+Version 0.1 found no background in 33 pictures and leaves them as they are, so it has few major losses (2); 0.1 → 0.38 gained 16 · lost 6 in "no major loss" (`p` = 0.052).
+This grading drew the line between "small pieces lost" and "major loss" more strictly than the 642-picture grading in the 0.38 entry (with the stored grades of the same 60 pictures, 0.37 has 41 and 0.38 has 47 with no major loss), so read it as the difference between four versions graded together by the same standard rather than as the size of the rates.
+The table at the end of the 0.38 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate for the four versions side by side.
+
 ---
 
 ## 12. Release history
@@ -2966,6 +3041,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.38 (2026-10-02) Returning lineless clothes · legs that went into the scene background
 
+- Resolving power: 1.78× version 0.1 (95% CI 1.50–2.14×, 11)
 - In pictures with a flat background, lumps of the scene background that entered only through the flat background (islands not touching the top · side borders) are returned to the character when they join a large character-side lump or hold a face
   (5 of 3.5, 4.5). Clothes · legs · hair painted without lines leak into the scene background less. Floating text · emblems · glitter stay in the background.
 - Verification: the 642 pixiv pictures were split into development · hold-out sets, the rule was set on the development set, and the 114 changed among the 319 hold-out pictures were graded blind.
@@ -2976,8 +3052,16 @@ Newest versions are at the top. Each version lists its last commit; downloading 
   offline copy · re-split cache after corrections fine.
 - Commit `7c053ca` (code)
 
+| | Version 0.1 | Version 0.36 | Version 0.37 | Version 0.38 |
+|---|---|---|---|---|
+| Resolving power | 100% | 133% | 153% | 178% |
+| Blind test | 42% | 50% | 52% | 58% |
+
+Resolving power is relative to version 0.1 (= 100%); the blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures (11).
+
 ### 0.37 (2026-10-01) Tilted pictures, keeping black clothes from leaking into the background
 
+- Resolving power: 1.53× version 0.1 (95% CI 1.29–1.84×, 11)
 - Pictures saved rotated, with the four corners white · one color · transparent, are recognized; the tilt is measured from the straight edges of the corners and faces are searched at that tilt (3.5, 4.5).
   The corners are kept as background, and the background is found even if the corners are transparent. When faces point strongly to one side, the bottom border rule follows the picture's actual bottom.
 - Added the "Tilted picture" setting (off by default). For pictures tilted while filling the whole canvas without corners, faces are searched at 0 · ±30 · ±60 · ±90°. The chosen tilt appears in the result line.
@@ -2990,6 +3074,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.36 (2026-09-30) Fixing layer names of old PSDs inside the program
 
+- Resolving power: 1.33× version 0.1 (95% CI 1.11–1.61×; background results identical to the previous version, 11)
 - Putting PSDs saved up to 0.34 into the program like pictures (drag and drop · choose, several at once) immediately saves PSDs with the `색트레스` layer renamed to `색 트레이스` (1, 4.15).
   The separate `rename-layers.html` was removed. Split results and PSDs for pictures are byte-identical to 0.35.
 - Verification: on 28 test PSDs saved with 0.33, 6 PSBs, 3 files with layer info in `Lr16` · `Lr32`, and 1 file with Pascal names written in EUC-KR,
@@ -3000,6 +3085,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.35 (2026-09-30) Layer name "색 트레이스", a tool to rename layers in old PSDs
 
+- Resolving power: 1.33× version 0.1 (95% CI 1.11–1.61×; background results identical to the previous version, 11)
 - The line color layer and setting name changed from `색트레스` to `색 트레이스` (PSD layer name, "line art + color trace" in the "Line color" setting). Other split results are the same as 0.34.
 - Added `rename-layers.html`. Dropping a PSD saved up to 0.34 gives a file with the `색트레스` layer renamed to `색 트레이스` (1, 4.15).
 - Verification: 35 layers were renamed in 28 test PSDs saved with 0.33 (1–2 per file), and in both psd-tools · ag-psd only the names differed,
@@ -3010,6 +3096,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.34 (2026-09-30) Tackling limitations again: narrow gaps on white backgrounds, mirror-agreed faces, returning black hair
 
+- Resolving power: 1.33× version 0.1 (95% CI 1.11–1.61×, 11)
 - Each limitation of 10 was attempted again. Only the three that improved on synthetic pictures · the 666 · blind grading were added; the rest (light over lines, glow spreading outside the outline, "clothes" names,
   erasing rough dots, left-right identical color clusters, relaxing character folder conditions, etc.) were left out with the reasons written down (7.5, 10).
 - On bright flat backgrounds, narrow gaps are closed and the flat fill is done once more (1 of 3.5, 4.5). The fill no longer enters white clothes · light hair through breaks in faint outlines.
@@ -3024,6 +3111,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.33 (2026-09-30) Verifying the character layer, background seen between character parts (gaps)
 
+- Resolving power: 1.29× version 0.1 (95% CI 1.08–1.55×, 11)
 - The character layer was verified (11). In 120 random pictures with characters, 14% had no background left in the character layer and 29% had it left widely;
   the leftover background was mostly props drawn with lines · blurred scene pieces · text · logos · frames · floors. Because the background is taken conservatively, the more background left, the less often the character was lost.
 - On white · flat backgrounds, background seen between arm and body · between hair · between legs (gaps) is sent to the background (10 of 3.5, 4.5): pieces within `ΔE` 5 of the background,
@@ -3037,6 +3125,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.32 (2026-09-30) Fewer pictures with no background found
 
+- Resolving power: 1.29× version 0.1 (95% CI 1.08–1.55×, 11)
 - For pictures with a thin border line (frame) around the edge, the frame's thickness is filled with the color just inside only while searching for the background (3.5, 4.5). Two character sheets on white backgrounds now have their background found.
 - If the scene background falls short of the area criterion with enclosed places (0.31) removed, it is searched again without removing them. The area criterion of the scene background was lowered 5% → 2%.
 - **Pictures with no background found at all (633 with characters): 18 → 5.** Blind grading of the 22 changed: new version better 14 · worse 1 · similar 7 (`p` = 0.001),
@@ -3047,6 +3136,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.31 (2026-09-30) Not taking places enclosed by lines into the background
 
+- Resolving power: 1.29× version 0.1 (95% CI 1.08–1.55×; lower than the previous version (0.30), 11)
 - A seventh cue, "enclosed by lines", was added to background finding (2.5, 4.5). The line map is reduced to 240 cells on the long side, rays are cast from each cell in 16 directions up to 25% of the long side,
   and places blocked by lines in 15 or more directions are not taken by scene background stage 1 · margin widening · color model · face-based widening, even if lines are sparse.
   White clothes · skirts · flat-colored hair without lines inside, dark clothes in front of dark backgrounds, and faces · hair the color model used to take stay as character.
@@ -3062,6 +3152,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.30 (2026-09-30) Splitting large pictures at a reduced size (setting)
 
+- Resolving power: 1.32× version 0.1 (95% CI 1.09–1.59×; background results identical to the previous version, 11)
 - Added the setting "Split large pictures at a reduced size" (off by default). While off, the method and target size (800–2000px, default 1200px) are disabled and results are the same as 0.29 (the screen results of the 28 test pictures are the same as 0.29).
 - Turning it on or changing the method shows a window with that method's explanation and verification results, and "Confirm and run" splits again right away (cancel restores the previous state).
   - **Reduce everything**: pictures with a long side larger than the target size are shrunk to that size and all stages run there (the PSD too). In blind grading of 114 high-resolution pictures against the original size:
@@ -3074,6 +3165,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.29 (2026-09-30) The color step threshold of large pictures in proportion to picture size
 
+- Resolving power: 1.32× version 0.1 (95% CI 1.09–1.59×, 11)
 - For pictures with a long side over 1200px, the thresholds of color difference between neighboring pixels where the flat background fill and the scene background's margin widening stop (0.035, 0.03) are multiplied by 1200/long side (4.5).
   In large pictures the same boundary spreads its color change over several pixels, so the one-step difference fell below the threshold and the background leaked into hair tips · hems · sleeves.
   If the background found with the reduced thresholds falls short of the area criteria (flat 3%, scene 5% after margin widening), it is redone with the original thresholds.
@@ -3095,6 +3187,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.28 (2026-09-29) Removing names from separated hair pieces
 
+- Resolving power: 1.31× version 0.1 (95% CI 1.09–1.59×; background results identical to the previous version, 11)
 - Most of the wrong names that increased in 0.27 were skirts · legs · sleeves · bags · background pieces with the hair's base color going into the "hair" part and getting the name.
   Now only pieces connected to or near (within 2.5 times the face's eye distance) the head zone of a face stay "hair", and the rest are split off as separate parts of the same color (color names) (3.9, 9 of 4.8).
   Long hair · twin tails cut off by arms · sleeves stay because they are near, while ties · ribbons · legs in the middle of the body are split off even if near.
@@ -3111,6 +3204,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.27 (2026-09-29) Skipping face-based widening on flat backgrounds, results by detailed condition
 
+- Resolving power: 1.31× version 0.1 (95% CI 1.09–1.59×, 11)
 - The 666 were looked at again at original size and the conditions marked in 12 fields (people · size, face direction · eyes, occlusion location · what occludes, focus, what tilts · how much · direction, pose · waist · viewpoint,
   paint · lines, background type · similar colors, hair color · length, effects, lighting, props · appearance), and face · name · folder · background results were measured per condition (11).
   - By a ridge logistic regression with all other conditions matched, the conditions that often lose large parts of the character are no lines (odds ratio 0.39) · occluded faces (0.39) · low quality (0.51) · dark scenes · backlight (0.55),
@@ -3135,6 +3229,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.26 (2026-09-29) Verification on 342 new pictures, empty background layer in pictures without background, the relation between faces and background results
 
+- Resolving power: 1.28× version 0.1 (95% CI 1.06–1.55×; background results identical to the previous version, 11)
 - Actual screen verification and face · name · folder grading were done on the 342 pixiv pictures alone, which were not used while refining the rules (11).
   0 screen errors · external requests, both psd-tools · ag-psd read all 342 PSDs, 57.3% of faces showing both eyes were found, and the number of character folders was right for 81.0% (95% 76.4–85.0%).
 - Fixed an empty "background" layer and [Background] · [Character] folders appearing when splitting opaque pictures with no background found on screen.
@@ -3170,6 +3265,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.25 (2026-09-29) Removing the "skin" color name in pictures without faces
 
+- Resolving power: 1.28× version 0.1 (95% CI 1.06–1.55×; background results identical to the previous version, 11)
 - In pictures where no face was found, flesh-toned parts that had been called "skin" are now "beige · apricot" (3.9, 10 of 4.8). "Skin" is now given only to parts confirmed by a face.
   Among the 85 faceless pictures of the 300 unseen ones, 43 had "skin", but only 10 had it right on faces · hands, and 24 had it on things like blond hair · sunflowers · rooms · robots · snacks (11).
 - Part splitting · background · character folders and reproduction are the same as 0.24; only the part names of pictures without faces change. PSDs saved from the test pictures are byte-identical to 0.24.
@@ -3184,6 +3280,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.24 (2026-09-29) Folders of two-person pictures, names for pale skin
 
+- Resolving power: 1.28× version 0.1 (95% CI 1.06–1.55×; background results identical to the previous version, 11)
 - The height condition for grouping character faces as characters of one picture was widened from within `3d` → `4d` vertically in each other's face frame (4.8).
   In 0.20 it was kept because fake faces split one-person pictures more often, but after fake faces were reduced in 0.22, measuring again showed no one-person picture newly split.
   5 of the 300 pixiv pictures changed: two pictures of two people standing at different heights were split correctly (in one, one person is a close-up inside a frame), and a character sheet · an 8-person group · a 9-panel picture got one more folder each but still do not have the right count.
@@ -3194,6 +3291,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.23 (2026-09-29) Faster re-splitting after corrections
 
+- Resolving power: 1.28× version 0.1 (95% CI 1.06–1.55×; background results identical to the previous version, 11)
 - When splitting again after painting with **Send to background** · **Return to character**, the stored result is used instead of redoing the automatic background decision (3.14, 8).
   Results are byte-identical to computing from scratch, and the time per correction dropped 17–35% on the test pictures.
 - Re-splitting stage by stage the 65 of the 300 unseen pictures with large parts of the character missing, most were the scene background (places with sparse lines) taking brush-painted · softly shaded clothes · hair.
@@ -3203,6 +3301,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.22 (2026-09-29) Fewer names · folders from fake faces
 
+- Resolving power: 1.28× version 0.1 (95% CI 1.06–1.55×; background results identical to the previous version, 11)
 - The 413 faces found in the 300 unseen pictures were marked real · fake one by one, and where the 163 missed faces dropped out was classified (11).
 - Faces chosen with scores adjusted by whether a mouth is visible, whether eye contrast · lower eyelids are too bright, and whether the skin area is white paper are used for part names · character folders (9 of 4.5).
   Fake faces 310 → 232, real faces found 193 → 196, pictures with the right folder count 232 → 236. Of the 52 pictures whose names changed, 24 got better and 12 worse.
@@ -3212,6 +3311,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.21 (2026-09-29) White clothes on white backgrounds
 
+- Resolving power: 1.28× version 0.1 (95% CI 1.06–1.55×, 11)
 - White shirts · school uniforms · skirts on white backgrounds becoming background down to the bottom edge of the picture were reduced. The flat background treats places reached only from the bottom border as background only when they are almost one color (1 of 3.5, 4.5).
 - Even when the face remains, background pieces in the body zone below it (white clothes · skirts · coat hems) are returned. Pieces whose color is much more common in the rest of the background (background seen between clothes, text boxes) remain (8 of 3.5, 4.5).
 - Fixed region splitting filling places the background decision had left to the character with the background number in pictures with textured paper · fine brush marks (3.7, 4.6).
@@ -3223,6 +3323,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.20 (2026-09-28) Verification with 300 unseen pictures
 
+- Resolving power: 1.25× version 0.1 (95% CI 1.03–1.52×; lower than the previous version (0.19), 11)
 - 300 all-ages illustrations chosen from the pixiv rankings were split, and faces · background · names · character folders were graded per picture and compared with 0.18 (11).
   There were 0 errors; only 53% of faces showing both eyes were found, and in 23% large parts of the character went to the background (mainly white · light clothes and backgrounds).
 - Fixed returning attached parts leaving another character's hair in the background in pictures where a swallowed character was returned (4.5, 7.2).
@@ -3233,6 +3334,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.19 (2026-09-28) Re-verifying background · faces · characters · glow · brush painting cleanup
 
+- Resolving power: 1.25× version 0.1 (95% CI 1.03–1.52×, 11)
 - 57 new synthetic pictures with ground truth for the character region · character number · glow · eye positions were made to re-verify the features of 0.12–0.17, and the defects found were fixed (11).
   Character kept 81.1% → 97.6%, background found 90.3% → 93.2%, faces found 57 → 70 of 73, pictures with the right character count 10 → 15 of 15 with two or more people.
 - When the scene background swallows a flat-colored character whose outline is invisible because it has the hair · background's color, background pieces in the head · body zones are returned based on the face zone (8 of 3.5, 4.5).
@@ -3247,6 +3349,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.18 (2026-09-28) Re-verifying naming
 
+- Resolving power: 1.00× version 0.1 (95% CI 0.83–1.21×; lower than the previous version (0.17), 11)
 - Eye · skin · hair names were re-verified with 48 synthetic pictures with ground truth and 25 real pictures, and the defects found were fixed (4.8, 11).
   On synthetic pictures, hair precision 98.3% → 99.7%, skin precision 90.1% → 97.3%, pictures with wrong names 11 → 1.
 - Only character faces give names. Wrong "hair" · "skin" · "eyes" on clothes · ribbons · props (black dress, teal apron, yellow clothes, ribbon) are gone,
@@ -3258,6 +3361,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.17 (2026-09-28) Cleaning up base colors of brush paintings
 
+- Resolving power: 1.01× version 0.1 (95% CI 0.84–1.21×, 11)
 - When treating two colors with white · gray on one side as shading of the same material, hue and brightness are checked together (4.6). Pale skin no longer merges as a "white highlight" of blue hair,
   and desaturated shadows of the same hue are grouped with the same material.
 - When merging shadow surfaces across lines, a shadow must not be brighter than the lit surface in any channel and must be close to the lit surface's hue (4.8).
@@ -3269,12 +3373,14 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.16 (2026-09-28) Outer glow layer
 
+- Resolving power: 1.01× version 0.1 (95% CI 0.84–1.21×, 11)
 - In pictures with a fluorescent band (neon glow) around the character, that band is taken out separately into the "Outer glow" layer of the [Background] folder (4.5). The background below it is filled in by guessing from the surrounding background.
 - It acts on the silver-haired gothic lolita among the test pictures; the other pictures give the same results as before. White sticker borders and borders of pictures where little background is found cannot be split yet.
 - Commit `9992d8e`
 
 ### 0.15 (2026-09-28) Per-character folders
 
+- Resolving power: 1.01× version 0.1 (95% CI 0.84–1.21×; background results identical to the previous version, 11)
 - Pictures with several characters are split into [Character 1] · [Character 2] … folders, each holding that character's line art · effects · painting (3.12, 4.8).
 - Characters are decided from the found faces and split along the outlines, starting from the head · body zones. All 7 two-person pictures were split in two, and no one-person picture was split wrongly.
 - Compared with person-drawn outlines, 93–99% of pixels go to the right character. The composite is the same as before.
@@ -3282,6 +3388,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.14 (2026-09-28) Eye · skin · hair names
 
+- Resolving power: 1.01× version 0.1 (95% CI 0.84–1.21×; background results identical to the previous version, 11)
 - When faces are found, part folders get the names **eyes · skin · hair** instead of color names (3.9, 4.8). Other parts keep color names as before.
 - All 25 test pictures got one or more names, and roughly 9 out of 10 are right. The wrong ones are cases grouped into one part, like clothes of the hair's color or floors · food of the skin's color.
 - Layer pixels and reproduction results do not change.
@@ -3289,6 +3396,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.13 (2026-09-28) Filtering fake faces
 
+- Resolving power: 1.01× version 0.1 (95% CI 0.84–1.21×; lower than the previous version (0.12), 11)
 - "Faces" whose head zone goes far outside the picture or sits on already found background (knees, cushions, background decorations) are dropped before face-based widening (4.5).
   Two people at the window background 24% → 26%, two people in yukata 19% → 20%. Averaged over the 8 outline pictures, background found 51.9% → 52.5%, character kept unchanged.
 - Ways to find more (crossing blurred lines, lowering the color threshold far away, crossing lines for pieces not touching the character) were tested too, but they took the character's arms · hair · skirts · props, so they were not added (7.5).
@@ -3296,6 +3404,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.12 (2026-09-28) Finding faces to widen the background
 
+- Resolving power: 1.01× version 0.1 (95% CI 0.84–1.21×; lower than the previous version (0.11), 11)
 - Anime-style faces (two eyes side by side + bright, even skin below) are found with rules and averaged patterns, without a trained model (4.5).
   30 of the 31 faces in the test pictures are found.
 - When faces are found, head · body zones are kept on the character side, and outside them, places whose color is clearly background and that connect without lines to already found background are added to the background.
@@ -3306,6 +3415,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.11 (2026-09-28) Line width set by measuring the picture
 
+- Resolving power: 1.02× version 0.1 (95% CI 0.85–1.24×, 11)
 - When the maximum line width is automatic (0), the line (pen) width is measured from the picture, and the window is widened when the default cannot hold the lines.
   For small pictures drawn with thick lines, found lines 1% → 92% (800px, 12px lines), 30% → 99% (500px, 9px lines).
 - The chosen value and the measured width are shown next to the setting (e.g. "Auto · 8 px", "this picture 13 px").
@@ -3316,6 +3426,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.10 (2026-09-28) Returning attached character parts, full re-verification
 
+- Resolving power: 1.02× version 0.1 (95% CI 0.85–1.23×, 11)
 - Arms · hands · sleeves · wings · cat ears painted softly without lines that got dragged into the background are returned to the character automatically (7 of 3.5).
   Pictures with nothing to return give byte-identical results to before.
 - All 28 test pictures so far were re-verified: 0 errors · external requests, PSDs checked with two tools, the same picture always gives the same result. Two test pictures were added.
@@ -3323,6 +3434,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.9 (2026-09-27) A rough without breaks
 
+- Resolving power: 0.95× version 0.1 (95% CI 0.80–1.15×; background results identical to the previous version, 11)
 - Fixed rough lines clumping thick and breaking into dashes. The hand-drawn strokes that look drawn over several times are kept, and the center lines of the original lines are laid underneath so even faint lines do not break.
 - Pieces not connected to lines, like glitter · small marks, are left out of the rough.
 - Tried and reverted: a single center line of even width (looked machine-traced), reducing hair grain.
@@ -3330,12 +3442,14 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.8 (2026-09-27) Turning all layers off
 
+- Resolving power: 0.95× version 0.1 (95% CI 0.80–1.15×; background results identical to the previous version, 11)
 - The eye icon above the layer list turns all layers and folders off at once, and pressing it again returns to the state before.
 - Turning a layer on also turns on the folders above it, and the list's scroll position is kept when checking.
 - Commit `99d8575`
 
 ### 0.7 (2026-09-27) Automatic separation of backgrounds drawn with lines
 
+- Resolving power: 0.95× version 0.1 (95% CI 0.80–1.15×, 11)
 - In pictures whose background is also drawn with lines, like fireworks · food stalls · graffiti, the background and character colors are learned per picture to widen the background (graph cut).
   Character region overlap (IoU): graffiti 0.72 → 0.90, fireworks 0.71 → 0.79, night view 0.68 → 0.77.
 - The "content hint" approach, where a person marks character outlines and part names, needed human hands, so it was removed and replaced by the automatic approach above.
@@ -3344,6 +3458,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.6 (2026-09-27) Automatic decision for cut-off parts, loop, maximum number of parts
 
+- Resolving power: 0.89× version 0.1 (95% CI 0.76–1.04×; lower than the previous version (0.5), 11)
 - Hats · sleeves cut off at the top · sides of the screen are kept as character automatically.
 - Drawing a loop with either correction tool moves its inside at once.
 - Added the maximum number of parts setting (default 32). Small overflowing parts go to the "small parts" folder.
@@ -3351,6 +3466,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.5 (2026-09-27) Correction tools
 
+- Resolving power: 0.90× version 0.1 (95% CI 0.77–1.06×, 11)
 - **Send to background**: rub tables · chairs to move them to the background. A chair leg moves in one stroke, and touching skirts · stockings do not come along.
 - **Return to character**: rub parts that wrongly went into the background to return them, and the picture is split again.
 - Corrections remain when settings are changed and the picture is split again, and are undone with `Ctrl+Z`.
@@ -3359,18 +3475,21 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.4 (2026-09-27) Scene backgrounds and exact lines
 
+- Resolving power: 0.90× version 0.1 (95% CI 0.77–1.05×; lower than the previous version (0.3), 11)
 - Scene backgrounds painted without lines are found by line density, and finely detailed backgrounds drawn blurred (shelves, writing) are found too (café interior background 19% → 41%).
 - Colored lines (color trace) are reproduced exactly (magical girl reproduction PSNR 38 → 60 dB).
 - Commit `f975896`
 
 ### 0.3 (2026-09-27) Refining with real pictures, work-file layers
 
+- Resolving power: 1.04× version 0.1 (95% CI 1.01–1.08×, 11)
 - Refined with real illustrations: parts were cleaned up from 168 to 9, and reproduction PSNR rose from 41 to 47 dB.
 - Added rim light, reflected light, gradient, background effect, silhouette (for selection) layers and [Character] · [Background] · [Line art] folders.
 - Commit `1e81f4e`
 
 ### 0.2 (2026-09-27) Illustrator-style layer structure, running without internet
 
+- Resolving power: 1.00× version 0.1 (95% CI 1.00–1.00×; background results identical to the previous version, 11)
 - A folder per part, with 1st · 2nd shadows and highlights clipped over the base color. Shading, light · sparkle, line art + color trace layers.
 - Clipping compositing in the preview was matched to Photoshop.
 - The file downloaded with the **Save program** button runs without internet.
@@ -3378,6 +3497,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 
 ### 0.1 (2026-09-27) First version
 
+- Resolving power: the reference (mean BER 0.1533 on 185 ground-truth pictures, 11)
 - Works as a single file (`index.html`) in the browser. Splits a finished picture into line art · base color · shadow · shading · highlight · sparkle · effects · background · rough,
   and saves a PSD (folders, clipping, blend modes, Korean layer names) that becomes the original again when stacked.
 - Commit `5ad0a49`
