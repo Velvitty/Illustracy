@@ -541,17 +541,13 @@ C=\begin{cases}12.92\,C_{lin} & C_{lin}\le 0.0031308\\ 1.055\,C_{lin}^{1/2.4}-0.
   $`r = \max(1, \mathrm{round}((\sqrt{4\sigma^2 + 1} - 1)/2))`$. If $`\sigma < 0.3`$, there is no blur.
 - **Inpainting**: unknown pixels are visited in order of distance from known pixels (outer rings first) and filled with the average of the 8-neighbors already settled one ring further in.
 
-  ```math
-  U(p)=\frac{1}{|\mathcal N_p|}\sum_{q\in\mathcal N_p}U(q),\qquad \mathcal N_p=\{q\in 8\text{-nbr}(p):\ \text{ring}(q)<\text{ring}(p)\}
-  ```
+  $`\displaystyle U(p)=\frac{1}{|\mathcal N_p|}\sum_{q\in\mathcal N_p}U(q),\qquad \mathcal N_p=\{q\in 8\text{-nbr}(p):\ \text{ring}(q)<\text{ring}(p)\}`$
 
 - **Label filling**: unlabeled pixels are visited in order of distance and filled by a majority vote of the settled 8-neighbor labels (4-neighbors get 2 votes, diagonals 1).
 - **Connected component**: a lump of equal values connected by 4-neighbors. The **perimeter** is the sum, over the pixels of the component, of the number of 4-neighbor sides that belong to another component (or lie outside the picture).
 - **Distance transform** (chamfer): two sweeps (top → bottom, bottom → top) with weight 1 for a horizontal · vertical step and $`\sqrt{2}`$ for a diagonal step approximate the distance to the nearest marked pixel.
 
-  ```math
-  d(p)=\min\big(d(p),\ d(q)+w_{pq}\big),\qquad w_{pq}\in\{1,\sqrt2\}
-  ```
+  $`\displaystyle d(p)=\min\big(d(p),\ d(q)+w_{pq}\big),\qquad w_{pq}\in\{1,\sqrt2\}`$
 
   Where it says "within so many steps", it means the number of steps of a 4-neighbor breadth-first search (Manhattan distance).
 - **k-means** (squared Lab distance): $`M = \min(n, M_\max)`$ samples are drawn (with replacement if $`n > M_\max`$); with **k-means++** the first center is uniform and each next center is drawn with probability proportional to the squared distance $`D(x)^2`$ to the nearest center so far.
@@ -561,9 +557,7 @@ C=\begin{cases}12.92\,C_{lin} & C_{lin}\le 0.0031308\\ 1.055\,C_{lin}^{1/2.4}-0.
   $`s \gets s + \mathtt{0x6D2B79F5}`$, $`t = (s \oplus s \gg 15) \cdot(s \mathbin{\vert} 1)`$, $`t \gets t \oplus(t + (t \oplus t \gg 7) \cdot(t \mathbin{\vert} 61))`$, random number $`= (t \oplus t \gg 14)/2^{32}`$ ($`\gg`$ is the unsigned right shift).
 - **Value noise** (jitter of the rough): a random number $`g`$ in $`[-1, 1]`$ at each grid point with spacing $`\mathrm{cell}`$, blended within a grid cell with $`s_x = \mathrm{smoothstep}(0, 1, t_x)`$, $`s_y = \mathrm{smoothstep}(0, 1, t_y)`$.
 
-  ```math
-  n(x,y)=\big(g_{00}+(g_{10}-g_{00})s_x\big)(1-s_y)+\big(g_{01}+(g_{11}-g_{01})s_x\big)s_y
-  ```
+  $`\displaystyle n(x,y)=\big(g_{00}+(g_{10}-g_{00})s_x\big)(1-s_y)+\big(g_{01}+(g_{11}-g_{01})s_x\big)s_y`$
 
 - **Bilinear interpolation**: with $`x_0 = \lfloor x\rfloor, t_x = x - x_0`$ (same vertically), $`f = f_{00}(1 - t_x)(1 - t_y) + f_{10}t_x(1 - t_y) + f_{01}(1 - t_x)t_y + f_{11}t_x t_y`$.
 - **Resizing** (for face finding, horizontal · vertical separately): if the ratio $`r = n / m`$ (original cells / new cells) is at least 1, the **area average** of the original interval $`[ir, (i + 1)r)`$ covered by new cell $`i`$;
@@ -627,17 +621,13 @@ O_c=a\,K_c+(1-a)\,U_c
   1. The base line color $`K^0`$ = per-channel median of the original colors of line pixels with alpha 0.85 or more (the first bin where the cumulative count reaches half, in the 256-bin 8-bit histogram)
   2. The least-squares alpha given a line color $`K`$ (the $`a`$ minimizing $`\sum_c (O_c - (aK_c + (1 - a)U_c))^2`$; 0 if the denominator is at most $`10^{-5}`$)
 
-     ```math
-     a(K)=\mathrm{clamp}\!\left(\frac{\sum_c (U_c-O_c)(U_c-K_c)}{\sum_c (U_c-K_c)^2}\right)
-     ```
+     $`\displaystyle a(K)=\mathrm{clamp}\!\left(\frac{\sum_c (U_c-O_c)(U_c-K_c)}{\sum_c (U_c-K_c)^2}\right)`$
 
   3. At pixels with $`a(K^0) \ge 0.5`$, the actual line color $`K_c = \mathrm{clamp}((O_c - (1 - a)U_c)/a)`$ is computed and inpainted over the whole line area ($`\mathrm{inMask}`$) to get a smooth line color $`\tilde{K}`$.
   4. If $`\Delta E(\tilde{K}, K^0) \le 6`$ and the residual of compositing with $`K^0`$ is at most 8/255 per channel, it is line art (base line color); otherwise it is color trace.
   5. The color trace alpha is taken at or above the **minimum alpha** at which the original is reproduced exactly by a line color within 0–1.
 
-     ```math
-     a_{min}=\max_c\left\{\,1-\frac{O_c}{U_c}\ (U_c>0.004),\ \ \frac{O_c-U_c}{1-U_c}\ (O_c>U_c,\ U_c<0.996)\right\},\qquad a=\max(a(\tilde K),a_{min})
-     ```
+     $`\displaystyle a_{min}=\max_c\left\{\,1-\frac{O_c}{U_c}\ (U_c>0.004),\ \ \frac{O_c-U_c}{1-U_c}\ (O_c>U_c,\ U_c<0.996)\right\},\qquad a=\max(a(\tilde K),a_{min})`$
 
      The color trace color of that pixel is $`K_c = \mathrm{clamp}((O_c - (1 - a)U_c)/a)`$. $`1 - O_c/U_c`$ is the minimum alpha that keeps the line color from going below 0, and $`(O_c - U_c)/(1 - U_c)`$ the minimum alpha that keeps it from going above 1.
   6. If the alpha sum of color trace pixels is less than 0.3% of the total line alpha sum, no color trace layer is made, and those pixels also go into the single line art layer with $`a(K^0)`$ and $`K^0`$.
@@ -755,9 +745,7 @@ If, in every run of a piece, there is a crisp line on the way to the first other
    and if either is a crisp line, 1 is also added to the crisp line length $`k`$.
 4. **Color distribution**: Lab is counted in $`13 \times 32 \times 32`$ bins ($`\lfloor L/8\rfloor`$, $`\lfloor(a + 128)/8\rfloor`$, $`\lfloor(b + 128)/8\rfloor`$, out-of-range values go to the end bins), smoothed by summing the neighboring $`3 \times 3 \times 3`$ bins, and normalized.
 
-   ```math
-   p(i)=\frac{\tilde h(i)}{\sum_j \tilde h(j)},\qquad \tilde h(l,a,b)=\sum_{|\delta_l|,|\delta_a|,|\delta_b|\le1}h(l+\delta_l,\,a+\delta_a,\,b+\delta_b)
-   ```
+   $`\displaystyle p(i)=\frac{\tilde h(i)}{\sum_j \tilde h(j)},\qquad \tilde h(l,a,b)=\sum_{|\delta_l|,|\delta_a|,|\delta_b|\le1}h(l+\delta_l,\,a+\delta_a,\,b+\delta_b)`$
 
 5. **Initial values**: background $`B^0 = \{\beta_r > 0.5\} \cup \{F_r > 0 \land \rho_r < 1\}`$, character core $`F^0 = \{\rho_r > 3 \land F_r = 0\} \setminus B^0`$.
    $`F^0`$ is used only for the overlap check below; the character distribution of the first cut is learned from all regions outside $`B^0`$.
@@ -766,23 +754,14 @@ If, in every run of a piece, there is a crisp line on the way to the first other
    - Not done if the existing background covers 90% or more of the top · left · right borders.
 7. **Energy**: for labels $`x_r`$ that are 1 for character and 0 for background,
 
-   ```math
-   E(x)=\sum_r \theta_r\,[x_r=0]\;+\;\sum_{(r,q)} w_{rq}\,[x_r\ne x_q]
-   ```
+   $`\displaystyle E(x)=\sum_r \theta_r\,[x_r=0]\;+\;\sum_{(r,q)} w_{rq}\,[x_r\ne x_q]`$
 
-   ```math
-   \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}}
-   +A_r\,\mathrm{clip}_{[0,2]}\ln\frac{\max(\rho_r,\,10^{-3})}{2}
-   -A_r\,\beta_r-20F_r
-   +A_r\,\mathrm{clip}_{[0,2]}\frac{\kappa_r-0.3}{0.15}
-   ```
+   $`\displaystyle \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}} +A_r\,\mathrm{clip}_{[0,2]}\ln\frac{\max(\rho_r,\,10^{-3})}{2} -A_r\,\beta_r-20F_r +A_r\,\mathrm{clip}_{[0,2]}\frac{\kappa_r-0.3}{0.15}`$
 
    The first term is color, the second is how far the crisp-line density exceeds $`2\tau_c`$ (half the median density on crisp lines) (maximum 2 at $`\rho_r = 2e^2 \approx 14.8`$),
    the third · fourth terms are the existing background and the border, and the fifth is how much the region is surrounded by crisp lines (0 at $`\kappa_r`$ 30%, 2 at 60%).
 
-   ```math
-   w_{rq}=8\,o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{2\cdot 12^2}\right)+0.3\,l
-   ```
+   $`\displaystyle w_{rq}=8\,o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{2\cdot 12^2}\right)+0.3\,l`$
 
    $`\theta_r > 0`$ is the cost on the character side. Regions with $`\beta_r > 0.5`$ are fixed as background ($`\theta = -\infty`$); regions with mean $`L^* < 30`$ and $`C^* < 12`$ (near-black achromatic) and
    regions with region mean $`\bar{\varepsilon}_r \ge 0.9`$ (enclosed by lines) are fixed as character ($`\theta = +\infty`$).
@@ -801,9 +780,7 @@ The random numbers use a fixed seed (777) for this stage alone, so pictures wher
 3. **Color log-likelihood ratio**: Lab is counted in $`10 \times 16 \times 16 = 2560`$ bins ($`\lfloor L/10\rfloor`$, $`\lfloor(a + 128)/16\rfloor`$, $`\lfloor(b + 128)/16\rfloor`$, out-of-range values go to the end bins), and the character distribution $`h_C`$ ($`\mathrm{known}`$ not in background, $`n_C`$ pixels) is compared with
    the background distribution $`h_B`$ ($`\mathrm{known}`$, $`n_B`$ pixels) minus the piece's own $`h_k`$ (Laplace smoothing adding 1 to each bin, $`n_B - \lvert k\rvert`$ at least 1).
 
-   ```math
-   \bar\ell_k=\frac1{|k|}\sum_{p\in k,\,known}\mathrm{clip}_{[-4,4]}\ln\frac{(h_C(c_p)+1)/(n_C+2560)}{(h_B(c_p)-h_k(c_p)+1)/(n_B-|k|+2560)}
-   ```
+   $`\displaystyle \bar\ell_k=\frac1{|k|}\sum_{p\in k,\,known}\mathrm{clip}_{[-4,4]}\ln\frac{(h_C(c_p)+1)/(n_C+2560)}{(h_B(c_p)-h_k(c_p)+1)/(n_B-|k|+2560)}`$
 
 4. **Conditions**: area at least 0.1% of the whole, not touching the top · left · right borders, contact length with the character at least 0.8 times the total contact length, $`\bar{\ell}_k \ge 0.8`$.
 5. The chosen pieces, the edge · line band on the piece side, and the edge band on the character side (up to 3px) are removed from the background.
@@ -818,14 +795,9 @@ It finds faces with hand-set rules and averaged patterns, without a trained mode
 
 1. **Eye candidates**: $`\ell = L^*/100`$ is blurred by 3 box blurs (radius $`\rho \in \{1, 2, 3, 4, 5, 7, 9, 12, 15, 20\}`$, $`\sigma^2 = \rho^2 + \rho`$: the box-blur variance formula of 4.2 solved backwards), and the Hessian is computed with second differences,
 
-   ```math
-   L_{xx}=\ell_{x-1,y}-2\ell_{x,y}+\ell_{x+1,y},\quad L_{yy}=\ell_{x,y-1}-2\ell_{x,y}+\ell_{x,y+1},\quad
-   L_{xy}=\tfrac14\left(\ell_{x+1,y+1}-\ell_{x-1,y+1}-\ell_{x+1,y-1}+\ell_{x-1,y-1}\right)
-   ```
+   $`\displaystyle L_{xx}=\ell_{x-1,y}-2\ell_{x,y}+\ell_{x+1,y},\quad L_{yy}=\ell_{x,y-1}-2\ell_{x,y}+\ell_{x,y+1},\quad L_{xy}=\tfrac14\left(\ell_{x+1,y+1}-\ell_{x-1,y+1}-\ell_{x+1,y-1}+\ell_{x-1,y-1}\right)`$
 
-   ```math
-   D_\sigma=\sigma^4\left(L_{xx}L_{yy}-L_{xy}^2\right)\quad(L_{xx}+L_{yy}>0)
-   ```
+   $`\displaystyle D_\sigma=\sigma^4\left(L_{xx}L_{yy}-L_{xy}^2\right)\quad(L_{xx}+L_{yy}>0)`$
 
    A positive Hessian determinant means a round blob, and only $`L_{xx} + L_{yy} > 0`$ (center darker than its surroundings) is considered. $`\sigma^4`$ is the scale normalization that makes values comparable across sizes.
    Points that are the largest within the two neighboring scales and 5×5 and have $`D > 0.004`$ become candidates of radius $`r = 1.414\sigma`$, up to 3000 in descending order.
@@ -837,10 +809,7 @@ It finds faces with hand-set rules and averaged patterns, without a trained mode
    If neither, there is one $`\varphi = 0`$, the same as 0.36.
 3. **Face frame**: with the midpoint of the two eyes as the origin, the eye direction as $`u`$, and the downward direction perpendicular to it as $`v`$, grid samples (bilinear interpolation, edge values outside the picture) are taken in units of $`d`$.
 
-   ```math
-   \mathbf c=\tfrac12(\mathbf a+\mathbf b),\quad d=|\mathbf b-\mathbf a|,\quad \mathbf e=\frac{\mathbf b-\mathbf a}{d},\quad \mathbf f=\pm(-e_y,\,e_x)\ (f_y\ge0),\qquad
-   \mathbf x(u,v)=\mathbf c+d\,(u\,\mathbf e+v\,\mathbf f)
-   ```
+   $`\displaystyle \mathbf c=\tfrac12(\mathbf a+\mathbf b),\quad d=|\mathbf b-\mathbf a|,\quad \mathbf e=\frac{\mathbf b-\mathbf a}{d},\quad \mathbf f=\pm(-e_y,\,e_x)\ (f_y\ge0),\qquad \mathbf x(u,v)=\mathbf c+d\,(u\,\mathbf e+v\,\mathbf f)`$
 
    Conversely, the frame coordinates of pixel $`x`$ are $`u = (x - c)\cdot e / d`$, $`v = (x - c)\cdot f / d`$. The tilt is $`t = \lvert b_y - a_y\rvert/ \max(\lvert b_x - a_x\rvert, 10^{-6})`$.
    A grid is $`n_u \times n_v`$ points evenly dividing the range, including both ends.
@@ -923,9 +892,7 @@ In pictures whose outline has the same color as the hair · background and canno
 2. **Pieces**: the current background is split into pieces $`k`$ the same way as for attached character parts (crisp edge $`\Delta E \ge 20`$, lines).
 3. **Rare color**: from the color distribution $`h_B`$ (Lab $`10 \times 16 \times 16 = 2560`$ bins) counted over the $`n_B`$ pixels of pieces touching the top · left · right borders, for each piece $`k`$ not touching the border,
 
-   ```math
-   \nu_k=\sum_{p\in k}\mathrm{clip}_{[-4,4]}\ln\frac{1/2560}{(h_B(c_p)+1)/(n_B+2560)}
-   ```
+   $`\displaystyle \nu_k=\sum_{p\in k}\mathrm{clip}_{[-4,4]}\ln\frac{1/2560}{(h_B(c_p)+1)/(n_B+2560)}`$
 
    The numerator is the uniform distribution and the denominator the border-side background distribution (Laplace smoothing), so it grows positive the rarer the color is in the border-side background compared with the uniform distribution.
 4. **Returning**: pieces with at least half of their area inside the head ellipse or body column (the same shape as the zone probability of face-based widening) of one of the swallowed faces,
@@ -947,29 +914,20 @@ In pictures whose outline has the same color as the hair · background and canno
 0. **Skip when the background is almost one color**: from the $`n_b`$ background pixels found so far (flatness 0 if fewer than 100), one in every $`t = \max(1, \lfloor n_b / 20000\rfloor)`$ is taken in pixel order and
    the per-channel medians $`(m_L, m_a, m_b)`$ of the original Lab $`(L_i, a_i, b_i)`$ are found (the $`\lfloor n/2\rfloor`$-th of $`n`$ sorted values, from 0).
 
-   ```math
-   \mathrm{flat}=\frac{1}{n}\left|\left\{\,i:(L_i-m_L)^2+(a_i-m_a)^2+(b_i-m_b)^2<10^2\,\right\}\right|
-   ```
+   $`\displaystyle \mathrm{flat}=\frac{1}{n}\left|\left\{\,i:(L_i-m_L)^2+(a_i-m_a)^2+(b_i-m_b)^2<10^2\,\right\}\right|`$
 
    If $`\mathrm{flat} \ge 0.6`$ (white background · one-color background), this stage is not done. Measured on the background before the face stage over 666 pictures, 171 of 211 white · one-color backgrounds (81%) are 0.6 or more,
    while only 13 of 173 scene backgrounds drawn with lines or paint (8%) are 0.6 or more (11).
 1. It uses the same region graph as the color model (24-color regions, contact lengths $`o, l`$, color distributions). The two stages share the graph built once.
 2. **Zone probability** (probability of being character) $`\pi(p)`$: for each face, at $`(u, v)`$ of the original resolution,
 
-   ```math
-   \pi_f=\begin{cases}0.9 & -1.2\le v\le 8,\ |u|\le 1.2+0.35\max(v-1.5,\,0)\quad(\text{body})\\
-   0.85 & (u/2.2)^2+((v+0.3)/2)^2\le 1\quad(\text{head})\\
-   0.45 & \text{otherwise}\end{cases},\qquad \pi(p)=\max_f \pi_f(p)
-   ```
+   $`\displaystyle \pi_f=\begin{cases}0.9 & -1.2\le v\le 8,\ |u|\le 1.2+0.35\max(v-1.5,\,0)\quad(\text{body})\\ 0.85 & (u/2.2)^2+((v+0.3)/2)^2\le 1\quad(\text{head})\\ 0.45 & \text{otherwise}\end{cases},\qquad \pi(p)=\max_f \pi_f(p)`$
 
    The region mean is $`\bar{\pi}_r`$. The log odds of the zone term are $`\ln(0.9/0.1) = 2.197`$, $`\ln(0.85/0.15) = 1.735`$, $`\ln(0.45/0.55) = -0.201`$.
 3. **First split**: character is the regions with $`\bar{\pi}_r \ge 0.8 \land \beta_r < 0.5`$ (head · body zones), background the regions with $`\beta_r > 0.5`$ (existing background). After that, it learns from the previous cut (character / everything else).
 4. The **energy** and minimum cut (the same Dinic as the color model) are repeated 4 times, relearning the color distributions.
 
-   ```math
-   \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}}+\sum_{p\in r}\ln\frac{\pi(p)}{1-\pi(p)}-2A_r\beta_r,\qquad
-   w_{rq}=o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{288}\right)+0.0375\,l
-   ```
+   $`\displaystyle \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}}+\sum_{p\in r}\ln\frac{\pi(p)}{1-\pi(p)}-2A_r\beta_r,\qquad w_{rq}=o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{288}\right)+0.0375\,l`$
 
 5. **Only sure places**: among regions that ended on the background side, those whose mean color term (per $`\mathrm{known}`$ pixel) is below $`-1`$ and with $`\bar{\pi}_r \le 0.5`$ are candidates (excluding regions where returned character parts exceed half the area, and regions with $`\bar{\varepsilon}_r \ge 0.9`$).
    Starting from the existing background ($`\beta_r > 0.5`$), the pixels of regions connected into the candidates crossing only boundaries with $`o \ge 0.5(o + l)`$ are added to the background
@@ -984,22 +942,16 @@ and line pixels ($`\mathrm{lineMask}`$) are fewer than $`0.3 n_o`$ of the $`n_o`
    and the flatness $`\mathrm{flat}`$ (the share within $`\Delta E`$ 10 of the median) is measured with the same formula as 0 of face-based widening. If $`\mathrm{flat} < 0.6`$, it is not done (scene backgrounds have varied colors where they show through gaps too, so this rule cannot separate them).
 2. **Candidates**: painted non-background pixels with almost the same color as the background representative color (excluding returned character parts) are split into 4-connected pieces $`r`$.
 
-   ```math
-   (L_p-m_L)^2+(a_p-m_a)^2+(b_p-m_b)^2\le 5^2
-   ```
+   $`\displaystyle (L_p-m_L)^2+(a_p-m_a)^2+(b_p-m_b)^2\le 5^2`$
 
 3. **Piece conditions**: with the 8-neighbors outside the piece that are not candidates as the perimeter $`R_r`$, and the painted non-background pixels among them as $`R^c_r`$,
 
-   ```math
-   30\le A_r\le 0.02N,\qquad |R^c_r|\le 0.1\,|R_r|,\qquad \forall p\in r,\ \forall f:\ (u/2.2)^2+((v+0.3)/2)^2>1
-   ```
+   $`\displaystyle 30\le A_r\le 0.02N,\qquad |R^c_r|\le 0.1\,|R_r|,\qquad \forall p\in r,\ \forall f:\ (u/2.2)^2+((v+0.3)/2)^2>1`$
 
    The perimeter must be almost only lines and background (white clothes · white hair touching other paint usually touch shadows · shading), and the piece must be outside the head ellipses of faces (faces used for background decisions) (whites of the eyes · teeth).
 4. **Picture condition**: all pieces meeting the conditions are added to the background only when their total area is 5% or less of the number $`n_c`$ of painted character-side pixels.
 
-   ```math
-   \sum_{r\ \text{meeting the conditions}} A_r\le 0.05\,n_c
-   ```
+   $`\displaystyle \sum_{r\ \text{meeting the conditions}} A_r\le 0.05\,n_c`$
 
    Pictures where the character itself has the background color, like white clothes on a white background or black-and-white line art filled with white, have a large sum and are filtered out. The two thresholds (0.05 · 0.02) and flatness 0.6 were set by looking one by one at the 161 pictures changed by a version that gathered pieces loosely (no sum limit, pieces 5%)
    (11). The pixels sent are remembered separately as a gap map and used for region · tone filling (4.6).
@@ -1098,18 +1050,12 @@ If only one side is achromatic ($`n`$: the side with $`C < 12`$, $`c`$: the othe
   The tone map is unchanged, so the background · character decision does not change.
 - **Shadow tones**: for the shadow threshold $`\eta_s`$ (default 0.5) (tones that are not the base, $`\mathrm{lum}(F) > 0.01`$)
 
-  ```math
-  \frac{\mathrm{lum}(\bar t)}{\mathrm{lum}(F)}<0.86+0.12\,\eta_s
-  \quad\Rightarrow\quad g_c=\min\!\left(1,\frac{t^{up}_c}{F_c}\right)\quad(g_c=1\text{ if }F_c\le0.004)
-  ```
+  $`\displaystyle \frac{\mathrm{lum}(\bar t)}{\mathrm{lum}(F)}<0.86+0.12\,\eta_s \quad\Rightarrow\quad g_c=\min\!\left(1,\frac{t^{up}_c}{F_c}\right)\quad(g_c=1\text{ if }F_c\le0.004)`$
 
   $`g`$ is the multiply color of that tone. Dividing by the bright-side mean leaves the darker pixels inside the tone to the shading layer (4.10).
 - **1st / 2nd**: the part's shadow tones (tones with a channel $`g_c < 0.998`$) are ordered by $`\mathrm{lum}(g)`$ descending; if the difference between first and last is 0.07 or more and the largest gap between neighbors is 0.04 or more, they are split there.
 
-  ```math
-  sh^1_c=q_8\!\left(\frac{\sum_{t\in\text{1st}}n_t\,g_{t,c}}{\sum_{t\in\text{1st}}n_t}\right),\qquad
-  sh^2_c=q_8\!\left(\frac{\sum_{t\in\text{2nd}}n_t\min\!\big(1,\ g_{t,c}/\max(sh^1_c,10^{-3})\big)}{\sum_{t\in\text{2nd}}n_t}\right),\qquad q_8(x)=\frac{\mathrm{round}(255\,\mathrm{clamp}(x))}{255}
-  ```
+  $`\displaystyle sh^1_c=q_8\!\left(\frac{\sum_{t\in\text{1st}}n_t\,g_{t,c}}{\sum_{t\in\text{1st}}n_t}\right),\qquad sh^2_c=q_8\!\left(\frac{\sum_{t\in\text{2nd}}n_t\min\!\big(1,\ g_{t,c}/\max(sh^1_c,10^{-3})\big)}{\sum_{t\in\text{2nd}}n_t}\right),\qquad q_8(x)=\frac{\mathrm{round}(255\,\mathrm{clamp}(x))}{255}`$
 
   $`n_t`$ is the tone's area (at least 1).
 - **Highlight**: among non-shadow tones, $`\mathrm{lum}(F) < 0.995`$ and $`1 - (1 - \mathrm{lum}(t^{lo}))/(1 - \mathrm{lum}(F)) > 0.12`$ (even the dark side is more than 12% brighter than the base color by screen).
@@ -1183,9 +1129,7 @@ Fake faces of knees · hands · clothing patterns · background decorations put 
    - "Skin" only for warm colors, "hair" only when there is no clothes mark. Names are looked at in the order skin → hair → eyes.
      With $`\mathrm{mx} = \max`$, $`\mathrm{mn} = \min`$ of the base color $`(r, g, b)`$ (0–1), a warm color ($`\mathrm{skinLike}`$) is
 
-     ```math
-     mx=r\ \wedge\ mx\ge0.55\ \wedge\ \big(mx-mn\ge0.07\,mx\ \vee\ \text{pale skin}\big)\ \wedge\ \big(g\ge b-0.02\ \vee\ b-g<0.35\,(r-\min(g,b))\big)
-     ```
+     $`\displaystyle mx=r\ \wedge\ mx\ge0.55\ \wedge\ \big(mx-mn\ge0.07\,mx\ \vee\ \text{pale skin}\big)\ \wedge\ \big(g\ge b-0.02\ \vee\ b-g<0.35\,(r-\min(g,b))\big)`$
 
      (the red channel is the brightest, saturation 7% or more, and the last term admits pink and excludes purple · blue).
      **Pale skin** ($`\mathrm{mx} \ge 0.85`$, $`\mathrm{mx} - \mathrm{mn} \ge 0.025\mathrm{mx}`$) is called "skin" only when the part's area is at most $`12 d_\max^2`$ ($`d`$ of the largest character face) and at most $`0.13N`$.
@@ -1276,9 +1220,7 @@ is repeated per channel to split in order ($`S^{(0)} = S`$, $`a_i = S^{(i-1)}w_i
   Pictures with neither background nor transparency have no silhouette, so no rim light is made.
 - $`\bar{O}`$ is the local mean of the brightening inside the edge ($`e > R_r`$). With $`m`$ = the indicator of (character and $`e > R_r`$),
 
-  ```math
-  \bar O=\begin{cases}\dfrac{G_{1.5R_r}(m\,S_{max})}{G_{1.5R_r}(m)} & G_{1.5R_r}(m)>0.02\\[4pt] 0 & \text{otherwise}\end{cases}
-  ```
+  $`\displaystyle \bar O=\begin{cases}\dfrac{G_{1.5R_r}(m\,S_{max})}{G_{1.5R_r}(m)} & G_{1.5R_r}(m)>0.02\\[4pt] 0 & \text{otherwise}\end{cases}`$
 
   Bright only at the edge ($`S_\max \gg \bar{O}`$) means rim light; similarly bright inside too means wide light.
 - $`T = \mathrm{lum}(U) - \mathrm{open}(\mathrm{lum}(U))`$ (white top-hat, $`\mathrm{open}`$ = erosion then dilation with radius $`r_s`$): only bright structures thinner than the sparkle size remain.
@@ -1341,9 +1283,7 @@ $`n`$ is the number of opaque pixels (alpha $`> 0.98`$). If $`\mathrm{MSE} \le 1
      Whether there is line art is decided by the number of pixels with $`\text{line alpha} \ge 0.25`$ being $`\ge 0.03 \times \max(1, \text{number of painted character pixels})`$.
    - For the background, the brightness $`\mathrm{lum}(U)`$ is blurred with $`\sigma = 1.5 \cdot \max(1, s)`$, then the Sobel gradient, keeping only maxima along the gradient direction, and hysteresis ($`0.045 / 0.02`$) find one-pixel contours, which are added (Canny style).
 
-     ```math
-     g_x=\tfrac18\big(\ell_{x+1,y-1}+2\ell_{x+1,y}+\ell_{x+1,y+1}-\ell_{x-1,y-1}-2\ell_{x-1,y}-\ell_{x-1,y+1}\big),\quad g_y=(\text{same vertically}),\quad |g|=\sqrt{g_x^2+g_y^2}
-     ```
+     $`\displaystyle g_x=\tfrac18\big(\ell_{x+1,y-1}+2\ell_{x+1,y}+\ell_{x+1,y+1}-\ell_{x-1,y-1}-2\ell_{x-1,y}-\ell_{x-1,y+1}\big),\quad g_y=(\text{same vertically}),\quad |g|=\sqrt{g_x^2+g_y^2}`$
 
      The direction $`\theta = \mathrm{atan2}(g_y, g_x) \bmod 180^\circ`$ is grouped into four directions ($`< 22.5^\circ\ \text{or}\ \ge 157.5^\circ`$ horizontal, $`< 67.5^\circ`$ diagonal ↘, $`< 112.5^\circ`$ vertical, otherwise diagonal ↙),
      and only background pixels not smaller than the two neighbors before and after in that direction are kept. Starting from points with $`\lvert g\rvert \ge 0.045`$, they are joined to 8-neighbor points with $`\lvert g\rvert \ge 0.02`$.
@@ -1356,9 +1296,7 @@ $`n`$ is the number of opaque pixels (alpha $`> 0.98`$). If $`\mathrm{MSE} \le 1
 3. **Removing crumbs**: only pieces connected with 4-neighbors starting from pixels within 5×5 (2px) of the center lines are kept among the material with thick surfaces filled ($`\mathrm{keep}`$).
 4. **Stroke base**:
 
-   ```math
-   b=\max\Big(\min\big(1,\;1.4\,G_{1.2}(\ell)\big),\;0.6\,\min\big(1,\;\sqrt{2\pi}\,\sigma_k\cdot 1.2\;G_{\sigma_k}(k)\big)\Big),\qquad \ell=\mathbb{1}_{keep}\max(\alpha_{line},\,0.5\,B),\quad \sigma_k=0.9\max(1,s)
-   ```
+   $`\displaystyle b=\max\Big(\min\big(1,\;1.4\,G_{1.2}(\ell)\big),\;0.6\,\min\big(1,\;\sqrt{2\pi}\,\sigma_k\cdot 1.2\;G_{\sigma_k}(k)\big)\Big),\qquad \ell=\mathbb{1}_{keep}\max(\alpha_{line},\,0.5\,B),\quad \sigma_k=0.9\max(1,s)`$
 
    The first term is a soft stroke following the width · darkness of the original lines, and the second is a floor guaranteeing a minimum darkness (0.6) along the center lines $`k`$.
    Blurring a 1px line with $`\sigma`$ makes the center value $`1/(\sqrt{2\pi}\sigma)`$, so multiplying by $`\sqrt{2\pi}\sigma_k \cdot 1.2`$ makes the center line about 1.2, which becomes 1 in $`\min(1, \cdot)`$.
@@ -1366,9 +1304,7 @@ $`n`$ is the number of opaque pixels (alpha $`> 0.98`$). If $`\mathrm{MSE} \le 1
 5. **Drawing over three times**: for $`j = 0, 1, 2`$, $`b`$ is warped by two value-noise maps ($`n_x`$, $`n_y`$) with cell size $`(35 + 25j) \cdot \max(1, s) / f`$ and displacement $`(2 + 1.6j) \cdot \max(1, s) / f`$, and
    composited by screen with weights $`\omega_j = 0.85 \cdot 0.55 \cdot 0.4`$ ($`v_0 = 0`$).
 
-   ```math
-   v_{j+1}(x,y)=1-\big(1-v_j(x,y)\big)\Big(1-\omega_j\,b\big(x+\mathrm{amp}_j\,n_x(x,y),\ y+\mathrm{amp}_j\,n_y(x,y)\big)\Big)
-   ```
+   $`\displaystyle v_{j+1}(x,y)=1-\big(1-v_j(x,y)\big)\Big(1-\omega_j\,b\big(x+\mathrm{amp}_j\,n_x(x,y),\ y+\mathrm{amp}_j\,n_y(x,y)\big)\Big)`$
 
    ($`b`$ is bilinearly interpolated, 0 outside the picture.) If at half resolution, it is returned to the original size by bilinear interpolation at $`((x + 0.5)/2 - 0.5, (y + 0.5)/2 - 0.5)`$.
 6. **Alpha**: $`a = \mathrm{smoothstep}(0.1, 0.65, v \cdot(0.82 + 0.18\xi))`$ ($`\xi`$ a new random number per pixel, pencil grain). Pixels with $`a < 0.02`$ are left empty, and the 8-bit alpha is $`\mathrm{round}(255a)`$.
@@ -1957,11 +1893,7 @@ In this section:
 - **Comparison with pixel ground truth**: with $`C`$ the pixels the program put on the character side, $`G`$ the ground-truth character, and $`I`$ the area excluding a 3px band around the ground-truth boundary (for real pictures with drawn outlines, the difference between the ground truth dilated 3 times and eroded 3 times;
   for synthetic pictures, excluding places where the ground-truth map changes dilated 3 times; the background ground truth of synthetic pictures also excludes glow places),
 
-  ```math
-  \mathrm{IoU}=\frac{|C\cap G|}{|C\cup G|},\qquad
-  \text{character kept}=\frac{|C\cap G\cap I|}{|G\cap I|},\qquad
-  \text{background found}=\frac{|\bar C\cap\bar G\cap I|}{|\bar G\cap I|}
-  ```
+  $`\displaystyle \mathrm{IoU}=\frac{|C\cap G|}{|C\cup G|},\qquad \text{character kept}=\frac{|C\cap G\cap I|}{|G\cap I|},\qquad \text{background found}=\frac{|\bar C\cap\bar G\cap I|}{|\bar G\cap I|}`$
 
   "Pixel total" divides the sums of numerators and denominators over several pictures, and "mean" is the mean of per-picture values. "In 24-color regions, area-weighted" counts the color model's regions weighted by area instead of pixels.
 - **Precision · recall**: with found $`P`$ and ground truth $`T`$, precision $`\lvert P \cap T\rvert/ \lvert P\rvert`$ and recall $`\lvert P \cap T\rvert/ \lvert T\rvert`$. Lines count as correct within 1px of a ground-truth line, and names are counted in pixels excluding a 3px band at material boundaries.
@@ -1969,24 +1901,17 @@ In this section:
 - **Coverage · purity** (base colors of brush paintings): the mean over materials $`m`$ of the share taken by the dominant part $`\max_k \lvert m \cap k\rvert/ \lvert m\rvert`$ (coverage), and over parts $`k`$ of the share of the dominant material $`\max_m \lvert m \cap k\rvert/ \lvert k\rvert`$ (purity).
 - **Colorfulness** (of test pictures, Hasler–Süsstrunk): on 0–255 values of the picture shrunk to a 300px long side, with $`\mathrm{rg} = R - G`$, $`\mathrm{yb} = (R + G)/2 - B`$,
 
-  ```math
-  M=\sqrt{\sigma_{rg}^2+\sigma_{yb}^2}+0.3\sqrt{\mu_{rg}^2+\mu_{yb}^2}
-  ```
+  $`\displaystyle M=\sqrt{\sigma_{rg}^2+\sigma_{yb}^2}+0.3\sqrt{\mu_{rg}^2+\mu_{yb}^2}`$
 
   Dull · medium · colorful were divided at the tertiles of $`M`$ over the added 342 pixiv pictures (33.4, 52.2).
 - **Spread of a proportion**: if $`k`$ of $`n`$ pictures pass, $`p = k/n`$, per-picture standard deviation $`\sqrt{p(1 - p)}`$, standard error $`\mathrm{SE} = \sqrt{p(1 - p)/n}`$, margin of error $`z \cdot \mathrm{SE}`$ ($`z`$ is 1.645 · 1.960 · 2.576 for 90 · 95 · 99%).
 - **Wilson score interval**:
 
-  ```math
-  \frac{p+\frac{z^2}{2n}}{1+\frac{z^2}{n}}\ \pm\ \frac{z}{1+\frac{z^2}{n}}\sqrt{\frac{p(1-p)}{n}+\frac{z^2}{4n^2}}
-  ```
+  $`\displaystyle \frac{p+\frac{z^2}{2n}}{1+\frac{z^2}{n}}\ \pm\ \frac{z}{1+\frac{z^2}{n}}\sqrt{\frac{p(1-p)}{n}+\frac{z^2}{4n^2}}`$
 
 - **Clopper–Pearson exact interval** (confidence level $`1 - \alpha`$): an interval inverting the binomial distribution, wider than the normal approximation, whose actual coverage never falls below $`1 - \alpha`$. $`B(q; a, b)`$ is the $`q`$ quantile of the beta distribution.
 
-  ```math
-  p_L=B\!\left(\tfrac{\alpha}{2};\,k,\,n-k+1\right)\ (0\text{ if }k=0),\qquad
-  p_U=B\!\left(1-\tfrac{\alpha}{2};\,k+1,\,n-k\right)\ (1\text{ if }k=n)
-  ```
+  $`\displaystyle p_L=B\!\left(\tfrac{\alpha}{2};\,k,\,n-k+1\right)\ (0\text{ if }k=0),\qquad p_U=B\!\left(1-\tfrac{\alpha}{2};\,k+1,\,n-k\right)\ (1\text{ if }k=n)`$
 
   The **one-sided 95% lower bound** is $`B(0.05; k, n - k + 1)`$, and **Bonferroni** uses a $`1 - 0.05/3 \approx 98.3\%`$ interval per criterion so that the three criteria together hold at 95% overall.
 - **$`t`$ interval of a mean**: from the mean $`\bar{x}`$ of per-picture values $`x_1 \dots x_n`$ and the sample standard deviation $`s = \sqrt{\sum(x_i - \bar{x})^2/(n - 1)}`$, $`\bar{x} \pm t_{n-1}(1 - \alpha/2) \cdot s/\sqrt{n}`$ ($`t_{n-1}(q)`$ is the $`q`$ quantile of the $`t`$ distribution with $`n - 1`$ degrees of freedom; capped at 100%).
@@ -1999,21 +1924,13 @@ In this section:
 - **Difference · ratio · odds ratio of two proportions**: if group 1 passes $`k_1`$ of $`n_1`$ and group 2 passes $`k_2`$ of $`n_2`$, the 95% interval of the difference $`p_1 - p_2`$ is the Newcombe interval combining the two Wilson intervals $`[l_1, u_1]`$, $`[l_2, u_2]`$,
   and the intervals of the ratio $`\mathrm{RR} = p_1/p_2`$ and odds ratio $`\mathrm{OR} = k_1(n_2 - k_2) / ((n_1 - k_1)k_2)`$ are normal approximations on the log scale.
 
-  ```math
-  \bigl[(p_1-p_2)-\sqrt{(p_1-l_1)^2+(u_2-p_2)^2},\ (p_1-p_2)+\sqrt{(u_1-p_1)^2+(p_2-l_2)^2}\bigr]
-  ```
+  $`\displaystyle \bigl[(p_1-p_2)-\sqrt{(p_1-l_1)^2+(u_2-p_2)^2},\ (p_1-p_2)+\sqrt{(u_1-p_1)^2+(p_2-l_2)^2}\bigr]`$
 
-  ```math
-  \mathrm{RR}\cdot e^{\pm1.96\sqrt{\frac{1}{k_1}-\frac{1}{n_1}+\frac{1}{k_2}-\frac{1}{n_2}}},\qquad
-  \mathrm{OR}\cdot e^{\pm1.96\sqrt{\frac{1}{k_1}+\frac{1}{n_1-k_1}+\frac{1}{k_2}+\frac{1}{n_2-k_2}}}
-  ```
+  $`\displaystyle \mathrm{RR}\cdot e^{\pm1.96\sqrt{\frac{1}{k_1}-\frac{1}{n_1}+\frac{1}{k_2}-\frac{1}{n_2}}},\qquad \mathrm{OR}\cdot e^{\pm1.96\sqrt{\frac{1}{k_1}+\frac{1}{n_1-k_1}+\frac{1}{k_2}+\frac{1}{n_2-k_2}}}`$
 
 - **Comparison with matched conditions (Mantel–Haenszel)**: dividing pictures into strata $`i`$ by the value of one condition (e.g. no occlusion · face occluded · body occluded) and the source, with a 2×2 table $`a_i, b_i, c_i, d_i`$ (sum $`n_i`$) per stratum,
 
-  ```math
-  \mathrm{OR}_{MH}=\frac{\sum_i a_i d_i/n_i}{\sum_i b_i c_i/n_i},\qquad
-  \chi^2_{CMH}=\frac{\bigl(\bigl|\sum_i a_i-\sum_i E[a_i]\bigr|-0.5\bigr)^2}{\sum_i \mathrm{Var}(a_i)}
-  ```
+  $`\displaystyle \mathrm{OR}_{MH}=\frac{\sum_i a_i d_i/n_i}{\sum_i b_i c_i/n_i},\qquad \chi^2_{CMH}=\frac{\bigl(\bigl|\sum_i a_i-\sum_i E[a_i]\bigr|-0.5\bigr)^2}{\sum_i \mathrm{Var}(a_i)}`$
 
   with $`E[a_i] = (a_i + b_i)(a_i + c_i)/n_i`$, $`\mathrm{Var}(a_i) = (a_i + b_i)(c_i + d_i)(a_i + c_i)(b_i + d_i) / (n_i^2(n_i - 1))`$ (1 degree of freedom). The interval of the odds ratio uses the Robins–Breslow–Greenland variance.
   Strata where an empty cell makes the table undefined are excluded. Within a stratum the condition is the same, so apparent differences caused by differences in the condition are filtered out.
