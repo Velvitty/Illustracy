@@ -1,50 +1,29 @@
-# math test 2
+# math test 3
 
-T7 list: other item has backtick inline math, this item has fence:
+T12 list with inline math; display formula written as displaystyle inline math in its own paragraph:
 
-- first item with $`x_1`$ math
-- second item text
+1. **Pieces**: components $`k`$ of stage background, and $`A < 0.98`$.
+2. **Color**: Lab bins
 
-  ```math
-  U(p)=\frac{1}{|\mathcal N_p|}\sum_{q\in\mathcal N_p}U(q)
-  ```
+   $`\displaystyle \bar\ell_k=\frac1{|k|}\sum_{p\in k,\,known}\mathrm{clip}_{[-4,4]}\ln\frac{(h_C(c_p)+1)/(n_C+2560)}{(h_B(c_p)-h_k(c_p)+1)/(n_B-|k|+2560)}`$
 
-- third item
+3. **Prob**: zone
 
-T8 list: same item has inline math then fence:
+   $`\displaystyle \pi_f=\begin{cases}0.9 & -1.2\le v\le 8,\ |u|\le 1.2\quad(\text{몸})\\
+   0.85 & (u/2.2)^2\le 1\quad(\text{머리})\\
+   0.45 & \text{그 밖}\end{cases},\qquad \pi(p)=\max_f \pi_f(p)`$
 
-- item with $`y`$ inline
+4. **Set**: $`\mathrm{flat}`$ is
 
-  ```math
-  E(x)=\sum_r \theta_r\,[x_r=0]
-  ```
+   $`\displaystyle \mathrm{flat}=\frac{1}{n}\left|\left\{\,i:(L_i-m_L)^2<10^2\,\right\}\right|`$
 
-T9 list: plain dollar inline elsewhere:
-
-- first item with $z$ math
-- second item
-
-  ```math
-  O_c=a\,K_c+(1-a)\,U_c
-  ```
-
-T10 numbered with inline in item text:
+T13 split list with top-level fence between items:
 
 1. **Pieces**: components $`k`$ of stage background.
 2. **Color**: Lab bins
 
-   ```math
-   \bar\ell_k=\frac1{|k|}\sum_{p\in k} x_p
-   ```
+```math
+\bar\ell_k=\frac1{|k|}\sum_{p\in k} x_p
+```
 
-3. **Conditions**: area.
-
-T11 list item fence followed by text with inline math:
-
-- item text
-
-  ```math
-  w_{rq}=8\,o\,\exp(-\Delta E^2)
-  ```
-
-  after text with $`\theta_r > 0`$ inline.
+3. **Conditions**: area $`\ge 0.1`$.
