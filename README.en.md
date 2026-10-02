@@ -7,7 +7,7 @@ A program that takes a single finished illustration and **splits it back into ma
 - One file (`index.html`): open it in a browser and it works.
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **1.78× version 0.1** (0.38, 95% CI 1.50–2.14×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth, 11).
+- Resolving power: **1.78× version 0.1** (0.39, 95% CI 1.50–2.14×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth, 11).
 
 ---
 
@@ -385,7 +385,9 @@ In pictures where brush strands are picked up as lines (more than half of the li
 ### 3.8 Tones and base color
 
 Each material is split again into tones (up to 6) with k-means. The bright-side average of the widest tone (the brighter one if areas are similar) is the **base color**.
+In a colored material whose widest tone is a shadow (cloaks · clothes · hair painted mostly in shadow), the brighter tone from which that shadow can be made by multiply becomes the base color.
 Same materials separated by a line (front hair / back hair) have their base colors matched to each other.
+Strongly colored tones inside a material whose base color is white · gray are not that material's shading but another material (a red tail joined to a white body without a line, an orange pattern on white fur), so they are split off and given their own base color.
 
 ### 3.9 Part cleanup
 
@@ -394,7 +396,8 @@ The number of parts is reduced, like a real work file.
 1. Nearly identical base colors become one part
 2. A darker surface across a line is merged if it is plausible as the shadow of the brighter part (a pale purple strand next to white hair).
    A shadow cannot be brighter than the lit surface in any channel, and if the lit surface has a hue, the shadow must be near that hue (apricot skin next to gray clothes, pink skin next to cream clothes are not merged)
-3. Small pieces go to a neighboring part of similar color
+3. Small pieces go to a neighboring part of similar color. If no part has a similar color, only very small pieces (under 0.01% of the picture) are merged into the longest-touching part;
+   larger ones such as pupils · hair ties · buttons are kept separately with their own base color (into the **small parts** folder of 4 if the number of parts is exceeded)
 4. If parts exceed the **maximum number of parts**, the smallest are merged into a neighbor of similar color first, and if there is no similar neighbor, into the **small parts** folder
 5. **Naming**: for each character face, the face frame finds the parts occupying the bridge of the nose · cheeks (skin), the bangs (hair, above it if the forehead is exposed), and the two eye cells (eyes), and gives them those names (4.8).
    The remaining parts are named by the color name of the base color (black, white, blue …). "Skin" is given only to parts confirmed by a face; other skin-toned parts are called "beige · apricot" even in pictures where no face was found.
@@ -1065,6 +1068,16 @@ If only one side is achromatic (`n`: the side with `C < 12`, `c`: the other), th
 - For each tone, the mean `t̄`, the **bright-side mean** `t^up` (pixels with `lum ≥ lum(t̄) − 0.01`), and the **dark-side mean** `t^lo` (`lum ≤ lum(t̄) + 0.01`) are found. Tones without samples convert the Lab of the k-means center back to sRGB (4.1).
 - **Base color**: among tones with at least 75% of the area of the widest tone, the tone whose bright-side mean has the largest `L*` → base color `F` = that tone's bright-side mean.
   Going from wide materials, if another tone (10% or more of the material) is `ΔE < 7` from a base color decided earlier (the closest one), the base is switched to that tone (the same material split by lines). If the current base color is closer than that, it is kept.
+- **Lit-side base color**: in a material whose base tone `b` has a bright-side mean with `C ≥ 12`, if another tone `t` of the same material satisfies all of the following, the base tone becomes the one among them whose bright-side mean has the largest `L*` (before the matching of same materials split by lines).
+  - its area is at least 35% of the widest tone of the material, and `L*_t > L*_b`
+  - the current base color can be made from `t` by multiply: `b^{up}_c ≤ t^{up}_c + 0.03` in every channel, and the brightness ratio `0.45 ≤ lum(b^{up}) / lum(t^{up}) ≤ 0.93`
+  - `C_t ≥ 12`, hue angle difference below 30°, and HSV saturation (`(max − min)/max`) `S_t ≥ 0.8 S_b − 0.02` (a brighter tone that lost much saturation is a highlight · light bloom)
+
+  This is not done for white · gray materials (`C < 12`): from color alone, whether the paler side is the lit surface or another material (gray hair next to white clothes) cannot be told.
+- **Splitting colors off white · gray materials**: in a material whose base color has `C < 12`, the tones that are not the base tone, have an area of at least `max(50, 0.0002N)`, and whose mean color has `C ≥ 25` are gathered,
+  and those connected by `shadeRelated` (4.6, default tolerances) become new materials. The base color of a new material follows the same rule (among tones with at least 75% of the widest tone's area, the tone whose bright-side mean has the largest `L*`).
+  When only one side is achromatic, material grouping treats the achromatic side as a highlight if it is more than 8 brighter (4.6), so a white surface and a colored surface touching without a line were grouped into one material whose base color was the wide white tone.
+  The tone map is unchanged, so the background · character decision does not change.
 - **Shadow tones**: for the shadow threshold `η_s` (default 0.5) (tones that are not the base, `lum(F) > 0.01`)
 
   ```math
@@ -1097,7 +1110,8 @@ The boundary length between parts is the number of horizontally · vertically ad
    in 25 test pictures · 48 synthetic pictures, apart from this case, all such dark surfaces merged as shadows were small surfaces under 0.3% of the picture). Then 1 is done once more.
    - Both with saturation below 25 (like white hair ↔ light purple shadow): `|C_d − C_l| < 18`, `r ≥ 0.55`, hue angle difference below 50° if the lighter side's saturation is 4 or more
    - Otherwise: both saturation 12 or more, hue angle difference below 30°, `0.5 < C_d/C_l < 2`
-3. Parts below `minPart` (from the smallest material) are merged into the longest-touching neighbor with `ΔE < 30`, or if none, the closest color among large parts with `ΔE < 20`, or if none either, the longest-touching neighbor.
+3. Parts below `minPart` (from the smallest material) are merged into the longest-touching neighbor with `ΔE < 30`, or if none, the closest color among large parts with `ΔE < 20`. If there is none either, they are merged into the longest-touching neighbor
+   only when the area is below `minKeep = max(64, 0.0001N)`; larger parts are kept separately (merging into a differently colored neighbor turned the base color of pupils · hair ties · ties into the skin · hair color, so they vanished from the base color layer).
 4. While the number of parts that are not "small parts" exceeds the maximum number of parts `max(4, P)` (`P` default 32), the smallest part is merged into the closest color with `ΔE < 30` among touching parts, or if none, marked as a "small part".
 
 Finally, going through parts by width, if the 8-bit-rounded base color is `ΔE < 2.5` from a previous part, they are treated as one when making layers (a difference people hardly distinguish).
@@ -1543,6 +1557,9 @@ Problems that came up while verifying with real pictures during development, and
 | Long blond hair · the leg skin of full-body pictures got no names | no name if more than half of the part was outside `6d` from the face | excluded only when more than two thirds are outside |
 | Light-catching brown hair merged into the skin part, and both skin and hair names were lost (synthetic two-person picture) | the "shadow surface across a line" rule of part cleanup treated brown (saturation 30) of the same hue as a shadow of pale skin (saturation 16) (brightness ratio 0.52) | surfaces with brightness ratio under 0.6 that are 1% or more of the picture are not merged as shadows (2 of 4.8). In 25 real pictures · 48 synthetic pictures, this was the only case caught by the condition |
 | Transparent-background PNGs and pictures with background separation off had no part names · character folders | faces were searched only in pictures where the background was found | always search faces, and filter fake faces treating transparent areas as background. In 8 synthetic transparent-background pictures, faces 0 → 14 (of 14), character folders 0 → 5 pictures (of 5) |
+| A red tail joined to a white body without a line, an orange pattern on white fur, yellow trims between white clothes became white · gray in the base color layer (pixiv pictures, 0.38) | when only one side is achromatic, material grouping treats the white side as a highlight if it is more than 8 brighter and groups them into one material, whose base color is its widest white tone | tones with chroma 25 or more are split off materials with an achromatic base color into new materials (4.7). The tone map is unchanged, so background · character maps are identical for all 642 pictures |
+| Small colored areas such as pupils · hair ties · ties vanished from the base color layer and took the skin · hair color (0.38) | part cleanup 3 merged pieces under 0.15% of the picture into the longest-touching part even without a similar-colored neighbor | if no part has a similar color, only pieces under 0.01% are merged and the rest are kept (3 of 4.8). "Small parts" rose from 1.8 to 4.2 per picture on average, and highlight pieces such as the glossy band on black hair can also be kept separately |
+| The base color of cloaks · clothes · hair painted mostly in shadow was the shadow color (0.38) | the base color is the widest tone (the brightest within 75% of its area) | in colored materials, if there is a brighter tone with the same hue and at least 35% of the area from which the current base color can be made by multiply, that tone becomes the base color (4.7) |
 
 ### 7.2 Background decisions
 
@@ -1694,6 +1711,8 @@ Problems that came up while verifying with real pictures during development, and
 | (0.37) Comparing colors for the black-clothes barrier with the original colors instead of `U` (lines filled in) | The leaking area of 4 dark-background synthetic pictures stayed the same (the leak entrance is on the shadow side, not line pixels) |
 | (0.38) Returning all islands in the scene background unconditionally | Blind review of the 137 changed among 323 development pictures: returning better 66 · 0.37 better 28 · same 43 (`p` = 0.0001). The 28 worse were cases where text · spray · emblems · glitter floating apart from the character came back to the character, and cases where background shapes attached to the character (panels · circles · stripes · floors inside a border) came back. For floating things, the character component holding the island was 4% or less of the largest component, so returning was changed to only when it is a quarter or more, or holds a face (in the 60 changed, the changed version was better 47 · worse 9 · same 4, `p` < 0.0001) |
 | (0.38) Adding "the share of flat background around the island" or "the color difference of the flat background touching the island" to island selection | Tried to filter out attached background shapes too, but on the 319 hold-out pictures, the medians for the 52 where 0.37 was better and the 55 where 0.38 was better were the same: perimeter share 0.51 · 0.51, color difference (channel maximum) 0.058 · 0.060, so they could not be told apart |
+| (0.39) When merging small pieces, prefer a neighbor · large part with a close color (ΔE below 12) first | The base-color resolving power of the ground-truth pictures rose 1.17× (whites of the eyes · collars into white parts), but in a blind review of 36 pixiv development pictures, keeping the previous rule was better 5 · the new one better 2 · same 29 (`p` = 0.45). The gain on ground-truth pictures did not carry over to real pictures |
+| (0.39) Applying the lit-side base color choice to white · gray materials too | In development pictures, gray clothes · gray hair grouped with white clothes got a nearly white base color, so it is used only for colored materials (this variant was not reviewed blind) |
 
 ---
 
@@ -1863,6 +1882,8 @@ Problems that came up while verifying with real pictures during development, and
   So in the changed pictures character losses fell sharply, but "perfect separation" fell 4 → 1 on hold-out pictures and 3 → 1 on development pictures, and side-by-side preference was about even: 0.37 better 52 · 0.38 better 55 · same 7
   (judgments choosing the side with less background left concentrated on 0.37's side, 11). It was added because leftover background pieces are easier to fix than lost character.
   The flat background share · color difference around islands could not separate attached background shapes from clothes (7.5).
+- Base colors sit on materials divided by color, so pictures full of scenery · props and brush · watercolor pictures get finely broken base colors (40 of 68 pixiv development pictures),
+  and skin with white clothes · pale hair of similar color easily share one base color (27). This remains in 0.39 (11).
 
 ---
 
@@ -2804,6 +2825,73 @@ Visibly better pictures: close-up of a girl in a hat (face · hands that were on
 two people at the window (white blouse and skin separated), two people, full body (face and white jacket separated), café and mascot (ice cream colors separated).
 
 
+**Base colors (0.39)**: the 642 pixiv pictures (consistent set of 300 · mixed set of 342) were split into 323 development pictures (151 · 172) and 319 hold-out pictures (149 · 170);
+the rules were set by looking only at the development set, and the hold-out set was graded blind once. To look only at base colors, a composite of only the base color layers was placed next to each original (background hatched).
+
+*What was wrong with 0.38's base colors*: 68 development pictures (37 of the 300 set · 31 of the 342 set) were viewed as base-color-only composites; one picture can have several problems.
+
+| Problem | Set of 300 (37) | Set of 342 (31) |
+|---|---|---|
+| Finely broken patchwork (pictures full of scenery · props, brush · watercolor pictures) | 19 (51%) | 21 (68%) |
+| Different materials with one base color (skin with white clothes · pale hair, blonde hair with a cream coat) | 14 (38%) | 13 (42%) |
+| Colored areas buried in a white · gray base color (red tail, orange pattern, yellow trims) | 10 (27%) | 6 (19%) |
+| A shadow surface with its own base color (two-colored hair) | 7 (19%) | 1 (3%) |
+| Small colored areas such as eyes · hair ties · ties lost into a neighbor's color | 4 (11%) | 5 (16%) |
+| Base color on the shadow side (a gold cloak as brown, black hair as gray) | 1 (3%) | 3 (10%) |
+| No visible problem | 3 (8%) | 2 (6%) |
+
+0.39 fixes the third, fifth and sixth (4.7, 4.8). The most common ones — patchwork, different materials with one base color — and shadow surfaces across a line getting their own base color remain (10).
+
+*Base-color resolving power (ground-truth pictures)*: measured on 117 synthetic pictures with material ground-truth maps (57 background · face synthetic pictures, 48 naming synthetic pictures, 12 brush paintings).
+A material is a (character, material) pair, and the ground-truth base color is the color it was drawn with (the character's set color for hair · skin · clothes · iris, white for collars · whites of the eyes, the local color for brush paintings).
+A 3px band around material boundaries (character boundaries included) and pixels gone to the background (no base color layer) are excluded; a pixel is wrong if the `ΔE*ab` between its base color layer color and the ground-truth base color is 10 or more.
+The mean over materials (with at least 100 remaining pixels) of each material's wrong share is the picture's base-color error rate,
+
+```math
+\mathrm{BER}_{\text{base}}=\frac{1}{|M|}\sum_{m\in M}\frac{|\{p\in m:\ \Delta E(F_p,\ F^{\text{true}}_m)\ge10\}|}{|m|},\qquad \text{base-color resolving power}=\frac{1}{\overline{\mathrm{BER}}_{\text{base}}}
+```
+
+and the reciprocal of its mean over the 117 pictures is the base-color resolving power. The 95% CI of the ratio is a picture-level paired bootstrap (10,000 draws, seed 20261002).
+
+| Version | 57 background · face synthetic | 48 naming synthetic | 12 brush paintings | All 117 | Base-color resolving power | Coverage | Purity | Mean base color ΔE | Parts |
+|---|---|---|---|---|---|---|---|---|---|
+| 0.38 | 23.25% | 20.92% | 56.83% | 25.74% | 3.89 | 95.4% | 96.6% | 7.0 | 6.5 |
+| 0.39 | 22.85% | 20.49% | 49.28% | 24.59% | 4.07 | 94.7% | 96.8% | 6.2 | 8.2 |
+
+0.38 → 0.39 is **1.05×** (95% CI 1.02–1.07×), with 19 pictures better · 9 worse · 89 the same.
+With other thresholds it is 1.02× (0.996–1.046) at `ΔE` 5 and 1.08× (1.015–1.153) at 20; at 5 the interval does not stay above 1.
+Of the 9 worse pictures, 7 are within 0.4 percentage points (the glossy band of black hair is no longer merged into the hair and becomes its own gray part, 4% of the hair pixels; 3 of 4.8).
+Two two-character pictures (striped background · naming synthetic) are 4.5 points worse because the base color of the second character's green iris became the color of the bright spot inside the iris (the lit-side base color of 4.7).
+The whites of the eyes are wrong at 87–93% in both versions (the shadow color on the white is wider, or it is merged into the skin part).
+The shirt · jacket of the brush paintings (blue shadows · warm light) mostly stay above `ΔE` 10 in 0.39.
+
+*Blind grading (hold-out)*: of the 319 hold-out pictures, the base color composite changed in 282 (131 of the 300 set · 151 of the 342 set); the 276 in which more than 0.1% of the character pixels changed by `ΔE` 10 or more
+were placed as [original | left | right] (sides randomized per picture, unblinded only after all grades were written) and graded by which side has better base colors, looking only at base colors.
+
+| Set | Graded | 0.39 better | 0.38 better | Same | Sign test `p` |
+|---|---|---|---|---|---|
+| 300 (consistent set) | 127 | 60 | 12 | 55 | 8.1 × 10⁻⁹ |
+| 342 (mixed set) | 149 | 63 | 8 | 78 | 1.0 × 10⁻¹¹ |
+| All | 276 | **123** | **20** | 133 | 2.8 × 10⁻¹⁹ |
+
+The 6 pictures that changed by less than 0.1% were not graded, and 37 had byte-identical base color composites. In changed pictures, the median share of changed character pixels is 4.5%.
+On the development set, a version with only the first two rules (splitting colors off white · gray materials, keeping small colored areas) was reviewed blind on 30 pictures: 0.38 better 1 · new better 20 · same 9 (set of 300: 1 · 10, set of 342: 0 · 10);
+the version adding the lit-side base color was compared with it on 20 pictures: with it better 4 · worse 1 · same 15.
+
+*Existing scores (0.38 → 0.39)*:
+
+| Score | Result |
+|---|---|
+| Background maps (background layer alpha ≥ 128) | byte-identical for all 642 pixiv pictures · 185 ground-truth pictures. So the strict separation grades and "no major loss" (300: 84.6% · 342: 75.4% · all 79.6%) and the background resolving power (1.78× version 0.1, 1.50–2.14×) are unchanged |
+| Character folder counts | identical for all 642. In the character folder maps, at most 0.014% of the character pixels moved to the neighboring character in 11 pictures (the moving of part pieces under 64 pixels depends on the parts) |
+| Names (blind, the 99 hold-out pictures whose name maps changed) | wrong names 93 → 93 (fewer in 8 pictures · more in 7, `p` = 1). Pictures without wrong names 35 → 33 (gained 1 · lost 3, `p` = 0.63). Pictures with a hair name 61 → 63 (better 3 · worse 3), skin 63 → 63 (better 3 · worse 0, `p` = 0.25). Which is better: 0.38 11 · 0.39 28 · same 60 (`p` = 0.009) |
+| Names, by set | 300 (50 pictures): wrong names 36 → 33, better side 0.38 5 · 0.39 20 (`p` = 0.004). 342 (49 pictures): 57 → 60 (fewer in 3 · more in 5, `p` = 0.73), pictures without wrong names 14 → 11 (`p` = 0.25), better side 6 · 8 (`p` = 0.79) |
+| Reproduction PSNR | mean over 642: 54.820 → 54.821 dB (difference +0.001, 95% CI −0.007 to +0.011), lowest 44.60 → 44.60 dB. On the 319 hold-out pictures, up 132 · down 154 (sign test `p` = 0.21). Over all 642, slightly lower pictures are more common (244 · 332, `p` = 0.0003; median size of the change 0.005 dB) |
+| Part counts (mean over 642) | parts 21.97 → 23.16, "small parts" 1.75 → 4.22 (pictures with small parts 221 → 320), pictures reaching the maximum of 32 parts 108 → 133 |
+| Pictures where the rules applied (642) | splitting colors off white · gray materials 438 (300 set 213 · 342 set 225; 3.0 new materials per picture on average, the moved tones a median 0.4% of the picture), keeping small colored areas 432 (225 · 207), lit-side base color 517 (245 · 272; 6.0 materials per picture on average). On the 117 ground-truth pictures: 5 · 73 · 37 |
+| Processing time | the background stage (2–4 s) is unchanged; the later stages took 2% more in total on 12 hold-out pictures (the shorter of two alternating runs in the same process; median 2.95 → 2.90 s) |
+| Screen verification (28 test pictures) | 0 errors · external requests, both psd-tools · ag-psd read all 28 (merged image PSNR 48.76–61.87 dB; 0.38: 48.79–61.86 dB), splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine. Mean layer count 113.3 → 121.7 |
+
 **Tilted pictures (0.37)**: pictures with ground truth were rotated and measured. The 57 synthetic pictures (character · material · two-eye ground truth) and 25 test pictures (35 two-eye positions marked by a person; 8 of them with character outline ground truth)
 were rotated about the center with Catmull–Rom (clockwise +) in three ways: corners of the enlarged canvas filled with white, filled with transparency, and only the largest rectangle inside the rotated picture cropped to fill the canvas.
 Results were mapped back to the original coordinates to match the ground truth, excluding pixels outside the rotated picture. On the 82 upright pictures, the tilt part left the character map · name map · faces byte-identical to 0.36 (0 differing pictures).
@@ -2959,7 +3047,7 @@ Over all 642 (the 401 unchanged use the stored 0.37 grades, the 241 changed use 
 As same-picture pairs, "no major loss" gained 39 · lost 1. The values from grading 0.37 separately were 300: 78.0% · 342: 67.2% · all 72.2% (without loss 21.1%);
 the boundary between "small pieces lost" and "without loss" is a criterion on which grading wavers (*Strict separation rate* above), so the without-loss share came out higher in this grading. The difference between the two versions should be read from the paired comparison above, graded the same way.
 
-**Resolving power by version**: every version from 0.1 to 0.38 was measured again with the same pictures and the same scoring.
+**Resolving power by version**: every version from 0.1 to 0.39 was measured again with the same pictures and the same scoring.
 Each version's `index.html` at its commit was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the balanced error rate
@@ -3012,32 +3100,59 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.36 | Fixing layer names of old PSDs inside the program | 87.8 | 89.2 | 0.1150 | 8.70 | **1.33** | 1.11–1.61 | 3.73 · 1.70 · 0.97 |
 | 0.37 | Tilted pictures, keeping black clothes from leaking into the background | 91.0 | 89.0 | 0.0999 | 10.01 | **1.53** | 1.29–1.84 | 3.46 · 1.70 · 1.18 |
 | 0.38 | Returning lineless clothes · legs that went into the scene background | 94.6 | 88.2 | 0.0862 | 11.60 | **1.78** | 1.50–2.14 | 3.43 · 1.70 · 1.44 |
+| 0.39 | Base colors: colors buried in white · small colored areas · shadow base colors | 94.6 | 88.2 | 0.0862 | 11.60 | **1.78** | 1.50–2.14 | 3.43 · 1.70 · 1.44 |
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
 0.19 recovered the synthetic pictures' characters (82.0 → 97.7%), and in 0.37 · 0.38 the posed pictures' character kept rose 81.6 → 86.7 → 91.9%, taking the posed group's multiplier 0.97 → 1.18 → 1.44×.
 
-**Blind test (0.1 · 0.36 · 0.37 · 0.38)**: to compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the three latest versions were run on them.
+**Blind test (0.1 · 0.37 · 0.38 · 0.39)**: to compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the three latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the four versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), and then the key was opened.
 "No major loss" is perfect separation · character intact · small pieces lost, "character without loss" is perfect separation · character intact, and the parentheses give picture counts and 95% Wilson intervals.
 
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
 | 0.1 | **41.7%** (25/60, 30.1–54.3) | 35.0% | 3.3% | 55.0% | 15/30 · 10/30 |
-| 0.36 | **50.0%** (30/60, 37.7–62.3) | 35.0% | 50.0% | 0.0% | 20/30 · 10/30 |
 | 0.37 | **51.7%** (31/60, 39.3–63.8) | 36.7% | 48.3% | 0.0% | 20/30 · 11/30 |
 | 0.38 | **58.3%** (35/60, 45.7–69.9) | 48.3% | 41.7% | 0.0% | 23/30 · 12/30 |
+| 0.39 | **58.3%** (35/60, 45.7–69.9) | 48.3% | 41.7% | 0.0% | 23/30 · 12/30 |
 
-As same-picture pairs, 0.37 → 0.38 gained 4 · lost 0 in "no major loss" (`p` = 0.13) and 7 · 0 in "character without loss" (`p` = 0.016), with 7 pictures graded higher and 0 lower.
-0.36 → 0.38 is 5 · 0 (`p` = 0.063) and 8 · 0 (`p` = 0.0078).
-Version 0.1 found no background in 33 pictures and leaves them as they are, so it has few major losses (2); 0.1 → 0.38 gained 16 · lost 6 in "no major loss" (`p` = 0.052).
+Version 0.39 has background maps byte-identical to 0.38 on all 60 pictures; identical results are graded once as one panel, so its grades are the same as 0.38's.
+As same-picture pairs, 0.37 → 0.39 gained 4 · lost 0 in "no major loss" (`p` = 0.13) and 7 · 0 in "character without loss" (`p` = 0.016), with 7 pictures graded higher and 0 lower.
+Version 0.1 found no background in 33 pictures and leaves them as they are, so it has few major losses (2); 0.1 → 0.39 gained 16 · lost 6 in "no major loss" (`p` = 0.052).
 This grading drew the line between "small pieces lost" and "major loss" more strictly than the 642-picture grading in the 0.38 entry (with the stored grades of the same 60 pictures, 0.37 has 41 and 0.38 has 47 with no major loss), so read it as the difference between four versions graded together by the same standard rather than as the size of the rates.
-The table at the end of the 0.38 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+The table at the end of the 0.39 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
 ## 12. Release history
 
 Newest versions are at the top. Each version lists its last commit; downloading `index.html` at that commit gives you that version.
+
+### 0.39 (2026-10-02) Base colors: colors buried in white · small colored areas · shadow base colors
+
+- Resolving power: 1.78× version 0.1 (95% CI 1.50–2.14×; background results identical to the previous version, 11)
+- Strongly colored areas inside a material whose base color is white · gray are split off and get their own base color (a red tail joined to a white body, an orange pattern on white fur, yellow trims on white clothes, 3.8, 4.7).
+- Small colored areas without a similar-colored neighbor (pupils, hair ties, ribbons) are merged into a neighbor only when very small, and kept otherwise (3.9, 4.8). "Small parts" rose accordingly from 1.8 to 4.2 per picture on average.
+- In colored materials whose widest surface is the shadow, the color of the lit surface is used as the base color (3.8, 4.7).
+- Base-color resolving power (reciprocal of the base-color error rate on 117 ground-truth pictures, 11): 3.89 → 4.07 (1.05×, 95% CI 1.02–1.07×). 9 pictures got worse (the glossy band of black hair became its own gray part, the base color of a green iris in two-character pictures became the color of its bright spot).
+- Verification: the 642 pixiv pictures were split into development · hold-out sets, the rules were set on the development set, and the 276 hold-out pictures (of 319) whose base colors changed were graded blind looking only at base colors.
+  0.39 better 123 · 0.38 better 20 · same 133 (`p` = 2.8 × 10⁻¹⁹); set of 300: 60 · 12 · 55, set of 342: 63 · 8 · 78 (11).
+- Background maps are byte-identical to 0.38 for all 642 pictures · 185 ground-truth pictures, so the background results (strict separation grades · background resolving power) are unchanged, and the character folder counts are identical for all 642.
+  In a blind review of the 99 pictures whose names changed, wrong names went 93 → 93 (`p` = 1). In the set of 342 they rose 57 → 60, which cannot be told apart from chance (`p` = 0.73).
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image PSNR 48.76 dB or more), splitting the same picture twice byte-identical for all 28,
+  offline copy · re-split cache after corrections fine.
+- Commit `8864512` (code)
+
+| | Version 0.1 | Version 0.37 | Version 0.38 | Version 0.39 |
+|---|---|---|---|---|
+| Resolving power | 100% | 153% | 178% | 178% |
+| Resolving power 95% CI | — | 129–184% | 150–214% | 150–214% |
+| Resolving power 80% CI | — | 136–173% | 159–200% | 159–200% |
+| Blind test | 42% | 52% | 58% | 58% |
+| Blind test 95% CI | 30–54% | 39–64% | 46–70% | 46–70% |
+| Blind test 80% CI | 34–50% | 43–60% | 50–66% | 50–66% |
+
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a bootstrap resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with Wilson intervals (11).
 
 ### 0.38 (2026-10-02) Returning lineless clothes · legs that went into the scene background
 
