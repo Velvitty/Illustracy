@@ -1884,19 +1884,19 @@ The synthetic pictures are not a random sample but every combination of fixed le
 
 The weaknesses found are below. Real-picture counts are the numbers of grading sheets given that type (small problems included).
 
-| Target | Weakness | Evidence |
-|---|---|---|
-| Base colors | Materials painted with more shade than lit area take the shade color as their base color | Synthetic: adding wide shadows drops good from 38.2% to 5.3%; every button material is wrong |
-| Base colors | Different materials share one base color, and scenery · brush paintings break into patchwork | Real: "different materials in one color" 577, "patchwork" 467 (of 650) |
-| Faces | Lying and face-down faces | Synthetic: lying, seen from above 1.7%, lying on the side 0.0%, lying on the stomach 0.0%, face down on a desk 8.3% |
-| Faces | Dark skin, head turned 60° | Synthetic: dark skin 0.0%, head turned 60° 14.4% |
-| Faces | Missed and false faces | Real: missed 423, false 255 |
-| Background | A room drawn with lines (furniture, window frames) stays on the character side | Synthetic: good 0.0% (background found averages 51.8%) |
-| Background | Scenery, text, and effects stay on the character side | Real: scenery 417, text · signature 200, effects · light 145 |
-| Body | Dark hair, clothes, and shoes in front of a dark flat background go to the background | Synthetic: body good 11.4% (head lost in 52%, feet in 88%, skirt in 24% of the pictures) |
-| Body | Hair, clothes, and white parts are lost | Real: hair 161, clothes 147, white · pale areas 72 |
-| Objects | A box on the floor beside the character stays on the character side | Synthetic: good 37.1%; real: loose items kept with the character 208 |
-| Objects | A background-colored bag in front of a dark flat background | Synthetic: good 6.0% |
+| Weakness | Evidence |
+|---|---|
+| **Base colors**: Materials painted with more shade than lit area take the shade color as their base color | Synthetic: adding wide shadows drops good from 38.2% to 5.3%; every button material is wrong |
+| **Base colors**: Different materials share one base color, and scenery · brush paintings break into patchwork | Real: "different materials in one color" 577, "patchwork" 467 (of 650) |
+| **Faces**: Lying and face-down faces | Synthetic: lying, seen from above 1.7%, lying on the side 0.0%, lying on the stomach 0.0%, face down on a desk 8.3% |
+| **Faces**: Dark skin, head turned 60° | Synthetic: dark skin 0.0%, head turned 60° 14.4% |
+| **Faces**: Missed and false faces | Real: missed 423, false 255 |
+| **Background**: A room drawn with lines (furniture, window frames) stays on the character side | Synthetic: good 0.0% (background found averages 51.8%) |
+| **Background**: Scenery, text, and effects stay on the character side | Real: scenery 417, text · signature 200, effects · light 145 |
+| **Body**: Dark hair, clothes, and shoes in front of a dark flat background go to the background | Synthetic: body good 11.4% (head lost in 52%, feet in 88%, skirt in 24% of the pictures) |
+| **Body**: Hair, clothes, and white parts are lost | Real: hair 161, clothes 147, white · pale areas 72 |
+| **Objects**: A box on the floor beside the character stays on the character side | Synthetic: good 37.1%; real: loose items kept with the character 208 |
+| **Objects**: A background-colored bag in front of a dark flat background | Synthetic: good 6.0% |
 
 #### Help wanted
 
