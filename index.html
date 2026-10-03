@@ -642,7 +642,7 @@ function detectBackground(U, known, W, H) {
   if (!bg && s < 1) { st = 0.035; bg = detectBackgroundAt(U, known, W, H, st); }
   // 밝고(L* 가운데값 70 이상) 거의 한 색인 배경(흰 · 옅은 단색)이면 좁은 틈을 막고 다시 채운다. 옅은 윤곽선의 끊긴 곳으로 흰 옷 · 옅은 머리 안까지 들어가는 것을 막는다.
   // 장면 · 무늬 배경은 한 걸음 색 차가 여기저기 벽이 되어 채우기가 끊기고, 어두운 한 색 배경(밤 장면)은 틈을 막으면 배경 물건이 캐릭터로 돌아와 하지 않는다
-  if (bg && bgFlatness(bg, U[0], U[1], U[2], W * H) >= 0.6 && bgMedianL(bg, U, W * H) >= 70) {
+  if (bg && bgFlatness(bg, U[0], U[1], U[2], W * H, bg.floor) >= 0.6 && bgMedianL(bg, U, W * H) >= 70) {
     const g = detectBackgroundAt(U, known, W, H, st, 2);
     if (g) bg = g;
   }
@@ -742,10 +742,62 @@ function detectBackgroundAt(U, known, W, H, stepMax, gapR) {
     if (!added) break;
     flood(0.12);                                       // 새 씨앗은 자기 색 주변만(옷 같은 어두운 면으로 새지 않게)
   }
+  // 바닥 띠: 기준색과 다른 한 색의 띠가 왼쪽 · 오른쪽 · 아래 테두리에 모두 닿고, 그 윗변이 곧은 선(벽과 바닥이 만나는 선)이면 배경.
+  // 그림 아래를 가로지르는 옷 · 머리카락은 윗변이 어깨선처럼 굽어 있어 걸리지 않는다
+  let floorBand = null;
+  if (!IMG_DOWN) {
+    const edgeP = [];
+    for (let y = 0; y < H; y++) { edgeP.push(y * W); edgeP.push(y * W + W - 1); }
+    for (let x = 1; x < W - 1; x++) edgeP.push((H - 1) * W + x);
+    const h2 = new Int32Array(4096);
+    let n2 = 0;
+    for (const p of edgeP) if (known[p] && !bg[p]) { h2[q4(p)]++; n2++; }
+    let m2 = 0;
+    for (let i = 1; i < 4096; i++) if (h2[i] > h2[m2]) m2 = i;
+    if (n2 && h2[m2] >= 0.1 * nb) {
+      const r2 = [0, 0, 0]; let c2 = 0;
+      for (const p of edgeP) if (known[p] && !bg[p] && q4(p) === m2) { r2[0] += U[0][p]; r2[1] += U[1][p]; r2[2] += U[2][p]; c2++; }
+      r2[0] /= c2; r2[1] /= c2; r2[2] /= c2;
+      const side = [0, 0, 0];                          // 왼쪽 · 오른쪽 · 아래 테두리의 씨앗 수
+      const b2 = new Uint8Array(N), st2 = [];
+      for (const p of edgeP) {
+        if (!known[p] || bg[p] || b2[p] || diff(p, r2[0], r2[1], r2[2]) >= 0.12) continue;
+        const x = p % W, y = (p / W) | 0;
+        if (y === H - 1) side[2]++; else if (x === 0) side[0]++; else side[1]++;
+        b2[p] = 1; st2.push(p);
+      }
+      if (side[0] >= 0.03 * H && side[1] >= 0.03 * H && side[2] >= 0.3 * W) {
+        while (st2.length) {
+          const p = st2.pop(), x = p % W;
+          for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p >= W ? p - W : -1, p < N - W ? p + W : -1]) {
+            if (q < 0 || b2[q] || bg[q] || !known[q] || (GR && near[q] > 0)) continue;
+            if (step(p, q) < stepMax && diff(q, r2[0], r2[1], r2[2]) < 0.3) { b2[q] = 1; st2.push(q); }
+          }
+        }
+        // 윗변: 열마다 띠의 가장 위 픽셀. 64개 열을 골라 두 점마다의 기울기 중앙값(테일-센)과 절편 중앙값으로 직선을 맞춘다
+        // (캐릭터가 가린 열은 윗변이 아래로 처져도 중앙값이 흔들리지 않음). 직선에서 tol 안의 열이 60% 이상이고
+        // 직선보다 tol 넘게 위에 있는 띠 픽셀이 2% 이하이면 곧은 윗변
+        const top = new Int32Array(W).fill(-1); let a2 = 0;
+        for (let p = 0; p < N; p++) if (b2[p]) { a2++; const x = p % W; if (top[x] < 0) top[x] = (p / W) | 0; }
+        const tol = Math.max(3, 0.01 * H), xs = [];
+        for (let i = 0; i < 64; i++) { const x = Math.round((i + 0.5) * W / 64); if (x < W && top[x] >= 0 && x !== xs[xs.length - 1]) xs.push(x); }
+        const med = a => { a.sort((u, v) => u - v); return a.length ? a[a.length >> 1] : 0; };
+        const sl = [];
+        for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++) sl.push((top[xs[j]] - top[xs[i]]) / (xs[j] - xs[i]));
+        const k = med(sl), c = med(xs.map(x => top[x] - k * x));
+        let inl = 0, above = 0;
+        for (let x = 0; x < W; x++) if (top[x] >= 0 && Math.abs(top[x] - (k * x + c)) <= tol) inl++;
+        for (let p = 0; p < N; p++) if (b2[p] && ((p / W) | 0) < k * (p % W) + c - tol) above++;
+        const ok = a2 >= 0.03 * N && a2 <= 0.6 * N && inl >= 0.6 * W && above <= 0.02 * a2;
+        if (ok) { for (let p = 0; p < N; p++) if (b2[p]) { bg[p] = 1; rf[0][p] = r2[0]; rf[1][p] = r2[1]; rf[2][p] = r2[2]; } floorBand = b2; }
+      }
+    }
+  }
   if (GR) regrow(0.3);
   let area = 0;
   for (let p = 0; p < N; p++) area += bg[p];
   if (area < N * 0.03 || area > N * 0.97) return null;
+  if (floorBand) bg.floor = floorBand;
   return bg;
 }
 
@@ -1982,17 +2034,21 @@ function bgMedianL(bg, U, N) {
   Ls.sort((a, b) => a - b);
   return Ls[Ls.length >> 1];
 }
-function bgFlatness(bg, R, G, B, N) {
+function bgFlatness(bg, R, G, B, N, band) {
   let nb = 0;
   for (let p = 0; p < N; p++) nb += bg[p];
   if (nb < 100) return 0;
-  const st = Math.max(1, Math.floor(nb / 20000)), Ls = [], As = [], Bs = [];
-  for (let p = 0, k = 0; p < N; p++) if (bg[p] && (k++ % st) === 0) { const v = labOf(R[p], G[p], B[p]); Ls.push(v[0]); As.push(v[1]); Bs.push(v[2]); }
+  const st = Math.max(1, Math.floor(nb / 20000)), S = [[[], [], []], [[], [], []]];
+  for (let p = 0, k = 0; p < N; p++) if (bg[p] && (k++ % st) === 0) { const v = labOf(R[p], G[p], B[p]), s = S[band && band[p] ? 1 : 0]; s[0].push(v[0]); s[1].push(v[1]); s[2].push(v[2]); }
   const med = a => { const s = Float64Array.from(a).sort(); return s[s.length >> 1]; };
-  const mL = med(Ls), mA = med(As), mB = med(Bs);
-  let near = 0;
-  for (let i = 0; i < Ls.length; i++) if ((Ls[i] - mL) ** 2 + (As[i] - mA) ** 2 + (Bs[i] - mB) ** 2 < 100) near++;
-  return near / Ls.length;
+  let near = 0, n = 0;
+  for (const [Ls, As, Bs] of S) {
+    if (!Ls.length) continue;
+    const mL = med(Ls), mA = med(As), mB = med(Bs);
+    for (let i = 0; i < Ls.length; i++) if ((Ls[i] - mL) ** 2 + (As[i] - mA) ** 2 + (Bs[i] - mB) ** 2 < 100) near++;
+    n += Ls.length;
+  }
+  return near / n;
 }
 function faceCutBg(bg, G, crisp, keep, faces, W, H, enc) {
   const N = W * H;
@@ -2501,6 +2557,7 @@ function process(img, opts, progress) {
       if (len >= 0.8 && Math.abs(Math.atan2(sx, sy)) > 40 * Math.PI / 180) IMG_DOWN = [sx / (len * sw), sy / (len * sw)];
     }
     bgMask = auto ? detectBackground(U, known, W, H) : null;
+    const floorBand = bgMask && bgMask.floor || null;
     if (auto) {
       let swal = null;
       const E = {}, edgesAt = thr => E[thr] || (E[thr] = crispEdges(U, W, H, thr)), edges = () => edgesAt(20);
@@ -2575,7 +2632,7 @@ function process(img, opts, progress) {
         faces = plausibleFaces(allFaces(), bgMask, W, H);
         nameFaces = plausibleFaces(allFaces().named, bgMask, W, H);
         // 배경이 거의 한 색이면 이미 찾은 배경으로 충분하고, 얼굴 기준 넓히기는 같은 색의 캐릭터 부분(흰 드레스 · 검은 머리)을 가져가기 쉬워 하지 않는다
-        const more = faces.length && bgFlatness(bgMask, R, Gc, B, N) < 0.6 ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H, enc) : null;
+        const more = faces.length && bgFlatness(bgMask, R, Gc, B, N, floorBand) < 0.6 ? faceCutBg(bgMask, getGraph(), crisp, back, faces, W, H, enc) : null;
         if (more) for (let p = 0; p < N; p++) if (more[p]) bgMask[p] = 1;
         // 캐릭터 사이로 보이는 단색 배경(틈)
         const gaps = bgGaps(bgMask, edges(), known, lineMask, A, back, faces, W, H);
