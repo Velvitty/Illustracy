@@ -8,6 +8,7 @@ A program that takes a single finished illustration and **splits it back into ma
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
 - Resolving power: **1.78× version 0.1** (0.39, 95% CI 1.50–2.14×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth, 11).
+- Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
 
@@ -1860,6 +1861,51 @@ Problems that came up while verifying with real pictures during development, and
 - A picture filling the canvas tilted 45° agrees with the same picture upright on only 76.1% of the character map's pixels (character IoU 69.5%; rotated with white corners 87.5%, flipped only 97.5%; 1440 real pictures, 11).
 - The boundaries splitting parts change when the picture is flipped or rotated (median IoU of the part overlapping most with the reference part: flipped 0.49, rotated 0.25–0.34, 11).
 
+### 10.6 Weaknesses seen through the five targets, and a call for help (0.39)
+
+Two kinds of pictures were used to measure in which cases 0.39 separates the background, body, base colors, faces, and objects correctly and in which it goes wrong (method and per-case tables in 11.13).
+
+- **10,080 synthetic pictures with ground truth**: the figure of the posed synthetic pictures was drawn in every combination of 6 backgrounds × 4 base-color cases × 6 faces × 5 objects × 14 poses, and each target was scored by "good" criteria fixed before looking at results.
+- **666 real pictures without ground truth**: each result became one grading sheet, shuffled together with the sheets of 168 synthetic pictures, and each target was graded blind as "no problem" (good · small problem) or "large problem" (large problem · not found).
+  The eye grades of the 168 mixed-in synthetic pictures were checked against their ground-truth scores, and 67 real sheets were renumbered, reshuffled and graded again to measure how much the grading wavers.
+
+| | Background | Body | Base colors | Faces | Objects |
+|---|---|---|---|---|---|
+| Synthetic: good | 77.8% | 72.0% | 23.6% | 42.6% | 79.5% |
+| Synthetic: good, 95% CI | 76.9–78.6% | 71.1–72.8% | 22.8–24.5% | 41.6–43.6% | 78.6–80.4% |
+| Synthetic: good, 80% CI | 77.2–78.3% | 71.4–72.5% | 23.1–24.2% | 42.0–43.2% | 78.9–80.1% |
+| Real: no problem | 47.6% | 75.4% | 10.9% | 45.8% | 52.8% |
+| Real: no problem, 95% CI | 43.8–51.5% | 71.9–78.5% | 8.8–13.6% | 42.0–49.7% | 47.7–57.8% |
+| Real: no problem, 80% CI | 45.2–50.1% | 73.2–77.5% | 9.5–12.6% | 43.3–48.3% | 49.5–56.1% |
+| Pictures (synthetic · real) | 10,080 · 657 | 10,080 · 650 | 10,080 · 650 | 10,080 · 644 | 8,064 · 373 |
+
+Intervals are Wilson intervals (z = 1.96 · 1.2816). Objects are counted only on the 8,064 synthetic pictures that have one, and real pictures without the target (no background to remove, no visible face, and so on) are left out.
+The synthetic pictures are not a random sample but every combination of fixed levels, so their intervals are the precision of the rates within this design.
+
+The weaknesses found are below. Real-picture counts are the numbers of grading sheets given that type (small problems included).
+
+| Target | Weakness | Evidence |
+|---|---|---|
+| Base colors | Materials painted with more shade than lit area take the shade color as their base color | Synthetic: adding wide shadows drops good from 38.2% to 5.3%; every button material is wrong |
+| Base colors | Different materials share one base color, and scenery · brush paintings break into patchwork | Real: "different materials in one color" 577, "patchwork" 467 (of 650) |
+| Faces | Lying and face-down faces | Synthetic: lying, seen from above 1.7%, lying on the side 0.0%, lying on the stomach 0.0%, face down on a desk 8.3% |
+| Faces | Dark skin, head turned 60° | Synthetic: dark skin 0.0%, head turned 60° 14.4% |
+| Faces | Missed and false faces | Real: missed 423, false 255 |
+| Background | A room drawn with lines (furniture, window frames) stays on the character side | Synthetic: good 0.0% (background found averages 51.8%) |
+| Background | Scenery, text, and effects stay on the character side | Real: scenery 417, text · signature 200, effects · light 145 |
+| Body | Dark hair, clothes, and shoes in front of a dark flat background go to the background | Synthetic: body good 11.4% (head lost in 52%, feet in 88%, skirt in 24% of the pictures) |
+| Body | Hair, clothes, and white parts are lost | Real: hair 161, clothes 147, white · pale areas 72 |
+| Objects | A box on the floor beside the character stays on the character side | Synthetic: good 37.1%; real: loose items kept with the character 208 |
+| Objects | A background-colored bag in front of a dark flat background | Synthetic: good 6.0% |
+
+#### Help wanted
+
+We are looking for people to help solve these weaknesses. If you are a grey hat, please help. Anyone who knows image processing or how illustrations are painted is welcome.
+
+- Send pictures that split wrongly (counterexamples), analyses of causes, or fixes as issues or pull requests.
+- Changes are measured with the same tests as section 11 (ground-truth scoring and blind grading) and go in only when they improve results.
+- Constraints kept: one file (`index.html`), running only in the browser, splitting by rules without trained models or external libraries.
+
 ---
 
 ## 11. Verification
@@ -3074,13 +3120,13 @@ base colors — for every material over 300 pixels (eyes excluded), at least 80%
 objects — at least 90% of the object pixels on the right side (held or hugged items with the character, items on the floor with the background). A target is not counted when the face is not visible or there is no object.
 The 168 pictures used for the blind-grade check below were run a second time separately, and the scores of all five targets matched the main run in 168 of 168 pictures.
 
-| Target | Good | 95% CI |
-|---|---|---|
-| Background | **77.8%** (7,838/10,080) | 76.9–78.6 |
-| Body | **72.0%** (7,253/10,080) | 71.1–72.8 |
-| Base colors | **23.6%** (2,381/10,080) | 22.8–24.5 |
-| Faces | **42.6%** (4,294/10,080) | 41.6–43.6 |
-| Objects | **79.5%** (6,413/8,064) | 78.6–80.4 |
+| Target | Good | 95% CI | 80% CI |
+|---|---|---|---|
+| Background | **77.8%** (7,838/10,080) | 76.9–78.6 | 77.2–78.3 |
+| Body | **72.0%** (7,253/10,080) | 71.1–72.8 | 71.4–72.5 |
+| Base colors | **23.6%** (2,381/10,080) | 22.8–24.5 | 23.1–24.2 |
+| Faces | **42.6%** (4,294/10,080) | 41.6–43.6 | 42.0–43.2 |
+| Objects | **79.5%** (6,413/8,064) | 78.6–80.4 | 78.9–80.1 |
 
 All five targets were good in 436 of the 8,064 pictures with an object (5.4%); adding the pictures without an object (four targets counted), every counted target was good in 596 pictures (5.9%). The table below gives the good rate (%) for each level of each variable; the number of pictures per level is 10,080 divided by that variable's number of levels (the object column skips "none").
 
@@ -3140,13 +3186,13 @@ these were shuffled together with the sheets of 168 of the synthetic pictures ab
 The sheets show no file names, sets, or conditions, and the grading rules (A good · B small problem · C large problem · N not found (background and faces only) · - not applicable, plus problem types per target) were fixed before grading and not changed.
 For objects, things the character holds or wears belong with the character, and loose items and furniture with the background. "No problem" is A or B; intervals are Wilson 95%.
 
-| Target | No problem | 95% CI | A · B · C · N | Test 24 · pixiv 300 · pixiv 342 (%) |
-|---|---|---|---|---|
-| Background | **47.6%** (313/657) | 43.8–51.5 | 117 · 196 · 232 · 112 | 41.7 · 49.2 · 46.7 |
-| Body | **75.4%** (490/650) | 71.9–78.5 | 323 · 167 · 160 · — | 87.5 · 77.5 · 72.7 |
-| Base colors | **10.9%** (71/650) | 8.8–13.6 | 1 · 70 · 579 · — | 4.2 · 9.6 · 12.6 |
-| Faces | **45.8%** (295/644) | 42.0–49.7 | 134 · 161 · 55 · 294 | 91.7 · 46.0 · 42.3 |
-| Objects | **52.8%** (197/373) | 47.7–57.8 | 129 · 68 · 176 · — | 35.3 · 54.0 · 53.3 |
+| Target | No problem | 95% CI | 80% CI | A · B · C · N | Test 24 · pixiv 300 · pixiv 342 (%) |
+|---|---|---|---|---|---|
+| Background | **47.6%** (313/657) | 43.8–51.5 | 45.2–50.1 | 117 · 196 · 232 · 112 | 41.7 · 49.2 · 46.7 |
+| Body | **75.4%** (490/650) | 71.9–78.5 | 73.2–77.5 | 323 · 167 · 160 · — | 87.5 · 77.5 · 72.7 |
+| Base colors | **10.9%** (71/650) | 8.8–13.6 | 9.5–12.6 | 1 · 70 · 579 · — | 4.2 · 9.6 · 12.6 |
+| Faces | **45.8%** (295/644) | 42.0–49.7 | 43.3–48.3 | 134 · 161 · 55 · 294 | 91.7 · 46.0 · 42.3 |
+| Objects | **52.8%** (197/373) | 47.7–57.8 | 49.5–56.1 | 129 · 68 · 176 · — | 35.3 · 54.0 · 53.3 |
 
 The most frequent problem types per target (number of sheets given that type, over B, C, and N):
 
