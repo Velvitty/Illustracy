@@ -4,7 +4,6 @@
 
 A program that takes a single finished illustration and **splits it back into many transparent layers**, the way it was painted, and saves them as a Photoshop file (PSD).
 
-- One file (`index.html`): open it in a browser and it works.
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
 - Resolving power: **2.14× version 0.1** (0.40, 95% CI 1.79–2.61×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth, 11).
@@ -63,12 +62,12 @@ If the program finds a face in the picture (also in PNGs with a transparent back
 
 ### What do I need?
 
-- The single file `index.html` and a browser (Chrome, Edge, Firefox, Safari)
+- A browser (Chrome, Edge, Firefox, Safari)
 - Nothing else: no internet, installation, account, or cost.
 
 ### How to use it
 
-1. Open `index.html` in a browser.
+1. Open the program in a browser.
 2. Drag an image onto the window, click the box at the top left to choose one, or paste a copied image with `Ctrl+V`.
    To try it first, click **Sample image** (`예제 그림`).
 3. Wait a few seconds and the layer list appears on the right.
@@ -93,12 +92,6 @@ Automatic splitting sometimes leaves a background object on the character side, 
 - While these two tools are on, pan the view with the right mouse button.
 
 Your fixes remain when you change settings and split again, and are cleared when you open a new picture. Fixing does not change the stacked result, which stays identical to the original picture.
-
-### Using it offline
-
-1. Download `index.html` (open the file on GitHub and choose *Download raw file*, or download the repository ZIP).
-   In the program you already have open, the top-left **⬇ Save program (for offline use)** (`⬇ 프로그램 저장 (오프라인 실행용)`) gives you the same file.
-2. Double-click the downloaded file. Every feature works without an internet connection.
 
 ### Renaming layers in old PSDs
 
@@ -1442,11 +1435,11 @@ Only color comparisons (<mark>k-means</mark>, $`\Delta E`$) are done in Lab spac
 
 ### 6.1 Files
 
-The single file `index.html` contains the following.
+The program contains the following.
 
 | Component | What it does |
 |---|---|
-| Screen (HTML · CSS) | settings on the left, preview in the middle, layer list on the right |
+| Screen | settings on the left, preview in the middle, layer list on the right |
 | `IllustracyCore()` | the whole splitting algorithm. Closed in one function, so it moves to a worker as is via `toString()` |
 | Worker connection | runs the core in a Blob URL worker and receives the result layers' buffers without copying (transferable). If it fails, runs on the page |
 | `PSD.write()` | PSD file writer |
@@ -1454,7 +1447,6 @@ The single file `index.html` contains the following.
 | Compositor | preview, difference view, PNG save, PSD merged image |
 | Correction tools | send to background, return to character, loop, undo stack |
 | Sample picture | a cel-shaded picture drawn directly on a canvas |
-| Save program | downloads the current page's HTML as a file as is |
 
 ### 6.2 Data flow
 
@@ -1713,7 +1705,7 @@ Problems that came up while verifying with real pictures during development, and
 - **Lightly painted layers**: multiply · screen layers are stored with the smallest possible alpha, so they look like layers an artist painted lightly and are easy to keep working on.
 - **Many cues for background decisions**: border connection, line density, how much lines enclose a place, sharpness (focus), color distributions learned per picture, and face positions are used in turn, and cut-off character parts are picked out. Faces are found with rules and averaged patterns, without a trained model.
 - **Precise manual correction**: a brush and loop that do not cross lines and part boundaries. Even after corrections, the composite stays identical to the original.
-- **One file, offline, free**: no installation · server · external libraries · paid services. The picture never leaves the computer.
+- **Offline, free**: no installation · server · external libraries · paid services. The picture never leaves the computer.
 - **A PSD writer built from scratch**: folders, clipping, blend modes, Korean names, merged image. Verified with two independent PSD parsers.
 - **Deterministic results**: the same picture with the same settings always gives the same result.
 - **Fast**: usually 4–9 seconds for pictures with a long side around 1200px, around 15 seconds for 2048px pictures (on the computer used for verification).
@@ -1917,7 +1909,7 @@ We are looking for people to help solve these weaknesses. If you are a grey hat,
 
 - Send pictures that split wrongly (counterexamples), analyses of causes, or fixes as issues or pull requests.
 - Changes are measured with the same tests as section 11 (ground-truth scoring and blind grading) and go in only when they improve results.
-- Constraints kept: one file (`index.html`), running only in the browser, splitting by rules without trained models or external libraries.
+- Constraints kept: running only in the browser, splitting by rules without trained models or external libraries.
 
 ---
 
@@ -1925,7 +1917,7 @@ We are looking for people to help solve these weaknesses. If you are a grey hat,
 
 For every picture, the PSD was recomposited with **psd-tools** (Python) and compared with the original, and its structure was read with **ag-psd** (JavaScript) to check that the layer · folder counts match the program.
 Checks of the layer structure (names, blend modes, clipping bases, empty layers, canvas bounds) found 0 problems, and splitting the same picture twice gave byte-identical pixels in every layer.
-It was also run with all external network requests from the browser blocked, and from a saved offline copy (0 external requests).
+It was also run with all external network requests from the browser blocked (0 external requests).
 
 In this section:
 
@@ -2397,7 +2389,7 @@ So the 342 pixiv pictures never used while fixing the rules were verified separa
 | PSD: psd-tools | all 342 open. Embedded merged image <mark>PSNR</mark> lowest 42.5 · median 52.8 dB, layers recomposited 42.4 · 51.3 dB. Layer · folder counts all match the screen |
 | PSD: ag-psd | all 342 read. Merged images 342, Korean layer names 342, layer counts all match the screen |
 | Splitting time on screen · PSD size | median 10.2 s per picture · longest 44.6 s (4 at a time), PSD median 8.6 MB · largest 45.6 MB |
-| Determinism (the same picture twice in new pages) | all 12 (4 per quality) byte-identical. Running the saved offline copy · the re-split cache after corrections also fine |
+| Determinism (the same picture twice in new pages) | all 12 (4 per quality) byte-identical. The re-split cache after corrections also fine |
 
 In two opaque pictures with no background found, an empty "background" layer and [Background] · [Character] folders appeared. The screen always passes correction masks (even with nothing painted),
 and the core made an empty background map just from the masks. Verification run directly in code had no masks, so it did not show.
@@ -2955,7 +2947,7 @@ the version adding the lit-side base color was compared with it on 20 pictures: 
 | Part counts (mean over 642) | parts 21.97 → 23.16, "small parts" 1.75 → 4.22 (pictures with small parts 221 → 320), pictures reaching the maximum of 32 parts 108 → 133 |
 | Pictures where the rules applied (642) | splitting colors off white · gray materials 438 (300 set 213 · 342 set 225; 3.0 new materials per picture on average, the moved tones a median 0.4% of the picture), keeping small colored areas 432 (225 · 207), lit-side base color 517 (245 · 272; 6.0 materials per picture on average). On the 117 ground-truth pictures: 5 · 73 · 37 |
 | Processing time | the background stage (2–4 s) is unchanged; the later stages took 2% more in total on 12 hold-out pictures (the shorter of two alternating runs in the same process; median 2.95 → 2.90 s) |
-| Screen verification (28 test pictures) | 0 errors · external requests, both psd-tools · ag-psd read all 28 (merged image <mark>PSNR</mark> 48.76–61.87 dB; 0.38: 48.79–61.86 dB), splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine. Mean layer count 113.3 → 121.7 |
+| Screen verification (28 test pictures) | 0 errors · external requests, both psd-tools · ag-psd read all 28 (merged image <mark>PSNR</mark> 48.76–61.87 dB; 0.38: 48.79–61.86 dB), splitting the same picture twice byte-identical for all 28, re-split cache after corrections fine. Mean layer count 113.3 → 121.7 |
 
 ### 11.9 Tilted pictures (0.37)
 
@@ -3242,7 +3234,7 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 ### 11.14 Resolving power by version
 
 Every version from 0.1 to 0.40 was measured again with the same pictures and the same scoring.
-Each version's `index.html` at its commit was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
+Each version's code was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the <mark>balanced error rate</mark>
 
@@ -3324,7 +3316,7 @@ The table at the end of the 0.40 entry in section 12 gives the resolving power a
 
 ## 12. Release history
 
-Newest versions are at the top. Each version lists its last commit; downloading `index.html` at that commit gives you that version.
+Newest versions are at the top.
 
 ### 0.40 (2026-10-03) The floor of line-drawn rooms
 
@@ -3342,7 +3334,6 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 - The background maps of the 666 pixiv pictures are all byte-identical to 0.39 (the 7 that reached the floor check were all stopped by the straight-top-edge condition), so the real-picture five-target results (10.6, 11.13) and the blind test (11.15) are the same as 0.39.
 - Tried but not added: sending detached pieces to the background by their size relative to the largest piece (for the box on the floor beside the character; a blind grading of 79 pieces on real pictures found 38 background · 15 character below a ratio of 0.2),
   tilted search for lying faces (33 real out of 157 newly found faces), and removing rectangular pieces such as windows (rare in real pictures, with a risk of removing subjects such as cards).
-- Commit `3727548` (code)
 
 | | Version 0.1 | Version 0.38 | Version 0.39 | Version 0.40 |
 |---|---|---|---|---|
@@ -3367,8 +3358,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Background maps are byte-identical to 0.38 for all 642 pictures · 185 ground-truth pictures, so the background results (strict separation grades · background resolving power) are unchanged, and the character folder counts are identical for all 642.
   In a blind review of the 99 pictures whose names changed, wrong names went 93 → 93 ($`p = 1`$). In the set of 342 they rose 57 → 60, which cannot be told apart from chance ($`p = 0.73`$).
 - Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image <mark>PSNR</mark> 48.76 dB or more), splitting the same picture twice byte-identical for all 28,
-  offline copy · re-split cache after corrections fine.
-- Commit `8864512` (code)
+  re-split cache after corrections fine.
 
 | | Version 0.1 | Version 0.37 | Version 0.38 | Version 0.39 |
 |---|---|---|---|---|
@@ -3391,8 +3381,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   "No major loss" over all 642 is 300: 78.9 → 84.6% · 342: 68.7 → 75.4% · all 73.5 → 79.6% (same grading criteria, 11).
 - Background shapes drawn attached to the character come back too, so "perfect separation" decreased (hold-out 4 → 1, 10).
 - Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image <mark>PSNR</mark> 48.8 dB or more), splitting the same picture twice byte-identical for all 28,
-  offline copy · re-split cache after corrections fine.
-- Commit `7c053ca` (code)
+  re-split cache after corrections fine.
 
 | | Version 0.1 | Version 0.36 | Version 0.37 | Version 0.38 |
 |---|---|---|---|---|
@@ -3416,29 +3405,26 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   Upright pictures do not change because of the tilt part.
 - Additional verification (code unchanged): in a 12-category blind test of 1440 samples from real pictures, splitting at the original size against enlarging 2× with <mark>DCCI</mark> to split was better 326 · worse 165 · same 949 ($`p < 0.0001`$),
   and reverse verification matched rotated and flipped results back to the reference coordinates (11).
-- Commit `e27e195` (code)
 
 ### 0.36 (2026-09-30) Fixing layer names of old PSDs inside the program
 
 - Resolving power: 1.33× version 0.1 (95% CI 1.11–1.61×; background results identical to the previous version, 11)
 - Putting PSDs saved up to 0.34 into the program like pictures (drag and drop · choose, several at once) immediately saves PSDs with the `색트레스` layer renamed to `색 트레이스` (1, 4.15).
-  The separate `rename-layers.html` was removed. Split results and PSDs for pictures are byte-identical to 0.35.
+  The separate layer renaming tool was removed. Split results and PSDs for pictures are byte-identical to 0.35.
 - Verification: on 28 test PSDs saved with 0.33, 6 PSBs, 3 files with layer info in `Lr16` · `Lr32`, and 1 file with Pascal names written in EUC-KR,
-  results were byte-identical to 0.35's `rename-layers.html` (whose results were confirmed in 0.35 with psd-tools · ag-psd to differ only in names).
-  Choosing one file · several files (fixed files · already fixed files · broken files mixed) · drag and drop · putting pictures and PSDs in together · the feature being in the offline copy were checked on screen,
+  results were byte-identical to 0.35's layer renaming tool (whose results were confirmed in 0.35 with psd-tools · ag-psd to differ only in names).
+  Choosing one file · several files (fixed files · already fixed files · broken files mixed) · drag and drop · putting pictures and PSDs in together were checked on screen,
   with no errors · external requests.
-- Commit `7ed94dd` (code)
 
 ### 0.35 (2026-09-30) Layer name "색 트레이스", a tool to rename layers in old PSDs
 
 - Resolving power: 1.33× version 0.1 (95% CI 1.11–1.61×; background results identical to the previous version, 11)
 - The line color layer and setting name changed from `색트레스` to `색 트레이스` (PSD layer name, "line art + color trace" in the "Line color" setting). Other split results are the same as 0.34.
-- Added `rename-layers.html`. Dropping a PSD saved up to 0.34 gives a file with the `색트레스` layer renamed to `색 트레이스` (1, 4.15).
+- Added a layer renaming tool. Dropping a PSD saved up to 0.34 gives a file with the `색트레스` layer renamed to `색 트레이스` (1, 4.15).
 - Verification: 35 layers were renamed in 28 test PSDs saved with 0.33 (1–2 per file), and in both psd-tools · ag-psd only the names differed,
   with the merged image · per-layer pixels · blend modes · opacity · clipping · hidden flags identical to the original. Putting a renamed file in again says there is no layer to rename.
   6 files converted to PSB, 3 files with layer info in `Lr16` · `Lr32`, and 1 file with Pascal names in EUC-KR also differed only in names in psd-tools.
   Files downloaded from the browser screen were byte-identical to the function's result, with no errors · horizontal overflow (width 360px).
-- Commit `bf3581c` (code)
 
 ### 0.34 (2026-09-30) Tackling limitations again: narrow gaps on white backgrounds, mirror-agreed faces, returning black hair
 
@@ -3452,8 +3438,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   wrong names 78 → 34 places; 6 one-person pictures that had been split into two folders were resolved, and 5 two- or three-person pictures lost one folder (11).
 - Black hair of almost the background's color is returned once more with fainter edges · fine color bins (8 of 3.5, 4.5). Character kept on 6 synthetic dark-background pictures 84.1% → 100%.
 - Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image <mark>PSNR</mark> 48.8 dB or more), splitting the same picture twice byte-identical for all 28,
-  offline copy · re-split cache after corrections fine.
-- Commit `0f4c00c` (code)
+  re-split cache after corrections fine.
 
 ### 0.33 (2026-09-30) Verifying the character layer, background seen between character parts (gaps)
 
@@ -3466,8 +3451,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Blind grading of 50 random pictures among the 134 whose character map changed: new version better 17 · worse 6 · similar 27 ($`p = 0.035`$); no major loss unchanged at 35 → 35; perfect separation 0 → 3 (11).
   Worse pictures are cases where white character parts surrounded only by lines (white wings · white plates of a robot) went as gaps.
 - Names: on 60 changed pictures, better 18 · worse 21 ($`p = 0.75`$), no difference. Wrong places 64 → 73 ($`p = 0.19`$).
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine.
-- Commit `043d068` (code)
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, re-split cache after corrections fine.
 
 ### 0.32 (2026-09-30) Fewer pictures with no background found
 
@@ -3477,8 +3461,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - **Pictures with no background found at all (633 with characters): 18 → 5.** Blind grading of the 22 changed: new version better 14 · worse 1 · similar 7 ($`p = 0.001`$),
   no major loss 7 → 19. No major loss over all 633: 443 → 455 (71.9%) (11).
 - Names: on the 18 changed, better 3 · worse 7 ($`p = 0.34`$), no difference; wrong places 15 → 13. Only 23 of the 666 changed; the rest are the same as 0.31.
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine.
-- Commit `2a2fa24` (code)
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, re-split cache after corrections fine.
 
 ### 0.31 (2026-09-30) Not taking places enclosed by lines into the background
 
@@ -3493,8 +3476,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   Names: on 60 random pictures, better 23 · worse 20, no difference; processing time is the same.
 - The variations tested (blocking only stage 1, threshold 0.8, the bottom border as a wall) and their results are in 7.5.
 - Fixed a hang where only returned character parts remained in pictures whose scene background was discarded by the area criterion (found on one picture while testing variations).
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine.
-- Commit `c68b877` (code)
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, re-split cache after corrections fine.
 
 ### 0.30 (2026-09-30) Splitting large pictures at a reduced size (setting)
 
@@ -3505,9 +3487,8 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
     reduced better 25 · original size better 29 · similar 60 ($`p = 0.68`$), no difference, and time 17.4 s → 9.1 s. Pictures with no background found at all 1 → 4.
   - **Find only background · faces at reduced size**: background · faces are found on the reduced picture and the layers are made at the processing resolution (4.5). In the same grading, reduced better 14 · original size better 51 ($`p < 0.0001`$):
     more pictures lose more character and time drops only 5%, so the explanation window says it is not recommended (7.5, 11).
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine.
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, re-split cache after corrections fine.
   The flow of turning the setting on and off (disabled by default, explanation window when turned on, cancel · Esc reverts, confirm enables + splits again, for both methods) was also checked with a 2000px picture (0 errors).
-- Commit `d235b91` (code)
 
 ### 0.29 (2026-09-30) The color step threshold of large pictures in proportion to picture size
 
@@ -3528,8 +3509,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   but enlarged better 23 · original size better 33 · similar 74 ($`p = 0.23`$), no major loss 84 → 80, no difference, so it was not added (7.5).
 - Splitting pictures larger than 1200px shrunk to a long side of 1200px was also graded blind on 114 high-resolution pictures, but reduced better 25 · original size better 29 · similar 60 ($`p = 0.68`$),
   no major loss 65 → 57 ($`p = 0.10`$), no improvement, so it was not added. Splitting time halves (17.4 s → 9.1 s) (7.5).
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine.
-- Commit `3a3de9b` (code)
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, re-split cache after corrections fine.
 
 ### 0.28 (2026-09-29) Removing names from separated hair pieces
 
@@ -3545,8 +3525,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   6 pictures had long hair tips far from the head, or the hair of people whose face was not found, become color names (10).
 - The same detaching was tried for skin, but separated skin pieces were mostly real hands · arms · legs, so it was not done (7.5).
 - The time detaching takes, measured alternately with it on and off on 6 pictures, is a median of +0.13 s (−0.07 to +0.77 s), similar to the variation between measurements.
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine.
-- Commit `8373c02` (code)
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, re-split cache after corrections fine.
 
 ### 0.27 (2026-09-29) Skipping face-based widening on flat backgrounds, results by detailed condition
 
@@ -3569,9 +3548,8 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   - In exchange, clothes · legs · hands · props newly kept on the character side were grouped into hair · skin parts more often, and pictures without wrong names went 419 → 410 (of 666, 3 · 12, $`p = 0.035`$).
     There is no evidence that hair names (226 → 230) · skin names (183 → 186) changed ($`p = 0.39`$, 0.25), and faces · character folders are unchanged.
     Lost character must be painted with the correction brush while a wrong name only needs the layer renamed, so the background improvement was chosen.
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine.
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, re-split cache after corrections fine.
 - Added to 11 the detailed condition table and the formulas for multiple-test correction (<mark>Benjamini–Hochberg</mark>) · <mark>ridge logistic regression</mark>.
-- Commit `d35c9ad` (code)
 
 ### 0.26 (2026-09-29) Verification on 342 new pictures, empty background layer in pictures without background, the relation between faces and background results
 
@@ -3607,7 +3585,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Whether the background is found differed between the screen (input re-saved as JPEG quality 95) and code (lossless input) in 4 of the 342.
   All were right next to a threshold (scene background area 5% · 90%, color distribution overlap 0.3); moving the thresholds would bring other pictures to that spot, so the code was kept and this was written in the limitations (10).
 - The statistical formulas used in verification (<mark>Fisher's exact test</mark>, intervals of the difference · ratio · <mark>odds ratio</mark> of two proportions, <mark>Mantel–Haenszel</mark>, <mark>logistic regression</mark>, <mark>McNemar</mark>, comparison of mean counts) were added to 11.
-- Commit `52f6c7b` (code)
 
 ### 0.25 (2026-09-29) Removing the "skin" color name in pictures without faces
 
@@ -3622,7 +3599,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Every formula the program uses was written in its section: input · processing resolution (4.0), Lab ↔ sRGB matrices (4.1), blur · <mark>distance transform</mark> · <mark>k-means</mark> · random numbers · interpolation (4.2),
   face finding's <mark>Hessian</mark> differences · face frame coordinates · sample grids (4.5), color names · skin color decision (4.8), stored layer values (4.12), the rough's <mark>Sobel</mark> · thinning (4.14),
   PSD byte layout · PackBits (4.15), screen zoom (4.16), correction tools · cache hash (4.17), verification metrics and statistics (11). The program's behavior did not change.
-- Commit `1f866af`
 
 ### 0.24 (2026-09-29) Folders of two-person pictures, names for pale skin
 
@@ -3633,7 +3609,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Very bright, pale skin is also called "skin" if the part's area is about that of a face · hands · limbs (7 of 4.8). 14 pixiv pictures got new skin names: 12 correctly on faces · hands, 2 also on small background pieces or a white cat character's face.
   In the 25 test pictures, the right figure's face in the tea party on the moon got a skin name, and the synthetic scores (48 naming ground truth · 65 character ground truth) are the same.
 - Letting very small faces be found, or widening the height condition further, did not improve and was left out (7.5).
-- Commit `1eeb098`
 
 ### 0.23 (2026-09-29) Faster re-splitting after corrections
 
@@ -3643,7 +3618,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Re-splitting stage by stage the 65 of the 300 unseen pictures with large parts of the character missing, most were the scene background (places with sparse lines) taking brush-painted · softly shaded clothes · hair.
   A method returning them by face zones and color was tested, but mostly background objects behind the character came back, so it was not adopted (7.5).
 - Results of a single split are byte-identical to 0.22 on every test picture.
-- Commit `9c80a71`
 
 ### 0.22 (2026-09-29) Fewer names · folders from fake faces
 
@@ -3653,7 +3627,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   Fake faces 310 → 232, real faces found 193 → 196, pictures with the right folder count 232 → 236. Of the 52 pictures whose names changed, 24 got better and 12 worse.
 - Background decisions keep using the original faces, so background and character regions are the same as 0.21 on every test picture (using the same adjustment for the background too made the background flip between better and worse, 7.5).
 - Fake faces on the 25 test pictures 35 → 27, on synthetic pictures 8 → 5.
-- Commit `06aee2a`
 
 ### 0.21 (2026-09-29) White clothes on white backgrounds
 
@@ -3665,7 +3638,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   In a few pictures with patterned · textured backgrounds touching the bottom edge, that background stays on the character side (10). Faces · character folders are all the same, and names changed with about as many better as worse.
 - On the 25 test pictures, apart from one picture (the black dress came back), edges changed by around 0.1%p, and the scores of the 65 synthetic pictures are the same.
 - Fixed one formula (rare color in 4.5) that rendered broken.
-- Commit `4880358`
 
 ### 0.20 (2026-09-28) Verification with 300 unseen pictures
 
@@ -3676,7 +3648,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Loosening or removing the height condition of character face selection was tested on these pictures, but one-person pictures were split more often, so it was kept (7.5).
 - White clothes + white backgrounds, wrong names from fake faces, and the folder counts of group pictures were written in the limitations (10).
 - PSDs of the 25 test pictures are byte-identical to 0.19.
-- Commit `48259fa`
 
 ### 0.19 (2026-09-28) Re-verifying background · faces · characters · glow · brush painting cleanup
 
@@ -3691,7 +3662,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - The causes of differences under left-right flipping (face pattern · eye refinement order, stages merging in pixel order) were measured, and making them symmetric was tested, but results got worse, so it was kept (7.5, 11).
 - It was confirmed that dark-skinned faces, non-fluorescent glows, and black hair in front of almost black backgrounds are still not found (10).
 - The 25 real pictures have PSDs byte-identical to 0.18, and the transparent-background sample only changed names ("purple" → "hair", "blue" → "eyes").
-- Commit `2e9f50a`
 
 ### 0.18 (2026-09-28) Re-verifying naming
 
@@ -3703,7 +3673,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - For hair exposing the forehead, hair is searched above the forehead, and shadows on the whites of the eyes · pupils are not called hair (the sample picture's "hair 2" is gone).
 - Faces of characters with small heads are not filtered as fake, and fake faces on the background are dropped even if they score highest (4.5). Characters differing in size by up to 2× are also split separately.
 - Layer pixels changed only in one picture, the tea party on the moon (a fake face removed).
-- Commit `095a202`
 
 ### 0.17 (2026-09-28) Cleaning up base colors of brush paintings
 
@@ -3715,14 +3684,12 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - In pictures where brush marks · hair grain are caught as lines, grain with the same color on both sides of the line is not treated as a material boundary (4.6). It does not apply to line-art pictures.
 - On 10 synthetic pictures with ground truth, material coverage 77.0% → 96.6%, part purity 85.0% → 99.3%, base color error 25.4 → 18.2 (11). Reproduction <mark>PSNR</mark> of real pictures is almost the same (mean 55.67 → 55.62 dB).
 - Long hair and the leg skin of full-body pictures also get names (4.8), and in pictures with faces found only parts confirmed by faces are called "skin".
-- Commit `c0a9600`
 
 ### 0.16 (2026-09-28) Outer glow layer
 
 - Resolving power: 1.01× version 0.1 (95% CI 0.84–1.21×, 11)
 - In pictures with a fluorescent band (neon glow) around the character, that band is taken out separately into the "Outer glow" layer of the [Background] folder (4.5). The background below it is filled in by guessing from the surrounding background.
 - It acts on the silver-haired gothic lolita among the test pictures; the other pictures give the same results as before. White sticker borders and borders of pictures where little background is found cannot be split yet.
-- Commit `9992d8e`
 
 ### 0.15 (2026-09-28) Per-character folders
 
@@ -3730,7 +3697,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Pictures with several characters are split into [Character 1] · [Character 2] … folders, each holding that character's line art · effects · painting (3.12, 4.8).
 - Characters are decided from the found faces and split along the outlines, starting from the head · body zones. All 7 two-person pictures were split in two, and no one-person picture was split wrongly.
 - Compared with person-drawn outlines, 93–99% of pixels go to the right character. The composite is the same as before.
-- Commit `73169c3`
 
 ### 0.14 (2026-09-28) Eye · skin · hair names
 
@@ -3738,7 +3704,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - When faces are found, part folders get the names **eyes · skin · hair** instead of color names (3.9, 4.8). Other parts keep color names as before.
 - All 25 test pictures got one or more names, and roughly 9 out of 10 are right. The wrong ones are cases grouped into one part, like clothes of the hair's color or floors · food of the skin's color.
 - Layer pixels and reproduction results do not change.
-- Commit `14eb736`
 
 ### 0.13 (2026-09-28) Filtering fake faces
 
@@ -3746,7 +3711,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - "Faces" whose head zone goes far outside the picture or sits on already found background (knees, cushions, background decorations) are dropped before face-based widening (4.5).
   Two people at the window background 24% → 26%, two people in yukata 19% → 20%. Averaged over the 8 outline pictures, background found 51.9% → 52.5%, character kept unchanged.
 - Ways to find more (crossing blurred lines, lowering the color threshold far away, crossing lines for pieces not touching the character) were tested too, but they took the character's arms · hair · skirts · props, so they were not added (7.5).
-- Commit `d1be572`
 
 ### 0.12 (2026-09-28) Finding faces to widen the background
 
@@ -3757,7 +3721,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   Two people, full body background 36% → 42%, qipao card illustration 15% → 21%, elf in a flower field 59% → 63%.
   Averaged over the 8 pictures with drawn character outlines, background found 49.9% → 51.9%, character kept 96.7% → 96.5%.
 - Pictures where no face is found or there is no background to add give byte-identical results to before. It takes a median of 0.6 s (up to 2.4 s) more per picture.
-- Commit `fe04e3c`
 
 ### 0.11 (2026-09-28) Line width set by measuring the picture
 
@@ -3768,7 +3731,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Line sensitivity · base color merge strength · shadow threshold · number of color clusters · maximum number of parts · sparkle size were also tried as values measured from the picture,
   but results got worse or did not improve, so defaults are used (7.5).
 - The 28 test pictures give byte-identical results to before.
-- Commit `19703f1`
 
 ### 0.10 (2026-09-28) Returning attached character parts, full re-verification
 
@@ -3776,7 +3738,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Arms · hands · sleeves · wings · cat ears painted softly without lines that got dragged into the background are returned to the character automatically (7 of 3.5).
   Pictures with nothing to return give byte-identical results to before.
 - All 28 test pictures so far were re-verified: 0 errors · external requests, PSDs checked with two tools, the same picture always gives the same result. Two test pictures were added.
-- Commit `d62b88a`
 
 ### 0.9 (2026-09-27) A rough without breaks
 
@@ -3784,14 +3745,12 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Fixed rough lines clumping thick and breaking into dashes. The hand-drawn strokes that look drawn over several times are kept, and the center lines of the original lines are laid underneath so even faint lines do not break.
 - Pieces not connected to lines, like glitter · small marks, are left out of the rough.
 - Tried and reverted: a single center line of even width (looked machine-traced), reducing hair grain.
-- Commit `e074b94`
 
 ### 0.8 (2026-09-27) Turning all layers off
 
 - Resolving power: 0.95× version 0.1 (95% CI 0.80–1.15×; background results identical to the previous version, 11)
 - The eye icon above the layer list turns all layers and folders off at once, and pressing it again returns to the state before.
 - Turning a layer on also turns on the folders above it, and the list's scroll position is kept when checking.
-- Commit `99d8575`
 
 ### 0.7 (2026-09-27) Automatic separation of backgrounds drawn with lines
 
@@ -3800,7 +3759,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   Character region overlap (<mark>IoU</mark>): graffiti 0.72 → 0.90, fireworks 0.71 → 0.79, night view 0.68 → 0.77.
 - The "content hint" approach, where a person marks character outlines and part names, needed human hands, so it was removed and replaced by the automatic approach above.
 - This document was rewritten from easy explanations to algorithms · formulas.
-- Commit `230ab4f`
 
 ### 0.6 (2026-09-27) Automatic decision for cut-off parts, loop, maximum number of parts
 
@@ -3808,7 +3766,6 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Hats · sleeves cut off at the top · sides of the screen are kept as character automatically.
 - Drawing a loop with either correction tool moves its inside at once.
 - Added the maximum number of parts setting (default 32). Small overflowing parts go to the "small parts" folder.
-- Commit `cb48cf5`
 
 ### 0.5 (2026-09-27) Correction tools
 
@@ -3817,33 +3774,27 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - **Return to character**: rub parts that wrongly went into the background to return them, and the picture is split again.
 - Corrections remain when settings are changed and the picture is split again, and are undone with `Ctrl+Z`.
 - Sleeves · skirts · legs cut off at the bottom of the screen do not become background.
-- Commit `5d1c8b6`
 
 ### 0.4 (2026-09-27) Scene backgrounds and exact lines
 
 - Resolving power: 0.90× version 0.1 (95% CI 0.77–1.05×; lower than the previous version (0.3), 11)
 - Scene backgrounds painted without lines are found by line density, and finely detailed backgrounds drawn blurred (shelves, writing) are found too (café interior background 19% → 41%).
 - Colored lines (color trace) are reproduced exactly (magical girl reproduction <mark>PSNR</mark> 38 → 60 dB).
-- Commit `f975896`
 
 ### 0.3 (2026-09-27) Refining with real pictures, work-file layers
 
 - Resolving power: 1.04× version 0.1 (95% CI 1.01–1.08×, 11)
 - Refined with real illustrations: parts were cleaned up from 168 to 9, and reproduction <mark>PSNR</mark> rose from 41 to 47 dB.
 - Added rim light, reflected light, gradient, background effect, silhouette (for selection) layers and [Character] · [Background] · [Line art] folders.
-- Commit `1e81f4e`
 
 ### 0.2 (2026-09-27) Illustrator-style layer structure, running without internet
 
 - Resolving power: 1.00× version 0.1 (95% CI 1.00–1.00×; background results identical to the previous version, 11)
 - A folder per part, with 1st · 2nd shadows and highlights clipped over the base color. Shading, light · sparkle, line art + color trace layers.
 - Clipping compositing in the preview was matched to Photoshop.
-- The file downloaded with the **Save program** button runs without internet.
-- Commit `705d921`
 
 ### 0.1 (2026-09-27) First version
 
 - Resolving power: the reference (mean BER 0.1533 on 185 ground-truth pictures, 11)
-- Works as a single file (`index.html`) in the browser. Splits a finished picture into line art · base color · shadow · shading · highlight · sparkle · effects · background · rough,
+- Works in the browser. Splits a finished picture into line art · base color · shadow · shading · highlight · sparkle · effects · background · rough,
   and saves a PSD (folders, clipping, blend modes, Korean layer names) that becomes the original again when stacked.
-- Commit `5ad0a49`
