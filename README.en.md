@@ -4,6 +4,14 @@
 
 A program that takes a single finished illustration and **splits it back into many transparent layers**, the way it was painted, and saves them as a Photoshop file (PSD).
 
+> [!IMPORTANT]
+> A license to use this program is granted only to those who prove that they work or study in a related field.
+>
+> This program was made for cases where drawn layers were merged by mistake and can no longer be separated, or where an image was exported as a single file and the original file could not be saved.
+>
+> Never use this program on images you did not create.\
+> Doing so violates this program's license and is an illegal act under copyright law, subject to criminal penalties.
+
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
 - Resolving power: **2.14× version 0.1** (0.40, 95% CI 1.79–2.61×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth, 11).
