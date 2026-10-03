@@ -336,7 +336,7 @@ so faces are searched for at that tilt (4.5) and the bottom-border · upper-corn
    out through weak edges at the flat background's edge. Such an island is returned to the character if it is connected to a large lump on the character side (at least a quarter of the largest lump) or contains a face.
    Text · emblems · sparkles floating apart from the character form small lumps and remain in the background.
 6. **Color model**: for pictures whose background is also drawn with lines (fireworks, food stalls, graffiti), the picture is split into small color regions,
-   the color distributions of "the background found so far" and "the character core dense with crisp lines" are learned, and regions are separated (graph cut in the GrabCut style).
+   the color distributions of "the background found so far" and "the character core dense with crisp lines" are learned, and regions are separated (<mark>graph cut</mark> in the <mark>GrabCut</mark> style).
    It is skipped for pictures whose colors overlap a lot and for pictures whose background was already fully found, and it only adds to the background found so far, never removes. Regions enclosed by lines are not added.
 7. **Returning attached character parts**: the background found in 1–5 (before returning in 8 below) is cut at crisp color edges and lines into pieces.
    Pieces that do not touch the top · left · right borders, have 80% or more of their perimeter touching the character, and whose color is closer to the character than to the rest of the background are
@@ -348,7 +348,7 @@ so faces are searched for at that tilt (4.5) and the bottom-border · upper-corn
    This is done twice: in the scene background stage (after 5) and after the color model (after 7).
    Even if a face is intact, background pieces that lie at least half inside the body zone below it are returned first (white clothes · skirts on a white background connected with the background down to the bottom border).
    Here the color does not need to be rare, but pieces whose color is far more common in the rest of the background than in the character (background seen between a skirt and a sleeve, text boxes) are kept.
-9. **Face-based widening**: when anime-style faces are found in the picture (4.5), the places where the head and body should be for each face are set as "probability of being character", and the same region graph cut as the color model is run again.
+9. **Face-based widening**: when anime-style faces are found in the picture (4.5), the places where the head and body should be for each face are set as "probability of being character", and the same region <mark>graph cut</mark> as the color model is run again.
    Of the regions that end up on the background side, only those whose color is clearly on the background side, that are outside the head · body zones, and that connect to background already found only through lineless boundaries (at least half of the shared length is not a line)
    are added to the background. Parts returned in 7 · 8 and regions enclosed by lines are not taken, and background already found is never removed. It is skipped for pictures where no face was found.
    It is also skipped if the background already found is almost one color (white backgrounds · flat backgrounds, 60% or more of background pixels similar to the median color). A background made of two colors, wall and floor, compares the wall side and the floor side each with its own median color (0.40).
@@ -375,7 +375,7 @@ For pictures where no background was found, a background layer appears only once
 
 ### 3.7 Region splitting and material grouping
 
-The picture with the color under lines restored is split into a few colors (default 18) with **k-means** in Lab color space, and connected lumps of the same color become **regions**.
+The picture with the color under lines restored is split into a few colors (default 18) with **<mark>k-means</mark>** in Lab color space, and connected lumps of the same color become **regions**.
 Regions that are too small or thin (edge bleeding) are discarded and filled from nearby regions.
 Places set as character by background detection that are more than 2.5px away from the background do not take a background label and are filled from nearby character regions
 (on textured paper · fine brush strokes, colors broke into small pieces so wide paint was discarded whole and background labels spread in, turning the character into background).
@@ -387,7 +387,7 @@ In pictures where brush strands are picked up as lines (more than half of the li
 
 ### 3.8 Tones and base color
 
-Each material is split again into tones (up to 6) with k-means. The bright-side average of the widest tone (the brighter one if areas are similar) is the **base color**.
+Each material is split again into tones (up to 6) with <mark>k-means</mark>. The bright-side average of the widest tone (the brighter one if areas are similar) is the **base color**.
 In a colored material whose widest tone is a shadow (cloaks · clothes · hair painted mostly in shadow), the brighter tone from which that shadow can be made by multiply becomes the base color.
 Same materials separated by a line (front hair / back hair) have their base colors matched to each other.
 Strongly colored tones inside a material whose base color is white · gray are not that material's shading but another material (a red tail joined to a white body without a line, an orange pattern on white fur), so they are split off and given their own base color.
@@ -426,7 +426,7 @@ Layers with almost no content are not made (for example, the gradient in cel-sha
 
 ### 3.12 Line art layer, check, layer tree, rough
 
-After making the line art · color trace layers, all layers are composited again **with the exact 8-bit values that will be saved** and compared with the original (reproduction PSNR, shown at the top right of the screen).
+After making the line art · color trace layers, all layers are composited again **with the exact 8-bit values that will be saved** and compared with the original (reproduction <mark>PSNR</mark>, shown at the top right of the screen).
 The layers are grouped into the tree of a work file, and the rough is made and hidden at the very top.
 
 ```
@@ -482,6 +482,7 @@ The PSD is written directly without external libraries (RGB 8-bit, folders, clip
 
 ### 4.0 Notation
 
+- <mark>Names highlighted in yellow</mark> are the statistical formulas · algorithms used in this document (<mark>Zhang–Suen thinning</mark>, <mark>Wilson score interval</mark>, <mark>Chi-square test of independence</mark> and others). The definitions of the statistics used for verification are collected in 11.1.
 - Pixel values are sRGB values in 0–1 (8-bit value divided by 255). The original is 𝑂, the alpha 𝐴, the restored color under lines 𝑈, and the channel $`c \in \lbrace R, G, B\rbrace`$.
 - Brightness is $`\mathrm{lum}(r, g, b) = 0.299r + 0.587g + 0.114b`$.
   The brightness used for finding lines is the brightness of the color laid on white, $`L = \mathrm{lum}(A\cdot O_R + 1 - A, A\cdot O_G + 1 - A, A\cdot O_B + 1 - A)`$.
@@ -491,7 +492,7 @@ The PSD is written directly without external libraries (RGB 8-bit, folders, clip
 - $`s = \max(W, H) / 1000`$ is the scale factor for picture size (multiplied into length reference values).
 - $`\mathrm{clamp}(x) = \min(1, \max(0, x))`$, and $`\mathrm{smoothstep}(a, b, x)`$ is $`t^2(3 - 2t)`$ for $`t = \mathrm{clamp}((x - a)/(b - a))`$ (a descending curve when $`a > b`$).
 - In block formulas, an interval $`[a, b]`$ written under $`\mathrm{clip}`$ means the value is clipped to that interval: $`\min(b, \max(a, x))`$.
-- Color difference $`\Delta E`$ is CIE76 (Euclidean distance in Lab). Hue angle difference is $`\Delta h = \min(d, 360^\circ - d)`$ for $`d = \lvert h_1 - h_2\rvert \bmod 360^\circ`$.
+- Color difference $`\Delta E`$ is <mark>CIE76</mark> (<mark>Euclidean distance</mark> in Lab). Hue angle difference is $`\Delta h = \min(d, 360^\circ - d)`$ for $`d = \lvert h_1 - h_2\rvert \bmod 360^\circ`$.
 - The percentage sliders in the settings (line sensitivity 𝜂, base color merge strength 𝑚, shadow threshold $`\eta_s`$) become 0–1 as $`\text{value}/100`$.
 - $`\mathrm{round}`$ is the nearest integer (0.5 rounds up); $`\lfloor x \rfloor`$ · $`\lceil x \rceil`$ are floor · ceiling.
 
@@ -519,7 +520,7 @@ From linear RGB to XYZ the sRGB (D65) matrix is used, with reference white $`X_n
 
 Linearization is precomputed as a 256-entry table of 8-bit values (𝐶 into bin $`\mathrm{round}(255C)`$). Chroma $`C^* = \sqrt{a^{*2} + b^{*2}}`$, hue angle $`h = \mathrm{atan2}(b^*, a^*)`$ (in degrees).
 
-**Lab → sRGB** (when recovering, from a k-means center, the color of a tone that has no samples):
+**Lab → sRGB** (when recovering, from a <mark>k-means</mark> center, the color of a tone that has no samples):
 
 ```math
 f_y=\frac{L^*+16}{116},\ f_x=f_y+\frac{a^*}{500},\ f_z=f_y-\frac{b^*}{200},\qquad
@@ -539,7 +540,7 @@ C=\begin{cases}12.92\,C_{lin} & C_{lin}\le 0.0031308\\ 1.055\,C_{lin}^{1/2.4}-0.
 
 - **Dilation / erosion** (square of radius 𝑟): $`\mathrm{dilate}_r(f)(x, y) = \max f(x + i, y + j)`$ (the maximum over $`\lvert i \rvert, \lvert j \rvert \le r`$; erosion takes the minimum; outside the picture is dropped from the window).
   The 1-D sliding max / min split into rows and columns is computed with a **monotonic deque**, $`O(1)`$ per pixel. **Closing** is dilation then erosion; **opening** is erosion then dilation.
-- **Gaussian blur**: approximated by repeating a box blur of radius 𝑟 (width $`2r + 1`$, repeating edge values outside the picture) three times horizontally and vertically.
+- **<mark>Gaussian blur</mark>**: approximated by repeating a box blur of radius 𝑟 (width $`2r + 1`$, repeating edge values outside the picture) three times horizontally and vertically.
   One box pass has variance $`((2r + 1)^2 - 1)/12 = r(r + 1)/3`$, so three passes give $`r(r + 1) = \sigma^2`$, which solves to
   $`r = \max(1, \mathrm{round}((\sqrt{4\sigma^2 + 1} - 1)/2))`$. If $`\sigma < 0.3`$, there is no blur.
 - **Inpainting**: unknown pixels are visited in order of distance from known pixels (outer rings first) and filled with the average of the 8-neighbors already settled one ring further in.
@@ -548,23 +549,23 @@ C=\begin{cases}12.92\,C_{lin} & C_{lin}\le 0.0031308\\ 1.055\,C_{lin}^{1/2.4}-0.
 
 - **Label filling**: unlabeled pixels are visited in order of distance and filled by a majority vote of the settled 8-neighbor labels (4-neighbors get 2 votes, diagonals 1).
 - **Connected component**: a lump of equal values connected by 4-neighbors. The **perimeter** is the sum, over the pixels of the component, of the number of 4-neighbor sides that belong to another component (or lie outside the picture).
-- **Distance transform** (chamfer): two sweeps (top → bottom, bottom → top) with weight 1 for a horizontal · vertical step and $`\sqrt 2`$ for a diagonal step approximate the distance to the nearest marked pixel.
+- **Distance transform** (<mark>chamfer</mark>): two sweeps (top → bottom, bottom → top) with weight 1 for a horizontal · vertical step and $`\sqrt 2`$ for a diagonal step approximate the distance to the nearest marked pixel.
 
   $`\displaystyle d(p)=\min\big(d(p),\ d(q)+w_{pq}\big),\qquad w_{pq}\in\lbrace1,\sqrt2\rbrace`$
 
-  Where it says "within so many steps", it means the number of steps of a 4-neighbor breadth-first search (Manhattan distance).
-- **k-means** (squared Lab distance): $`M = \min(n, M_\max)`$ samples are drawn (with replacement if $`n > M_\max`$); with **k-means++** the first center is uniform and each next center is drawn with probability proportional to the squared distance $`D(x)^2`$ to the nearest center so far.
+  Where it says "within so many steps", it means the number of steps of a 4-neighbor <mark>breadth-first search</mark> (<mark>Manhattan distance</mark>).
+- **<mark>k-means</mark>** (squared Lab distance): $`M = \min(n, M_\max)`$ samples are drawn (with replacement if $`n > M_\max`$); with **<mark>k-means++</mark>** the first center is uniform and each next center is drawn with probability proportional to the squared distance $`D(x)^2`$ to the nearest center so far.
   Assignment → mean update runs up to 18 times, stopping from the 4th iteration on when fewer than $`0.001M`$ samples change assignment. An empty cluster is moved to the farthest sample.
   $`M_\max`$ is 50000 for region splitting, 40000 for the region graph of the color model, and 6000 for tones per material.
-- **Random numbers**: fixed-seed mulberry32 so results are the same every time (main computation 12345, region graph of the color model · face stage 777). With 32-bit integer arithmetic,
+- **Random numbers**: fixed-seed <mark>mulberry32</mark> so results are the same every time (main computation 12345, region graph of the color model · face stage 777). With 32-bit integer arithmetic,
   $`s \gets s + \mathtt{0x6D2B79F5}`$, $`t = (s \oplus s \gg 15) \cdot(s \mathbin{\vert} 1)`$, $`t \gets t \oplus(t + (t \oplus t \gg 7) \cdot(t \mathbin{\vert} 61))`$, random number $`= (t \oplus t \gg 14)/2^{32}`$ (≫ is the unsigned right shift).
 - **Value noise** (jitter of the rough): a random number 𝑔 in $`[-1, 1]`$ at each grid point with spacing $`\mathrm{cell}`$, blended within a grid cell with $`s_x = \mathrm{smoothstep}(0, 1, t_x)`$, $`s_y = \mathrm{smoothstep}(0, 1, t_y)`$.
 
   $`\displaystyle n(x,y)=\big(g_{00}+(g_{10}-g_{00})s_x\big)(1-s_y)+\big(g_{01}+(g_{11}-g_{01})s_x\big)s_y`$
 
-- **Bilinear interpolation**: with $`x_0 = \lfloor x\rfloor,\ t_x = x - x_0`$ (same vertically), $`f = f_{00}(1 - t_x)(1 - t_y) + f_{10}t_x(1 - t_y) + f_{01}(1 - t_x)t_y + f_{11}t_x t_y`$.
+- **<mark>Bilinear interpolation</mark>**: with $`x_0 = \lfloor x\rfloor,\ t_x = x - x_0`$ (same vertically), $`f = f_{00}(1 - t_x)(1 - t_y) + f_{10}t_x(1 - t_y) + f_{01}(1 - t_x)t_y + f_{11}t_x t_y`$.
 - **Resizing** (for face finding, horizontal · vertical separately): if the ratio $`r = n / m`$ (original cells / new cells) is at least 1, the **area average** of the original interval $`[ir, (i + 1)r)`$ covered by new cell 𝑖;
-  if below 1, **linear interpolation** at $`x = (i + 0.5)r - 0.5`$.
+  if below 1, **<mark>linear interpolation</mark>** at $`x = (i + 0.5)r - 0.5`$.
 - **Percentile**: for ascending $`s_0 \dots s_{n-1}`$ with $`x = (n - 1)q / 100,\ k = \lfloor x\rfloor`$, the value is $`s_k + (s_{k + 1} - s_k)(x - k)`$ (the median is $`q = 50`$). The **standard deviation** is the population standard deviation divided by 𝑛.
 - **z-normalization**: $`z = (a - \text{mean})/\text{standard deviation}`$ (all 0 if the standard deviation is at most $`10^{-6}`$).
 
@@ -595,13 +596,13 @@ Grown lumps that reach the end of the $`w + 1`$ steps (dark surfaces continuing 
 d>0.02,\qquad \mathrm{strength}\ge 0.45,\qquad \frac{G_{1.5}(L)-L}d\ge 0.25
 ```
 
-$`G_\sigma`$ is a Gaussian blur. The third condition means "a thin line that loses 25% or more of its depth when slightly blurred".
+$`G_\sigma`$ is a <mark>Gaussian blur</mark>. The third condition means "a thin line that loses 25% or more of its depth when slightly blurred".
 
 The lines and their 1px 8-neighbors are $`\mathrm{inMask}`$, and the remaining pixels with $`A > 0.02`$ are $`\mathrm{known}`$.
 
 #### Automatic setting (when the maximum line width is 0)
 
-**Pen width**: $`\mathrm{strength}`$ as above is computed with a generous window $`R_b = \max(8, \mathrm{round}(12s))`$, and in the distance transform 𝐷 (chamfer) of structures with $`\mathrm{strength} \ge 0.5`$,
+**Pen width**: $`\mathrm{strength}`$ as above is computed with a generous window $`R_b = \max(8, \mathrm{round}(12s))`$, and in the <mark>distance transform</mark> 𝐷 (<mark>chamfer</mark>) of structures with $`\mathrm{strength} \ge 0.5`$,
 the width $`2D - 1`$ ($`\ge 1.8`$) is counted at each 4-neighbor local maximum ($`D(p) \ge`$ the 𝐷 of its four neighbors, a center line). In the histogram ℎ (0–63) of widths rounded into 1px bins,
 the width among $`w = 2, \dots, 59`$ with the largest sum of $`h_k`$ over $`\lvert k - w \rvert \le \max(1, \mathrm{round}(0.2w))`$ is the peak 𝑚,
 and the $`\lfloor 0.9(n - 1)\rfloor`$-th value (one decimal) of the widths at most 3 times 𝑚, in ascending order, is the pen width $`w_{90}`$. It is not measured if there are fewer than 150 center points.
@@ -642,7 +643,7 @@ Pixels with alpha at most 0.02 are treated as not lines, and their restored colo
 #### Find at reduced size (setting, off by default)
 
 With "Find only background · faces at reduced size" and $`\max(W, H) > S`$ (the target size), the background stages below and face finding alone run on a picture with each channel area-averaged down by $`k = S / \max(W, H)`$
-(the line width is the user's chosen value times 𝑘, or measured again on the reduced picture if automatic). The background · returned-part maps are enlarged back to the original size bilinearly and turned on where $`\ge 0.5`$,
+(the line width is the user's chosen value times 𝑘, or measured again on the reduced picture if automatic). The background · returned-part maps are enlarged back to the original size <mark>bilinearly</mark> and turned on where $`\ge 0.5`$,
 but on the original-size lines (+ 1px edge) only where the enlarged value is 1. Faces have their position · size multiplied by $`1/k`$.
 "Reduce everything" is the same as lowering the processing resolution to $`\min(\text{processing resolution}, S)`$.
 
@@ -667,7 +668,7 @@ inner pixel ($`(\mathrm{clamp}(x, f, W - 1 - f), \mathrm{clamp}(y, f, H - 1 - f)
 4. Tilt 𝜃: the direction angles 𝛼 of the eight lines (for row ends, from the slope $`m = dx/dy,\ \alpha = \mathrm{atan2}(1, m)`$; for column ends, $`\alpha = \mathrm{atan2}(m, 1)`$) are averaged as quadrupled angles, $`\theta = 1/4 \cdot \mathrm{atan2}(\sum \sin 4\alpha, \sum \cos 4\alpha)`$ (−45°–45°, clockwise positive).
    The rectangle's sides alone cannot distinguish 𝜃 from $`\theta \mp 90^\circ`$. If $`\lvert \theta \rvert < 1^\circ`$ (untilted margins · letterboxes), it is not used.
 5. Only during the background stages (everything below, and the stages after face finding), each pixel of the band $`B = F \oplus 7\times 7`$ (𝐹 widened by 3px: mixed colors · outliers at the boundary created by rotation) has
-   its 𝑈, original, alpha, $`\mathrm{known}`$, line, crisp line, and $`\mathrm{inMask}`$ replaced by the values of the nearest pixel outside 𝐵 by 4-neighbor breadth-first search, restored at the end.
+   its 𝑈, original, alpha, $`\mathrm{known}`$, line, crisp line, and $`\mathrm{inMask}`$ replaced by the values of the nearest pixel outside 𝐵 by 4-neighbor <mark>breadth-first search</mark>, restored at the end.
    Then 𝐹 is set as background (removed from returned parts). Even with transparent corners, the background is searched for, and "send to background" also works. The background layer's alpha is the original alpha (255 as is for opaque pictures).
 6. Faces are searched for in the picture before filling.
 
@@ -692,7 +693,7 @@ and if $`\bar g = \sum w f / \sum w`$ has $`\lvert \bar g\rvert \ge 0.8`$ (the f
    are added as new seeds (their own color as reference) and it spreads again with tolerance 0.12 (until there are no new seeds, at most 3 times). The walk is broken when it meets a line (a pixel that is not $`\mathrm{known}`$).
    - **Floor band** (0.40): the known pixels on the left, right and bottom borders that are not yet background are counted in the same 4096 bins as in 1; if the fullest bin holds 10% or more of the known border pixels, its average is a second reference color r₂.
      If border pixels within a channel-max difference of 0.12 from r₂ make up at least 3% of the height on the left and on the right, and at least 30% of the width on the bottom, the area spread from them under the same conditions as 2 (neighbor change < 0.035k, difference from r₂ < 0.3) is the band F.
-     For each column x the topmost pixel t(x) of F is taken, and a line y = a·x + b is fitted on 64 evenly chosen columns with a = the median of the slopes between every two columns and b = the median of t(x) − a·x (Theil–Sen; columns hidden by the character, where t(x) sags lower, do not move the medians).
+     For each column x the topmost pixel t(x) of F is taken, and a line y = a·x + b is fitted on 64 evenly chosen columns with a = the median of the slopes between every two columns and b = the median of t(x) − a·x (<mark>Theil–Sen</mark>; columns hidden by the character, where t(x) sags lower, do not move the medians).
      F is added to the background if it covers at least 3% and at most 60% of the picture, at least 60% of the columns are within τ = max(3, 0.01H)px of the line, and at most 2% of F's pixels are more than τ above the line. It is not done for rotated pictures (whose downward direction is set).
      The floor of a line-drawn room, differing in color from the wall, is caught here, while clothes · hair crossing the bottom of the picture have a curved top edge and too few columns on the line. On the 666 pixiv pictures, all 7 pictures that reached this check were stopped by the straight-top-edge condition.
 4. It is used only if the area is 3–97% of the whole.
@@ -745,7 +746,7 @@ If, in every run of a piece, there is a crisp line on the way to the first other
 
 #### Widening with a color model (GrabCut style)
 
-1. **Regions**: the Lab of the original is split by k-means (24 colors, 40,000 samples) on $`\mathrm{known}`$ pixels; 4-connected components of the same color with 40px or more become regions 𝑟, and the rest are attached by label filling.
+1. **Regions**: the Lab of the original is split by <mark>k-means</mark> (24 colors, 40,000 samples) on $`\mathrm{known}`$ pixels; 4-connected components of the same color with 40px or more become regions 𝑟, and the rest are attached by label filling.
    If there are fewer than $`0.2N`$ $`\mathrm{known}`$ pixels, this stage and face-based widening are not done.
 2. **Region features**: area $`A_r`$, mean Lab ($`\mathrm{known}`$ pixels), crisp-line density ratio $`\rho_r = \mathrm{mean}_r(D_c)/\tau_c`$ (here $`\tau_c \ge 10^{-4}`$), existing background share $`\beta_r`$, number $`F_r`$ of top · left · right border pixels that are in 𝑟,
    and the share of crisp lines on the perimeter $`\kappa_r = (\text{number of boundary pixel pairs on crisp lines})/(\text{number of boundary pixel pairs touching other regions})`$.
@@ -773,9 +774,9 @@ If, in every run of a piece, there is a crisp line on the way to the first other
 
    $`\theta_r > 0`$ is the cost on the character side. Regions with $`\beta_r > 0.5`$ are fixed as background ($`\theta = -\infty`$); regions with mean $`L^* < 30`$ and $`C^* < 12`$ (near-black achromatic) and
    regions with region mean $`\bar \varepsilon_r \ge 0.9`$ (enclosed by lines) are fixed as character ($`\theta = +\infty`$).
-8. **Minimum cut**: in the graph with capacity $`\theta_r^{+} = \max(\theta_r, 0)`$ from the source (character) to each region, $`\theta_r^{-} = \max(-\theta_r, 0)`$ from each region to the sink (background), and $`w_{rq}`$ in both directions between region pairs, the **Dinic** maximum flow is found
-   (repeat: assign levels by breadth-first search, then push flow along augmenting paths whose level increases by one, depth-first, until blocked; residual capacity $`10^{-9}`$ or less counts as 0),
-   and the regions reachable from the source in the residual graph become character. The maximum flow equals the minimum cut, so this is the split that minimizes $`E(x)`$.
+8. **Minimum cut**: in the graph with capacity $`\theta_r^{+} = \max(\theta_r, 0)`$ from the source (character) to each region, $`\theta_r^{-} = \max(-\theta_r, 0)`$ from each region to the sink (background), and $`w_{rq}`$ in both directions between region pairs, the **<mark>Dinic</mark>** <mark>maximum flow</mark> is found
+   (repeat: assign levels by <mark>breadth-first search</mark>, then push flow along augmenting paths whose level increases by one, depth-first, until blocked; residual capacity $`10^{-9}`$ or less counts as 0),
+   and the regions reachable from the source in the residual graph become character. The <mark>maximum flow</mark> equals the <mark>minimum cut</mark>, so this is the split that minimizes $`E(x)`$.
 9. **Connection condition**: a new background region must be reachable from the reference background ($`B^0`$) crossing only boundaries whose non-crisp contact $`o + l - k`$ is at least $`\max(3, 0.3(o + l))`$. If not reachable, it is returned to the character.
 10. The two color distributions are relearned from the split and 7–9 are repeated 4 times. The $`\mathrm{known}`$ pixels and faint line pixels of regions that became background are added to the background (crisp lines are not added).
 
@@ -801,13 +802,13 @@ The random numbers use a fixed seed (777) for this stage alone, so pictures wher
 It finds faces with hand-set rules and averaged patterns, without a trained model. The picture is scaled by $`k_f = 800 / \max(W, H)`$ ($`w = \max(2, \mathrm{round}(k_f W))`$, ℎ likewise)
 (area averaging when shrinking, white backing $`A\cdot O + 1 - A`$ for transparent areas), and measured in Lab. Found positions · sizes are multiplied by $`1/k_f`$ to return to the processing resolution.
 
-1. **Eye candidates**: $`\ell = L^*/100`$ is blurred by 3 box blurs (radius $`\rho \in \lbrace1, 2, 3, 4, 5, 7, 9, 12, 15, 20\rbrace`$, $`\sigma^2 = \rho^2 + \rho`$: the box-blur variance formula of 4.2 solved backwards), and the Hessian is computed with second differences,
+1. **Eye candidates**: $`\ell = L^*/100`$ is blurred by 3 box blurs (radius $`\rho \in \lbrace1, 2, 3, 4, 5, 7, 9, 12, 15, 20\rbrace`$, $`\sigma^2 = \rho^2 + \rho`$: the box-blur variance formula of 4.2 solved backwards), and the <mark>Hessian</mark> is computed with second differences,
 
    $`\displaystyle L_{xx}=\ell_{x-1,y}-2\ell_{x,y}+\ell_{x+1,y},\quad L_{yy}=\ell_{x,y-1}-2\ell_{x,y}+\ell_{x,y+1},\quad L_{xy}=\tfrac14\left(\ell_{x+1,y+1}-\ell_{x-1,y+1}-\ell_{x+1,y-1}+\ell_{x-1,y-1}\right)`$
 
    $`\displaystyle D_\sigma=\sigma^4\left(L_{xx}L_{yy}-L_{xy}^2\right)\quad(L_{xx}+L_{yy}>0)`$
 
-   A positive Hessian determinant means a round blob, and only $`L_{xx} + L_{yy} > 0`$ (center darker than its surroundings) is considered. $`\sigma^4`$ is the scale normalization that makes values comparable across sizes.
+   A positive <mark>Hessian determinant</mark> means a round blob, and only $`L_{xx} + L_{yy} > 0`$ (center darker than its surroundings) is considered. $`\sigma^4`$ is the scale normalization that makes values comparable across sizes.
    Points that are the largest within the two neighboring scales and 5×5 and have $`D > 0.004`$ become candidates of radius $`r = 1.414\sigma`$, up to 3000 in descending order.
 2. **Pairs**: two candidates (left 𝑎, right 𝑏) with distance $`d \ge 16,\ 4 \le d / \bar r \le 24`$ ($`\bar r`$ the mean of the two radii), $`\lvert \Delta y\rvert \le 0.8\Delta x`$, radius ratio $`\le 1.7`$.
    **Tilt hypotheses** (0.37): for a rotated canvas (tilt 𝜃), it searches separately for each hypothesis $`\varphi \in \lbrace\theta, \theta \mp 90^\circ \rbrace`$. The pair filter uses $`\lvert \tan \delta \rvert \le 0.8`$ for the difference 𝛿 (folded into −90°–90°) between the eye-to-eye direction and 𝜑,
@@ -815,7 +816,7 @@ It finds faces with hand-set rules and averaged patterns, without a trained mode
    pairs whose eye line is steep are also measured in the frame rotated by 180° (both 𝑒 and 𝑓 sign-flipped). The hypothesis with the larger top score of naming faces (mirror-agreed: $`-\varphi`$ for the flipped picture) is used; on a tie, 𝜃.
    With the "Tilted picture" setting on, pictures that are not rotated canvases are also searched the same way with $`\varphi \in \lbrace0, -30, 30, -60, 60, -90, 90\rbrace^\circ`$ (0° is not favored).
    If neither, there is one $`\varphi = 0`$, the same as 0.36.
-3. **Face frame**: with the midpoint of the two eyes as the origin, the eye direction as 𝑢, and the downward direction perpendicular to it as 𝑣, grid samples (bilinear interpolation, edge values outside the picture) are taken in units of 𝑑.
+3. **Face frame**: with the midpoint of the two eyes as the origin, the eye direction as 𝑢, and the downward direction perpendicular to it as 𝑣, grid samples (<mark>bilinear interpolation</mark>, edge values outside the picture) are taken in units of 𝑑.
 
    $`\displaystyle \mathbf c=\tfrac12(\mathbf a+\mathbf b),\quad d=|\mathbf b-\mathbf a|,\quad \mathbf e=\frac{\mathbf b-\mathbf a}d,\quad \mathbf f=\pm(-e_y,\,e_x)\ (f_y\ge0),\qquad \mathbf x(u,v)=\mathbf c+d\,(u\,\mathbf e+v\,\mathbf f)`$
 
@@ -935,7 +936,7 @@ In pictures whose outline has the same color as the hair · background and canno
 
    The region mean is $`\bar \pi_r`$. The log odds of the zone term are $`\ln(0.9/0.1) = 2.197,\ \ln(0.85/0.15) = 1.735,\ \ln(0.45/0.55) = -0.201`$.
 3. **First split**: character is the regions with $`\bar \pi_r \ge 0.8 \land \beta_r < 0.5`$ (head · body zones), background the regions with $`\beta_r > 0.5`$ (existing background). After that, it learns from the previous cut (character / everything else).
-4. The **energy** and minimum cut (the same Dinic as the color model) are repeated 4 times, relearning the color distributions.
+4. The **energy** and <mark>minimum cut</mark> (the same <mark>Dinic</mark> as the color model) are repeated 4 times, relearning the color distributions.
 
    $`\displaystyle \theta_r=\sum_{p\in r,\,known}\mathrm{clip}_{[-3,3]}\ln\frac{p_F(c_p)+10^{-6}}{p_B(c_p)+10^{-6}}+\sum_{p\in r}\ln\frac{\pi(p)}{1-\pi(p)}-2A_r\beta_r,\qquad w_{rq}=o\,\exp\!\left(-\frac{\Delta E_{rq}^2}{288}\right)+0.0375\,l`$
 
@@ -972,14 +973,14 @@ A saturated, bright band around the character (neon glow, fluorescent outline) i
 
 It is looked at only in pictures whose background is 2–95% of the whole.
 
-1. **Band candidates**: painted ($`\mathrm{known}`$, non-line) pixels touching the background with 4-neighbors are at depth 1, and pixels reached toward the character within $`D = \max(12, \mathrm{round}(0.025\cdot \max(W, H)))`$ steps without crossing lines (4-neighbor breadth-first search; the depth is the number of steps).
-2. **Decision**: a pixel is fluorescent if $`L^* > 60`$ and $`C^* > 45`$ (in 𝑈, with the color under lines restored). With $`f_r`$ fluorescent among $`n_r`$ band candidates and $`f_i`$ fluorescent among $`n_i`$ pixels inside the character (chamfer distance to background $`> 2D`$),
+1. **Band candidates**: painted ($`\mathrm{known}`$, non-line) pixels touching the background with 4-neighbors are at depth 1, and pixels reached toward the character within $`D = \max(12, \mathrm{round}(0.025\cdot \max(W, H)))`$ steps without crossing lines (4-neighbor <mark>breadth-first search</mark>; the depth is the number of steps).
+2. **Decision**: a pixel is fluorescent if $`L^* > 60`$ and $`C^* > 45`$ (in 𝑈, with the color under lines restored). With $`f_r`$ fluorescent among $`n_r`$ band candidates and $`f_i`$ fluorescent among $`n_i`$ pixels inside the character (<mark>chamfer distance</mark> to background $`> 2D`$),
    it needs $`f_r \ge 0.18 n_r,\ f_r / n_r \ge 4 f_i / n_i,\ f_r \ge 0.002N`$.
 3. **Glow colors**: fluorescent pixels of the band candidates are counted in 16×16 $`(a^*, b^*)`$ bins ($`\lfloor(a^* + 128)/16\rfloor,\ \lfloor(b^* + 128)/16\rfloor`$); bins with $`0.005 f_r`$ or more.
 4. **Glow**: widened with 4-neighbors from the fluorescent pixels of the band candidates.
-   - Character side: among pixels with depth to background + chamfer distance to the nearest line $`\le D`$ (a band squeezed between background and outline), glow colors ($`L^* > 45,\ C^* > 25`$, glow bin) or white cores ($`L^* > 80`$)
-   - Background side: glow colors with chamfer distance to the character $`\le D`$
-5. **Surrounding**: used only if 35% or more of the background pixels touching the character (chamfer distance to the character $`\le 1.5`$) are within 3px of the glow (square dilation of radius 3).
+   - Character side: among pixels with depth to background + <mark>chamfer distance</mark> to the nearest line $`\le D`$ (a band squeezed between background and outline), glow colors ($`L^* > 45,\ C^* > 25`$, glow bin) or white cores ($`L^* > 80`$)
+   - Background side: glow colors with <mark>chamfer distance</mark> to the character $`\le D`$
+5. **Surrounding**: used only if 35% or more of the background pixels touching the character (<mark>chamfer distance</mark> to the character $`\le 1.5`$) are within 3px of the glow (square dilation of radius 3).
 6. Glow pixels are moved to the background side and put in the "Outer glow" layer (normal, opaque) with their original colors. The background layer color below them is inpainted from the rest of the background.
    Places the user returned to the character and character parts returned from the background are excluded.
 
@@ -1002,14 +1003,14 @@ Removed line pixels are restored to their original colors and left in the backgr
 
 ### 4.6 Regions and materials
 
-- **k-means** (4.2): the 𝑈 Lab of non-background $`\mathrm{known}`$ pixels into $`K = \max(2, \min(\text{number of colors}, \text{number of pixels}))`$ colors (number of colors default 18), at most 50,000 samples, k-means++ initialization, at most 18 iterations,
+- **<mark>k-means</mark>** (4.2): the 𝑈 Lab of non-background $`\mathrm{known}`$ pixels into $`K = \max(2, \min(\text{number of colors}, \text{number of pixels}))`$ colors (number of colors default 18), at most 50,000 samples, <mark>k-means++</mark> initialization, at most 18 iterations,
   stopping when fewer than 0.1% of samples moved. Empty clusters are moved to the farthest sample. Every pixel gets the color number of the nearest center, and 4-connected components with the same number are region candidates.
 - **Region keep condition**: $`A \ge \max(10, \mathrm{round}(12s^2))`$ and $`A \ge 0.75 \times \text{perimeter}`$ (removes thin smears; the perimeter follows the definition in 4.2, so a one-pixel strip has $`A/\text{perimeter} \approx 0.5`$).
-  Discarded pixels and line pixels are filled with the number of the nearby region (background included). However, if a non-background $`\mathrm{known}`$ pixel received the background number and is more than 2.5px (chamfer distance) away
-  from the background, the filling is done once more without the background number to give it the number of a nearby character region. In pictures with textured paper · fine brush marks, k-means breaks the paint into small pieces,
+  Discarded pixels and line pixels are filled with the number of the nearby region (background included). However, if a non-background $`\mathrm{known}`$ pixel received the background number and is more than 2.5px (<mark>chamfer distance</mark>) away
+  from the background, the filling is done once more without the background number to give it the number of a nearby character region. In pictures with textured paper · fine brush marks, <mark>k-means</mark> breaks the paint into small pieces,
   35–39% of the picture's pixels were discarded and 8–12% received the background number, and places the background decision had left to the character became background (20 of 300 pixiv pictures by more than 1%, median 0.24%).
   The border within 2.5px is kept because of smearing in contact with the background (fixing the border too changed the found background of the 8 pictures with drawn outlines from 56.79 → 56.66% in pixel total).
-- **Undoing numbers smeared from gaps**: if there are gaps (4.5), the background is split into gaps 𝐺 and the rest 𝑂, and chamfer distances $`d_G,\ d_O`$ are measured. Among opaque non-background pixels (line pixels included),
+- **Undoing numbers smeared from gaps**: if there are gaps (4.5), the background is split into gaps 𝐺 and the rest 𝑂, and <mark>chamfer distances</mark> $`d_G,\ d_O`$ are measured. Among opaque non-background pixels (line pixels included),
   those that received the background number with $`d_G > 2.5`$ and $`d_G < d_O`$ (the nearest background is a gap) are filled once more without the background number to receive a nearby character number.
   This is done for both region numbers (above) and tone numbers (after the small-piece filling of 4.7). Lines have no region number and receive a nearby number, and when a gap puts the background number in the middle of a character,
   that number spreads far along the lines. A version that added only the gaps, without this undoing and the line-share condition (4.5), lost more character outside the gaps in 131 of the 198 changed pictures (more than 0.05%, up to 3.8%);
@@ -1043,9 +1044,9 @@ If only one side is achromatic (𝑛: the side with $`C < 12`$, 𝑐: the other)
 
 ### 4.7 Tones, base color, shadow, highlight
 
-- For each material, k-means with the number of tones $`k = \min(6, \max(1, \lfloor n/40\rfloor))`$ (𝑛 = number of pixels in the material) (at most 6000 samples, the mean if $`k = 1`$); centers with $`\Delta E < 8`$ become one. Pixels get the nearest tone.
+- For each material, <mark>k-means</mark> with the number of tones $`k = \min(6, \max(1, \lfloor n/40\rfloor))`$ (𝑛 = number of pixels in the material) (at most 6000 samples, the mean if $`k = 1`$); centers with $`\Delta E < 8`$ become one. Pixels get the nearest tone.
 - Tones also discard small pieces with the same keep condition as regions ($`A \ge \max(10, \mathrm{round}(12s^2))`$, $`A \ge 0.75 \times \text{perimeter}`$) and fill them by label filling.
-- For each tone, the mean $`\bar t`$, the **bright-side mean** $`t^{up}`$ (pixels with $`\mathrm{lum} \ge \mathrm{lum}(\bar t) - 0.01`$), and the **dark-side mean** $`t^{lo}`$ ($`\mathrm{lum} \le \mathrm{lum}(\bar t) + 0.01`$) are found. Tones without samples convert the Lab of the k-means center back to sRGB (4.1).
+- For each tone, the mean $`\bar t`$, the **bright-side mean** $`t^{up}`$ (pixels with $`\mathrm{lum} \ge \mathrm{lum}(\bar t) - 0.01`$), and the **dark-side mean** $`t^{lo}`$ ($`\mathrm{lum} \le \mathrm{lum}(\bar t) + 0.01`$) are found. Tones without samples convert the Lab of the <mark>k-means</mark> center back to sRGB (4.1).
 - **Base color**: among tones with at least 75% of the area of the widest tone, the tone whose bright-side mean has the largest $`L^*`$ → base color 𝐹 = that tone's bright-side mean.
   Going from wide materials, if another tone (10% or more of the material) is $`\Delta E < 7`$ from a base color decided earlier (the closest one), the base is switched to that tone (the same material split by lines). If the current base color is closer than that, it is kept.
 - **Lit-side base color**: in a material whose base tone 𝑏 has a bright-side mean with $`C \ge 12`$, if another tone 𝑡 of the same material satisfies all of the following, the base tone becomes the one among them whose bright-side mean has the largest $`L^*`$ (before the matching of same materials split by lines).
@@ -1102,8 +1103,8 @@ Character splitting and part names use the faces for names · folders (9 of face
    $`\max(0, \text{score} - 10)^2`$ gives much larger votes to sure faces than to faces near the threshold (score 11 gives 1 vote, 14 gives 16).
 2. **Seeds**: for each face, painted pixels within $`10d`$ horizontally · vertically of the center that fall only in one character's head ellipse or body column. Pixels in two or more zones are removed from the seeds.
 3. **Spreading**: from the seeds (distance 0), it spreads along paint · line pixels with 4-neighbors, and characters are decided by the shortest distance with a step cost $`1 + \mathrm{round}(30\,{\alpha_q}^2)`$ for entering pixel 𝑞 (𝛼 = line alpha).
-   The costs are integers, so a bucket queue (32 buckets reused in rotation; enough since a step costs 31 or less) is used instead of Dijkstra. A dark line ($`\alpha = 1`$) costs 31 steps for one cell and is hard to cross.
-   Unreached pixels (detached pieces, background) are filled with the nearest character by 4-neighbor breadth-first search.
+   The costs are integers, so a bucket queue (32 buckets reused in rotation; enough since a step costs 31 or less) is used instead of <mark>Dijkstra</mark>. A dark line ($`\alpha = 1`$) costs 31 steps for one cell and is hard to cross.
+   Unreached pixels (detached pieces, background) are filled with the nearest character by 4-neighbor <mark>breadth-first search</mark>.
 4. Characters taking less than 5% of the character-side pixels are removed and 1–3 are redone.
 5. Part pieces under 64 pixels in a character are moved to the character with the most of that part (so the tips of a neighboring character's parts do not become crumb layers).
 6. For each character, [Line art] · [Effects] · [Painting] containing only its pixels are made. Characters do not share pixels, so the composite is the same as with one folder.
@@ -1149,7 +1150,7 @@ Fake faces of knees · hands · clothing patterns · background decorations put 
    - **Anchors**: for each anchor face (character faces, and all faces scoring 11 or more: other people not included in the character group · a second appearance of the same person),
      the pixels reached along 𝑘 with 4-neighbors from the 𝑘 pixels inside the head ellipse $`(u/2.2)^2 + ((v + 0.3)/2)^2 \le 1`$ are kept.
    - **Nearby pieces**: among the 4-connected pieces 𝑐 (area $`A_c`$) of the 𝑘 pixels not kept, pieces whose pixel count $`B_c`$ in the central body column $`\lvert u\rvert < 1 \land v > 1.5`$ of a character face is $`B_c \le 0.5 A_c`$ and
-     that have at least one pixel with chamfer distance (4.2) to the kept pixels of $`2.5 d_\max`$ or less ($`d_\max`$ = 𝑑 of the largest character face) are kept.
+     that have at least one pixel with <mark>chamfer distance</mark> (4.2) to the kept pixels of $`2.5 d_\max`$ or less ($`d_\max`$ = 𝑑 of the largest character face) are kept.
      The distance is measured again from the kept pieces and repeated up to three times until no new piece is kept.
    - Pixels not kept are moved to a new part with the same base color (no meaning name). So the layer pixels and the composite do not change.
    - If the new parts push the number of parts that are not "small parts" over the maximum number of parts, that many new parts are marked as "small parts", from the smallest.
@@ -1283,7 +1284,7 @@ Background pixels are $`v = \text{background} \to 1 - (1 - v)(1 - aK)`$ (backgro
 \mathrm{PSNR}=10\log_{10}\frac{255^2}{\mathrm{MSE}}
 ```
 
-𝑛 is the number of opaque pixels (alpha $`> 0.98`$). If $`\mathrm{MSE} \le 10^{-9}`$, PSNR is set to 99 and shown as "∞" on screen.
+𝑛 is the number of opaque pixels (alpha $`> 0.98`$). If $`\mathrm{MSE} \le 10^{-9}`$, <mark>PSNR</mark> is set to 99 and shown as "∞" on screen.
 
 ### 4.14 Rough generation
 
@@ -1291,14 +1292,14 @@ Background pixels are $`v = \text{background} \to 1 - (1 - v)(1 - aK)`$ (backgro
    - Pictures with almost no line art (line pixels under 3% of the character's painted area) also get the boundaries between parts with base colors $`\Delta E \ge 20`$.
    - For the silhouette · part boundaries, 𝑝 is added when the group (empty / undecided / background / material) of pixel 𝑝 and its right · lower neighbor differ, and either one side is not character (silhouette) or, in a picture without line art, the base colors of the two parts are $`\Delta E \ge 20`$.
      Whether there is line art is decided by the number of pixels with $`\text{line alpha} \ge 0.25`$ being $`\ge 0.03 \times \max(1, \text{number of painted character pixels})`$.
-   - For the background, the brightness $`\mathrm{lum}(U)`$ is blurred with $`\sigma = 1.5 \cdot \max(1, s)`$, then the Sobel gradient, keeping only maxima along the gradient direction, and hysteresis ($`0.045 / 0.02`$) find one-pixel contours, which are added (Canny style).
+   - For the background, the brightness $`\mathrm{lum}(U)`$ is blurred with $`\sigma = 1.5 \cdot \max(1, s)`$, then the <mark>Sobel gradient</mark>, keeping only maxima along the gradient direction, and hysteresis ($`0.045 / 0.02`$) find one-pixel contours, which are added (<mark>Canny</mark> style).
 
      $`\displaystyle g_x=\tfrac18\big(\ell_{x+1,y-1}+2\ell_{x+1,y}+\ell_{x+1,y+1}-\ell_{x-1,y-1}-2\ell_{x-1,y}-\ell_{x-1,y+1}\big),\quad g_y=(\text{same vertically}),\quad |g|=\sqrt{g_x^2+g_y^2}`$
 
      The direction $`\theta = \mathrm{atan2}(g_y, g_x) \bmod 180^\circ`$ is grouped into four directions ($`< 22.5^\circ\ \text{or}\ \ge 157.5^\circ`$ horizontal, $`< 67.5^\circ`$ diagonal ↘, $`< 112.5^\circ`$ vertical, otherwise diagonal ↙),
      and only background pixels not smaller than the two neighbors before and after in that direction are kept. Starting from points with $`\lvert g\rvert \ge 0.045`$, they are joined to 8-neighbor points with $`\lvert g\rvert \ge 0.02`$.
 2. **Center lines**: surfaces thicker than the line width 𝑤 (what remains after opening with radius $`r_T = \lceil w/2\rceil + 1`$) keep only their outer contour (pixels with a 4-neighbor outside the surface), then 𝐵 is widened by 1px with 3×3 to bridge gaps
-   (the 1px picture border is cleared), and **Zhang–Suen thinning** gives 1px center lines. With the 8-neighbors of pixel 𝑝 clockwise from north as $`P_2 \dots P_9`$,
+   (the 1px picture border is cleared), and **<mark>Zhang–Suen thinning</mark>** gives 1px center lines. With the 8-neighbors of pixel 𝑝 clockwise from north as $`P_2 \dots P_9`$,
    $`B(p) = \sum P_i`$ (2–6) and $`A(p)`$, the number of 0 → 1 transitions in the order $`P_2 \to P_3 \to \dots \to P_9 \to P_2`$, is 1;
    pixels with $`P_2P_4P_6 = 0 \land P_4P_6P_8 = 0`$ in the first step and $`P_2P_4P_8 = 0 \land P_2P_6P_8 = 0`$ in the second step are removed all at once, alternating until nothing more is removed.
    End points (8-neighbors 1 or fewer) are removed $`k = \max(3, \mathrm{round}(5 \cdot \max(1, s)))`$ times, and from the surviving line ends (1 neighbor) the removed pixels are revived for at most 𝑘 steps, trimming short spurs.
@@ -1316,7 +1317,7 @@ Background pixels are $`v = \text{background} \to 1 - (1 - v)(1 - aK)`$ (backgro
 
    $`\displaystyle v_{j+1}(x,y)=1-\big(1-v_j(x,y)\big)\Big(1-\omega_j\,b\big(x+\mathrm{amp}_j\,n_x(x,y),\ y+\mathrm{amp}_j\,n_y(x,y)\big)\Big)`$
 
-   (𝑏 is bilinearly interpolated, 0 outside the picture.) If at half resolution, it is returned to the original size by bilinear interpolation at $`((x + 0.5)/2 - 0.5, (y + 0.5)/2 - 0.5)`$.
+   (𝑏 is <mark>bilinearly</mark> interpolated, 0 outside the picture.) If at half resolution, it is returned to the original size by <mark>bilinear interpolation</mark> at $`((x + 0.5)/2 - 0.5, (y + 0.5)/2 - 0.5)`$.
 6. **Alpha**: $`a = \mathrm{smoothstep}(0.1, 0.65, v \cdot(0.82 + 0.18\xi))`$ (𝜉 a new random number per pixel, pencil grain). Pixels with $`a < 0.02`$ are left empty, and the 8-bit alpha is $`\mathrm{round}(255a)`$.
    On the center lines $`v \ge 0.6 \cdot 0.85`$, so the alpha does not fall below about 0.5 and the lines do not break.
    Rough color (default `#2F6FE0`), opacity $`115/255 \approx 45\%`$, hidden.
@@ -1419,7 +1420,7 @@ The layer structure of a picture imitates the properties of light and paint, and
 
 | Physical phenomenon | Picture layer | Computation |
 |---|---|---|
-| **Absorption of light**: light passing through a color filter (cellophane, glazed transparent paint) is reduced per channel by its transmittance, and two filters give the product of transmittances (Beer–Lambert law) | Shadow, shading, gradient (multiply) | $`x \cdot g`$, 1st shadow multiplied by 2nd shadow = two filters |
+| **Absorption of light**: light passing through a color filter (cellophane, glazed transparent paint) is reduced per channel by its transmittance, and two filters give the product of transmittances (<mark>Beer–Lambert</mark> law) | Shadow, shading, gradient (multiply) | $`x \cdot g`$, 1st shadow multiplied by 2nd shadow = two filters |
 | **Adding light**: switching on another lamp brightens without exceeding white. The name comes from projecting several slides onto one screen together, and the formula has the same form as "the probability that at least one of two lights arrives" | Light, sparkle, rim light, reflected light (screen) | $`1 - (1 - a)(1 - b)`$ |
 | **Covering**: opaque ink covers 𝑎 of the pixel's area. The soft edge of a line (anti-aliasing) is a partly covered pixel | Line art, base color, highlight (normal) | $`aK + (1 - a)U`$ |
 | **Ink lines**: thin material that absorbs light | Line art | thin dark structure = $`\text{closing} - \text{original}`$ |
@@ -1433,7 +1434,7 @@ The layer structure of a picture imitates the properties of light and paint, and
 
 Multiply · screen are computed on **gamma-encoded sRGB values**, like Photoshop.
 It is not physically exact linear-space compositing, but Photoshop composites a PSD with the same formulas when it is opened, so the original is reproduced as it is.
-Only color comparisons (k-means, $`\Delta E`$) are done in Lab space, after linearization.
+Only color comparisons (<mark>k-means</mark>, $`\Delta E`$) are done in Lab space, after linearization.
 
 ---
 
@@ -1485,7 +1486,7 @@ The correction tools and the PSD writer recognize a layer's role by this value.
 
 ### 6.5 Determinism
 
-All random numbers use a mulberry32 generator with fixed seeds (12345 for the main process, 777 for the region graph shared by the color model · face stages). Face finding uses no random numbers.
+All random numbers use a <mark>mulberry32</mark> generator with fixed seeds (12345 for the main process, 777 for the region graph shared by the color model · face stages). Face finding uses no random numbers.
 The same picture with the same settings always gives the same result, and fixing one stage does not disturb the random number streams of other stages.
 
 ---
@@ -1502,7 +1503,7 @@ Problems that came up while verifying with real pictures during development, and
 | Parts multiplied to dozens | in pictures with many colors, every small color piece became a part | maximum number of parts + merging only into neighbors with similar colors + the "small parts" folder |
 | Hair grain · bright skin surfaces were picked up as sparkles | only the size of the brightening was looked at | only pale colors that stand out from their surroundings in the picture itself are accepted (white top-hat + minimum channel condition) |
 | Small pictures drawn with thick lines had almost no lines found (12px lines at 800px: 1% of lines found) | the line detection window was set by resolution only | measure the pen width from the picture and widen the window when the default is too small (4.3). 92% on the same picture |
-| Colors of 1–2px gaps between lines were off | inpainting mixes from the lines on both sides | solve the line alpha by least squares, and reproduce mismatched places exactly with a minimum-alpha color trace |
+| Colors of 1–2px gaps between lines were off | inpainting mixes from the lines on both sides | solve the line alpha by <mark>least squares</mark>, and reproduce mismatched places exactly with a minimum-alpha color trace |
 | Rough lines broke into dashes (unusable as a guide for line art) | faint or thin lines become small after blurring and break wherever they fall below the final threshold. Small marks from color boundaries and sparkle crumbs also remained as dots | lay the center line of each line under the strokes at a minimum darkness, and remove crumbs and color-boundary marks not connected to center lines. The over-drawn pencil feel stays. Pieces per 1000px of line 16–35 → 3.6–5.4 |
 | Changing the rough to an even single center line looked artificial, like a machine tracing outlines | a person's rough varies in width · darkness from line to line and is smudged by drawing over several times | the even single-line approach was dropped and reverted to soft strokes following the original line width + drawing three times (only the break prevention added) |
 | "Hair" names from faces were also put on black dresses · white clothes | parts are split by color, so clothes of the same color as the hair are one part | colors covering 25% or more of the torso center are not called hair. Colors that received both the skin vote and the hair vote are not named either |
@@ -1537,7 +1538,7 @@ Problems that came up while verifying with real pictures during development, and
 | Hats · sleeves cut off at the top · sides became background | they touch the border and have few lines inside | walking along the border, pieces squeezed between crisp outlines and different in color from both sides are returned (4.5) |
 | Room corners · pillars were mistaken for cut-off parts | one corner pixel is not background, so the piece looks squeezed between borders | pieces touching within 5% of the two upper corners are excluded |
 | Blurred shelves · writing stayed as character | high line density | stage 2 expansion to "places with no crisp lines and only dense blurred marks" |
-| Fireworks · food stall · graffiti backgrounds were not found | the background is also drawn with lines, so line density cannot separate it | color model graph cut (4.5). Boundary overlap IoU 0.72 → 0.90 (graffiti), 0.71 → 0.79 (fireworks) |
+| Fireworks · food stall · graffiti backgrounds were not found | the background is also drawn with lines, so line density cannot separate it | color model <mark>graph cut</mark> (4.5). Boundary overlap <mark>IoU</mark> 0.72 → 0.90 (graffiti), 0.71 → 0.79 (fireworks) |
 | The color model took black clothes · dark hair into the background | no visible line between black background and black clothes, and the same color | near-black achromatic colors are not added; not done if the background already surrounds 90% of the border |
 | The color model took the school uniform of a watercolor-style picture into the background | uniform and wall · desk colors are similar | not done if the color distributions of the character core and background overlap 0.3 or more |
 | The color model took away props like books · hats | line-blocked boundaries are cheap to cut | new background is accepted only if connected to the existing background without crossing crisp lines |
@@ -1585,7 +1586,7 @@ Problems that came up while verifying with real pictures during development, and
 
 | Method | Result |
 |---|---|
-| Enlarging small pictures 2× to split, then shrinking the character map back to the original size | Of 126 pictures with a long side under 900px, enlarging with Lanczos changed the character map by more than 1% in 119, and of 18 re-graded, worse 10 · better 1 (sign test $`p = 0.012`$), at 4.4× the time. Enlarging pixels 2× as they are (no interpolation) also gave worse 5 · better 1 of 12. Enlarging with DCCI, which keeps outlines from blurring (directional cubic convolution interpolation: between original pixels, interpolates $`(-a + 9b + 9c - d)/16`$ along the diagonal · horizontal · vertical direction with the smaller change, blending by $`1/(1 + d^5)`$ when the change ratio of two directions is within 1.15), still gave worse 11 · better 2 of 27 ($`p = 0.022`$) at 3.5× the time, and 17 of 18 pictures graded together with Lanczos got the same verdict. DCCI restores a picture halved and enlarged back 1–2 dB closer to the original (than a cubic spline), so blurred outlines were not the cause. The cause was the values set in pixels (10): in the enlarged picture, the found lines fell from 17.1% → 8.5% of the picture area, and scene background stage 1 · margin widening and the flat background fill entered clothes · hair. On 40 pictures, matching the line window · color step threshold · crisp-line blur to the enlargement factor reduced pixels disagreeing with the original-size result from 1.24 million → 0.54 million |
+| Enlarging small pictures 2× to split, then shrinking the character map back to the original size | Of 126 pictures with a long side under 900px, enlarging with <mark>Lanczos</mark> changed the character map by more than 1% in 119, and of 18 re-graded, worse 10 · better 1 (<mark>sign test</mark> $`p = 0.012`$), at 4.4× the time. Enlarging pixels 2× as they are (no interpolation) also gave worse 5 · better 1 of 12. Enlarging with <mark>DCCI</mark>, which keeps outlines from blurring (directional cubic convolution interpolation: between original pixels, interpolates $`(-a + 9b + 9c - d)/16`$ along the diagonal · horizontal · vertical direction with the smaller change, blending by $`1/(1 + d^5)`$ when the change ratio of two directions is within 1.15), still gave worse 11 · better 2 of 27 ($`p = 0.022`$) at 3.5× the time, and 17 of 18 pictures graded together with <mark>Lanczos</mark> got the same verdict. <mark>DCCI</mark> restores a picture halved and enlarged back 1–2 dB closer to the original (than a cubic spline), so blurred outlines were not the cause. The cause was the values set in pixels (10): in the enlarged picture, the found lines fell from 17.1% → 8.5% of the picture area, and scene background stage 1 · margin widening and the flat background fill entered clothes · hair. On 40 pictures, matching the line window · color step threshold · crisp-line blur to the enlargement factor reduced pixels disagreeing with the original-size result from 1.24 million → 0.54 million |
 | Enlarging only the faces of small pictures 2× to find them | In 74 pictures whose faces changed, 18 real faces newly found · 12 lost (net +6), and fake faces net +37. Fake faces make names · folders wrong, so not adopted |
 | Halving large pictures (long side 2048px) to split, then mapping back | 102 of 115 changed by more than 1%, but 18 re-graded showed better 2 · worse 2, no difference, while the time went from a median of 18.0 s → 5.6 s. Results did not improve, so the default processing resolution stays; to see results quickly, choose 1024px as the processing resolution in the settings |
 | (0.28) Detaching separated pieces for "skin" too | Skin pieces were detached in 48 of the 111 pictures named skin, but in 12 looked at at random, the detached pieces were mostly real hands · arms · legs (only cut off by the face and clothes). Only hair is detached |
@@ -1601,12 +1602,12 @@ Problems that came up while verifying with real pictures during development, and
 | Deciding by the length connected to the character without lines (smooth contact) | Sky pieces also connect smoothly to the margin around the character, so they cannot be told apart. Decided by the share of contact length and color |
 | Measuring line sensitivity from the picture too (threshold at the top 25% of line darkness) | In pictures with faint lines, grain · small marks also became lines, raising the line density used for background finding. Café interior background 41% → 32%, three pictures reduced by 3–4%p. Default kept |
 | Always changing the line detection window to the pen width (including shrinking) | Even ordinary pictures had the window change by 1px, shaking background · parts (café interior background 41% → 33%). Widened only when the default window is too small |
-| Setting base color merge strength · shadow threshold at the valley of the distribution (Otsu) | The distributions have only one peak, so almost every picture went to the end of the range (merge 0.3, shadow 0.2). The only improvement on synthetic pictures was "collar and whites of the eyes merged into one part". Defaults kept |
+| Setting base color merge strength · shadow threshold at the valley of the distribution (<mark>Otsu</mark>) | The distributions have only one peak, so almost every picture went to the end of the range (merge 0.3, shadow 0.2). The only improvement on synthetic pictures was "collar and whites of the eyes merged into one part". Defaults kept |
 | Increasing the number of color clusters · maximum number of parts in pictures with many colors | Parts were only split differently among the same color names (skin 1–12, red 1–13), with no improvement, and some pictures got more small parts. Defaults kept |
 | Reducing the number of color clusters in simple pictures | With 10 colors, purple hair split into two parts; with 12 colors, the whites of the eyes merged with the collar. 14 colors is the same as the default. Default kept |
 | Setting the sparkle size from the size of small bright dots (90th percentile of white top-hat piece radii) | Pictures with large stars and ordinary pictures had almost the same value (13.1 vs 11.9, mostly eye sparkles). Catching the large stars was luck near the threshold, and the 2048px enlargement, unlike the 800px original, sent eye sparkles to the sparkle layer. Default kept |
 | Using the "line share" of region perimeters as evidence in both directions | Shadow boundaries inside the character (no lines) were pushed to the background side, making results much worse. Used only as character-side evidence |
-| Separating character and background by color distribution alone | Even using the character · background color distributions learned from the ground-truth outlines as they are, pictures with the same colors on both sides (red ribbon and autumn leaves, black hat and a shaded shrine) got only 76–86% of regions right. Grouping neighbors (graph cut) raised it by only 1–4%p |
+| Separating character and background by color distribution alone | Even using the character · background color distributions learned from the ground-truth outlines as they are, pictures with the same colors on both sides (red ribbon and autumn leaves, black hat and a shaded shrine) got only 76–86% of regions right. Grouping neighbors (<mark>graph cut</mark>) raised it by only 1–4%p |
 | Separating character lines and background lines by line style (line color · darkness · width) | In pictures with background drawn with the same lines as the character, only 1–7%p better than calling "all lines character". Clear only in a kitchen picture with fluorescent background lines |
 | Blur (focus): ratio of fine-scale to coarse-scale gradients | The character and background distributions were almost the same. Even at its best, majority-vote level |
 | Rules on position relative to faces (torso below the face is character, above the head is background) | Hats · large hairstyles above the head were seen as background. Widening by color alone without position made half of the two characters in the autumn leaves picture background. Changed to probabilities that add only sure places, and adopted (4.5) |
@@ -1627,7 +1628,7 @@ Problems that came up while verifying with real pictures during development, and
 | Desaturated shadows without a darkness limit | Black gloves · hair pieces became one material with a dark green jacket, turning the jacket's base color into light gray-green. Only brightness 30 or more |
 | Making face finding left-right symmetric (average face pattern averaged with its mirror, eye refinement done twice, left eye first · right eye first, taking the better) | Scores became exactly the same when flipped (maximum difference 1.24 → 0), and 60 of 62 faces in original · flipped pictures were found (59 before). But character face selection was right only 40 of 48 times (42 before), names in real pictures got worse (hair names in the qipao · gothic lolita pictures, skin in the close-up, hair · skin names of the golden dancer mostly lost, and the girl on the dark background got her hair name on something else), and the character folders of the window-side picture went 89% → 61%. The average pattern was made from these pictures' faces, so it is tuned to the original orientation. On flipped pictures alone the two were equal (20 of 24) |
 | Face pattern correlation as the larger of the pattern and its mirror | Symmetric, but fake faces increased 49 → 58, and in the checked-shirt picture a large fake frame below the face (score 14.0) hid the real face, which was missed |
-| Color clusters (k-means) from a histogram of Lab color bins instead of pixel samples (independent of pixel order) | In the synthetic naming pictures, hair split into two parts of almost the same color, and hair recall went 84.8% → 65.4%. The name overlap under left-right flipping stayed almost the same (background fill · material grouping · part cleanup also merge greedily in pixel order) |
+| Color clusters (<mark>k-means</mark>) from a histogram of Lab color bins instead of pixel samples (independent of pixel order) | In the synthetic naming pictures, hair split into two parts of almost the same color, and hair <mark>recall</mark> went 84.8% → 65.4%. The name overlap under left-right flipping stayed almost the same (background fill · material grouping · part cleanup also merge greedily in pixel order) |
 | Narrowing or widening the seed zones of character splitting (head ellipse 0.7–1×, body column width 0.8–1.2𝑑, widening 0.1–0.35) | No difference: 4 real two-person pictures 93.6–93.8%, 10 synthetic pictures with two or more people 98.6–98.8%. The errors are at the seam where two characters touch (one hair strand wide), a matter of line strength along the spreading path, not the seeds |
 | Loosening the height condition of character face selection (within 3𝑑 vertically in each other's face frame) to 5𝑑, measuring in the mean direction of the two face frames, or removing it. Score threshold 11.5 → 11 | With the faces of 0.20, group pictures in the 300 pixiv pictures (11) got 1–3 more right, but one-person pictures split into two or more by fake faces rose from 13 to 17–32. After fake faces were reduced in 0.22, widening to 4𝑑 was adopted (0.24) |
 | (0.24) Height condition 5𝑑 · removed, character face score threshold 11 · 11.25 · 12 · 12.5, size ratio 0.4–2.5 | All had fewer or equal pictures with the right folder count than 4𝑑 (5𝑑: group pictures +1 · one-person pictures −2; threshold 12.5: one-person pictures +6 · group pictures −6) |
@@ -1644,27 +1645,27 @@ Problems that came up while verifying with real pictures during development, and
 | Not searching faces in opaque pictures with no background found (as in 0.18) | Among the 5 such pictures in the 300 pixiv pictures, 1 picture had its character split by a fake face, but 1 picture also lost a wrong "skin" color name and newly got a correct hair name. Faces are always searched for the gain in transparent-background pictures (11) |
 | (0.25) Not merging the color region occupying the cheek · nose bridge cells of a character face with the color region occupying the bangs cell (color difference $`\Delta E`$ 6 or more) in material grouping · part cleanup | Tried because nearly half of the faces without hair names were cases where the skin part covered the bangs too. 28 pixiv pictures changed and more pictures got hair · skin names, but one by one, 5 were better · 10 worse. Detached hair grouped with logs · lanterns · leaves of the same color became "hair", or names went on faces · hats · tablecloths. Material grouping merges greedily, so blocking one pair changes the following merges in a chain, and even with the same background decision the tones differed, slightly shifting the character · background boundary of 9 pictures |
 | (0.25) Doing the separation above only in the part cleanup stage | The character · background maps stayed the same and only the names of 21 pictures changed, but 6 were better (hair · skin · eyes of pale skin + light hair, green hair) · 6 worse (logs · trees · tablecloths · hat brims) |
-| (0.26) Filtering out only character pieces by statistics among the pieces face-based widening (9 of 3.5) adds to the background | Looking one by one at the 398 added pieces (0.1% of the picture or more) in the 91 pictures that the face stage made worse or mixed: background 131 · character 191 · ambiguous 76. The discriminating power of 19 cues (color log-likelihood ratio, face zone probability, crisp edge share, contact length with background · character and its line share, distance to the face, area, color difference with surrounding character · background, color difference with the hair color, inner sharpness and its ratio, dark lines on the boundary, color spread, brightness) was AUC 0.41–0.63 (0.5 is chance), and a logistic regression combining 11 non-overlapping ones gave AUC 0.51 under picture-level 10-fold cross-validation (even the best 0.63 was a value high by chance among many). Filtering half of the character pieces also catches 48% of the background pieces, losing as much background as is filtered. White dresses and white walls, black hair and dark backgrounds take the same values on color · line · position cues, so adding formulas brings no information to separate them |
+| (0.26) Filtering out only character pieces by statistics among the pieces face-based widening (9 of 3.5) adds to the background | Looking one by one at the 398 added pieces (0.1% of the picture or more) in the 91 pictures that the face stage made worse or mixed: background 131 · character 191 · ambiguous 76. The discriminating power of 19 cues (color log-likelihood ratio, face zone probability, crisp edge share, contact length with background · character and its line share, distance to the face, area, color difference with surrounding character · background, color difference with the hair color, inner sharpness and its ratio, dark lines on the boundary, color spread, brightness) was <mark>AUC</mark> 0.41–0.63 (0.5 is chance), and a <mark>logistic regression</mark> combining 11 non-overlapping ones gave <mark>AUC</mark> 0.51 under picture-level <mark>10-fold cross-validation</mark> (even the best 0.63 was a value high by chance among many). Filtering half of the character pieces also catches 48% of the background pieces, losing as much background as is filtered. White dresses and white walls, black hair and dark backgrounds take the same values on color · line · position cues, so adding formulas brings no information to separate them |
 | Setting only an upper limit on the brightness difference for merging shadow surfaces | Small surfaces now merged as shadows (60–330 pixels, window-side · café interior · autumn leaves · bench · night view pictures) also include brightness differences of 35–44 and were blocked too. Checked together with area (1% of the picture) to block only wide surfaces comparable in size to the lit surface |
 | (0.29) Making the three size-sensitive values (line detection window · color step threshold · crisp-line blur) proportional to a long side of 1200px at every size | Line detection window $`\max(1, \mathrm{round}(4s))`$ (removing the floor of 3), the pen width measured on brightness scaled to a long side of 1200px and mapped back, color step threshold $`\times 1200/\text{long side}`$, crisp-line blur $`\sigma = 1.5 \times \text{long side}/1200`$. The 24 pictures of 1200px were unchanged, 275 of 283 other-sized pictures changed, and re-grading the 248 changed by more than 0.2% gave better 61 · worse 77. Pictures with a long side under 900px got better 19 · worse 57 ($`p < 0.0001`$) and no major loss 57 → 38 ($`p = 0.0005`$), so overall no major loss fell 384 → 367 (better 12 · worse 29, $`p = 0.012`$) (10) |
-| (0.29) Making the three values proportional one at a time in pictures smaller than 1200px | Changing only the line detection window changed 78 of 168 pictures by more than 5% and made 61% of the difference pixels of the row above (pictures where the window made more than 70% of the difference: better 10 · worse 37). The window shrank from 3–5px to 2px, fewer lines were found, line density inside the character fell, and the scene background entered clothes · hair (the same cause as DCCI enlargement). The color step threshold alone (larger in small pictures) 23% (better 1 · worse 6), the crisp-line blur alone 24% (better 4 · worse 6) |
+| (0.29) Making the three values proportional one at a time in pictures smaller than 1200px | Changing only the line detection window changed 78 of 168 pictures by more than 5% and made 61% of the difference pixels of the row above (pictures where the window made more than 70% of the difference: better 10 · worse 37). The window shrank from 3–5px to 2px, fewer lines were found, line density inside the character fell, and the scene background entered clothes · hair (the same cause as <mark>DCCI</mark> enlargement). The color step threshold alone (larger in small pictures) 23% (better 1 · worse 6), the crisp-line blur alone 24% (better 4 · worse 6) |
 | (0.29) Making the crisp-line blur proportional for large pictures too (𝜎 1.5 → 2.6) | Of 16 pictures where the blur made more than 70% of the difference, better 7 · worse 3 · similar 6 ($`p = 0.34`$); the evidence was weak, so it was left as is |
 | (0.29) Measuring the pen width of large pictures on brightness shrunk to a long side of 1200px | 2 of the 4 pictures whose line detection window changed got worse (the picture with window 10 → 8 found no background at all, the one with 8 → 12 went from 70% → 14% found background) |
 | (0.29) Reducing the color step threshold of large pictures without falling back | 2 pictures that had found background found none (the background spread with the reduced threshold fell short of the 3% · 5% area criteria). With the fallback, these two pictures became the same as 0.28 |
 | (0.29) Making the three values proportional in small pictures and also matching the line density criteria to size | On copies of 60 pictures of 1200px shrunk to a long side of 540px, the values best reproducing the scene background candidates of the original-size result were found (crisp line density multiplier 0.25 → 0.15, blurred line density threshold 0.085 → 0.06, color model crisp line density multiplier 0.25 → 0.15 · character core 3 → 4, joined by powers between 1200px and 540px) and run on 168 pictures smaller than 1200px. Re-graded side by side with 0.29: better 26 · worse 60 ($`p = 0.0003`$), no major loss 84 → 69 (gained 6 · lost 21, $`p = 0.006`$). Slightly better than the version without matched line density (84 → 63), but worse than 0.29. On the shrunk copies, background pixels disagreeing with the original-size result were also fewest with the current pixel-based values at 9.0%; line detection window proportional alone 10.4% · color step threshold alone 9.9% · crisp-line blur alone 10.3% · all three 11.4% · all three + line density 11.6%, all disagreeing more |
-| (0.29) Enlarging pictures smaller than 1200px with DCCI to split at a long side of 1200px (the size the rules are tuned to), then mapping back | Enlarged 2× at a time past 1200px (twice for 540px pictures) and fitted to 1200px with Lanczos, and the character · name maps mapped back to the label with the largest area average. 165 of 168 changed by more than 0.2%, and re-graded side by side with 0.29: better 42 · worse 52 · similar 63 ($`p = 0.35`$), no major loss 84 → 82 (gained 15 · lost 17), character without loss 20 → 27 (11 · 4, $`p = 0.12`$), perfect separation 7 → 4. 540px pictures better 32 · worse 44 (no major loss 57 → 51), 900–1200px pictures better 10 · worse 8 (27 → 31); neither clear. Enlarging keeps more blurred edges as character but also sends more lineless clothes · hair to the background, cancelling out. Processing time per picture under 900px 2.6 s → 7.9 s |
-| (0.29) Enlarging only pictures with a long side of 900–1200px with DCCI to split at 1200px | 42 real 900–1200px pictures and, to enlarge the sample, copies of 90 pictures of 1200px shrunk to 900–1199px (88 changed) were placed side by side with the original-size result without knowing which side was enlarged (left/right at random) and re-graded. Enlarged better 23 · original size better 33 · similar 74 ($`p = 0.23`$), no major loss 84 → 80 (gained 6 · lost 10, $`p = 0.45`$), character without loss 26 → 27. Real pictures alone: enlarged better 7 · original size better 14. Pixels disagreeing with the 1200px original's result on the shrunk copies also showed no difference: original size 5.20% · enlarged 5.45%. Splitting time alone 8.4 s → 10.3 s (DCCI time excluded) |
-| (0.29) Shrinking pictures larger than 1200px to a long side of 1200px (Lanczos) to split, then mapping back | 114 of 115 high-resolution pictures changed and were re-graded placed left/right at random with 0.29 (original size), without knowing which was shrunk. Shrunk better 25 · original size better 29 · similar 60 ($`p = 0.68`$), no major loss 65 → 57 (gained 5 · lost 13, $`p = 0.10`$), no background found 1 → 4. Splitting time halves 17.4 s → 9.1 s, but results did not improve, so it is not the default; added in 0.30 as a setting ("Reduce everything") |
+| (0.29) Enlarging pictures smaller than 1200px with <mark>DCCI</mark> to split at a long side of 1200px (the size the rules are tuned to), then mapping back | Enlarged 2× at a time past 1200px (twice for 540px pictures) and fitted to 1200px with <mark>Lanczos</mark>, and the character · name maps mapped back to the label with the largest area average. 165 of 168 changed by more than 0.2%, and re-graded side by side with 0.29: better 42 · worse 52 · similar 63 ($`p = 0.35`$), no major loss 84 → 82 (gained 15 · lost 17), character without loss 20 → 27 (11 · 4, $`p = 0.12`$), perfect separation 7 → 4. 540px pictures better 32 · worse 44 (no major loss 57 → 51), 900–1200px pictures better 10 · worse 8 (27 → 31); neither clear. Enlarging keeps more blurred edges as character but also sends more lineless clothes · hair to the background, cancelling out. Processing time per picture under 900px 2.6 s → 7.9 s |
+| (0.29) Enlarging only pictures with a long side of 900–1200px with <mark>DCCI</mark> to split at 1200px | 42 real 900–1200px pictures and, to enlarge the sample, copies of 90 pictures of 1200px shrunk to 900–1199px (88 changed) were placed side by side with the original-size result without knowing which side was enlarged (left/right at random) and re-graded. Enlarged better 23 · original size better 33 · similar 74 ($`p = 0.23`$), no major loss 84 → 80 (gained 6 · lost 10, $`p = 0.45`$), character without loss 26 → 27. Real pictures alone: enlarged better 7 · original size better 14. Pixels disagreeing with the 1200px original's result on the shrunk copies also showed no difference: original size 5.20% · enlarged 5.45%. Splitting time alone 8.4 s → 10.3 s (<mark>DCCI</mark> time excluded) |
+| (0.29) Shrinking pictures larger than 1200px to a long side of 1200px (<mark>Lanczos</mark>) to split, then mapping back | 114 of 115 high-resolution pictures changed and were re-graded placed left/right at random with 0.29 (original size), without knowing which was shrunk. Shrunk better 25 · original size better 29 · similar 60 ($`p = 0.68`$), no major loss 65 → 57 (gained 5 · lost 13, $`p = 0.10`$), no background found 1 → 4. Splitting time halves 17.4 s → 9.1 s, but results did not improve, so it is not the default; added in 0.30 as a setting ("Reduce everything") |
 | (0.30) Finding only the background · faces of large pictures at 1200px and making layers at the original size | 114 of 115 high-resolution pictures changed and were graded blind against the original size: shrunk better 14 · original size better 51 · similar 49 ($`p < 0.0001`$), no major loss 66 → 58. Enlarging the reduced maps puts their boundaries out of line with the original-size line · color edges, and later stages (pieces on the background · line cleanup) widen the mismatch. The background stage is about 1/3 of the total time, so only 5% faster, 17.4 s → 16.6 s. Kept only as a setting, not recommended (11) |
 | (0.31) Excluding enclosed places only in scene background stage 1 | Blocking only stage 1, which fills places with low line density, lets the following margin widening (widening into places where color continues smoothly) take lineless white clothes · skirts as before. The version blocking stage 1 · color model · face-based widening was better 22 · worse 11 than 0.30 in 45 blind pictures, and the version also blocking margin widening (adopted) was better 18 · worse 3 than that version in 26 blind pictures |
 | (0.31) Enclosure threshold 0.8 (13 of 16 directions) | Graded blind against 0.9 (15 directions) on 20 random pictures of the 361 changed: better 8 · worse 8 · similar 4, no difference, and one picture found no background at all (the found scene background fell short of 5% area) |
 | (0.31) Treating the bottom border as a wall too when measuring enclosure (characters cut off at the bottom of the screen) | Graded blind against the 0.9 version on 12 random pictures of the 167 changed: better 6 · worse 5 · similar 1, no difference. As much bottom floor · grass stays on the character side as cut-off skirts · legs are kept |
 | (0.32) In pictures searched again without enclosure, also running the color model · face-based widening without enclosure | Differs only in pictures where the scene background without enclosure fell short, and 5 of 666 changed (one picture's background 8.8% → 14.7%). Some pictures lost more character clothing pieces, so the color model · face-based widening still block enclosed places |
-| (0.33) Releasing enclosure protection only in pictures that got worse in 0.31 | Comparing pictures where 0.30 was better and where 0.31 was better in the 0.31 blind grading (89 · 243 pictures where places only 0.30 saw as background exceeded 1% of the picture) on 13 values (share of enclosed places, line share, share of protected places that are enclosed · outside face zones, enclosure of the border band, flat background area, etc.), the discriminating power was AUC 0.34–0.61 (0.5 is chance). That 90% of protected places are enclosed was also the same on both sides (medians 0.905 · 0.896). Counting only long line pieces (3% · 8% of the long side or more) as walls reduced protection equally on both sides (0.70 · 0.71 at 3%), so pictures could not be told apart |
+| (0.33) Releasing enclosure protection only in pictures that got worse in 0.31 | Comparing pictures where 0.30 was better and where 0.31 was better in the 0.31 blind grading (89 · 243 pictures where places only 0.30 saw as background exceeded 1% of the picture) on 13 values (share of enclosed places, line share, share of protected places that are enclosed · outside face zones, enclosure of the border band, flat background area, etc.), the discriminating power was <mark>AUC</mark> 0.34–0.61 (0.5 is chance). That 90% of protected places are enclosed was also the same on both sides (medians 0.905 · 0.896). Counting only long line pieces (3% · 8% of the long side or more) as walls reduced protection equally on both sides (0.70 · 0.71 at 3%), so pictures could not be told apart |
 | (0.33) Loose gaps (no limit on the piece sum, pieces up to 5% of the picture) | Changed 161 of 666 pictures by more than 0.05%; one by one: exactly removed gaps only 85 · visibly lost character 20 · mixed 15 · almost nothing 41. The losses were black-and-white line art filled with white, and white stockings · white ribbons · white clothing pieces (sum 5–30% of the character's paint), so limiting to a 5% sum · 2% pieces reduced losses to 10 with 74 exact (4.5) |
 | (0.33) Undoing numbers smeared from gaps on the non-gap background side too | In 3 test pictures the character layer grew 4–12%, mostly lines · patterns of the background picture coming to the character, so only places whose nearest background is a gap are undone (4.6) |
 | (0.34) Light · sparkle painted over lines as a layer above line art | Treating line pixels brighter and more saturated than the surrounding paint as light over lines was right on synthetic pictures (light stroked over lines), but found something in 574 of 666 pictures, mostly color trace (lines tinted with the paint color). Color trace and "black line + screen light" cannot be told apart from one pixel's color, and adding connectivity to neighboring lines as a condition also removed the gain on synthetic pictures |
-| (0.34) Faint glow spreading outside the outline | Inpainting the background far from the character inward to guess the background's own color, and treating the outline surroundings as glow if tinted with one color more strongly than that color and fading with distance from the line (hue concentrated on one side 0.7 or more, near/far difference ratio 1.5 or more, edge continuing smoothly into the surroundings, surrounding 35% or more of the boundary within 3px). Synthetic glow recall went 6.8% → 27.0% (precision 100%), but all 24 pictures where glow was newly found among the 666 were fake (bands around characters on yellow flat backgrounds, underwater scene pieces, edge stripes). Many pictures (gradients · lighting) have far-background inpainted colors that differ from the actual color of the near background |
+| (0.34) Faint glow spreading outside the outline | Inpainting the background far from the character inward to guess the background's own color, and treating the outline surroundings as glow if tinted with one color more strongly than that color and fading with distance from the line (hue concentrated on one side 0.7 or more, near/far difference ratio 1.5 or more, edge continuing smoothly into the surroundings, surrounding 35% or more of the boundary within 3px). Synthetic glow <mark>recall</mark> went 6.8% → 27.0% (<mark>precision</mark> 100%), but all 24 pictures where glow was newly found among the 666 were fake (bands around characters on yellow flat backgrounds, underwater scene pieces, edge stripes). Many pictures (gradients · lighting) have far-background inpainted colors that differ from the actual color of the near background |
 | (0.34) Calling the part in the torso cell "clothes" | Called the widest part in the face frame's torso cell ($`\lvert u\rvert \le 0.8,\ 2 \le v \le 3.5`$) "clothes" (excluding skin · hair) when the cell was more than half painted. Of all 62 named pictures: only on clothes 33 · mixed 12 · mostly not clothes 17 (hair strands, floor · curtains left in the character layer, frames of misdetected faces). Filtering by share inside the body column · share above the eyes · whether both skin and hair were found for that face still left 9 wrong of 44 and lost 4 correct. What is clothes cannot be decided by color and position |
 | (0.34) Erasing small dot marks of the rough (pieces under $`(6s)^2`$ not connected to other strokes) | In 12 pictures (10 random + 2 test pictures), only 0–67 pixels were erased per picture. The marks left around lace · patterns are mostly short strokes over 100 pixels, so erasing small pieces does not reduce them |
 | (0.34) Mirror-agreed faces for background decisions too | The background took character parts (legs, hair) that fake faces had protected, and major losses rose by 4 among pictures whose character map changed. Used only for names · folders (10 of 4.5) |
@@ -1689,10 +1690,10 @@ Problems that came up while verifying with real pictures during development, and
 | Target | Method | Effect |
 |---|---|---|
 | Dilation · erosion | 1D sliding max/min split into rows · columns, monotonic deque | $`O(1)`$ per pixel regardless of radius |
-| Gaussian blur | 3 box blurs, cumulative sums | $`O(N)`$ regardless of radius |
-| Spreading computations (fills, distances, inpainting) | breadth-first search over the front only, visiting in distance order | each pixel visited once |
-| Background color model | graph cut on regions (thousands) instead of pixels, Dinic maximum flow | solving thousands of regions instead of millions of pixels stays light even repeated 4 times |
-| k-means | at most 50,000 samples (40,000 for the color model), k-means++ initialization, early stopping | clustering cost independent of picture size |
+| <mark>Gaussian blur</mark> | 3 box blurs, cumulative sums | $`O(N)`$ regardless of radius |
+| Spreading computations (fills, distances, inpainting) | <mark>breadth-first search</mark> over the front only, visiting in distance order | each pixel visited once |
+| Background color model | <mark>graph cut</mark> on regions (thousands) instead of pixels, <mark>Dinic maximum flow</mark> | solving thousands of regions instead of millions of pixels stays light even repeated 4 times |
+| <mark>k-means</mark> | at most 50,000 samples (40,000 for the color model), <mark>k-means++</mark> initialization, early stopping | clustering cost independent of picture size |
 | Layer storage | stored cropped to the rectangle with content, empty layers not made | saves memory and PSD size |
 | PSD compression | PackBits RLE per channel row | layers with large transparent areas become very small |
 | Where computation runs | Web Worker, result buffers moved (no copy) | the screen does not freeze during computation |
@@ -1707,7 +1708,7 @@ Problems that came up while verifying with real pictures during development, and
 
 ## 9. Strengths
 
-- **A split that returns to the original**: stacking the split layers gives back the original (reproduction PSNR 49–65 dB). Splitting into layers does not damage the picture.
+- **A split that returns to the original**: stacking the split layers gives back the original (reproduction <mark>PSNR</mark> 49–65 dB). Splitting into layers does not damage the picture.
 - **The same structure as an artist's work file**: base color folders per part, clipped 1st · 2nd shadows and highlights, multiply shading, screen light effects, line art + color trace.
 - **Lightly painted layers**: multiply · screen layers are stored with the smallest possible alpha, so they look like layers an artist painted lightly and are easy to keep working on.
 - **Many cues for background decisions**: border connection, line density, how much lines enclose a place, sharpness (focus), color distributions learned per picture, and face positions are used in turn, and cut-off character parts are picked out. Faces are found with rules and averaged patterns, without a trained model.
@@ -1749,7 +1750,7 @@ Problems that came up while verifying with real pictures during development, and
 - Scenes drawn densely with lines across the whole screen, with similar character and background colors, may have no background found automatically. Drawing around the background two or three times with the **Send to background** loop creates the background layer.
   Such pictures can be separated only by recognizing what is a hat and what is a maple leaf, so rules like color · lines · blur have limits (7.5, 11).
 - Splitting the 666 pictures by detailed conditions, even with other conditions matched, pictures without lines · with faces hidden · low resolution (long side under 900px) · dark scenes · backlight
-  more often lose large parts of the character (odds ratio 0.39–0.55), and faces with closed eyes or winks · flat · black-and-white · sketch · thick paint · oblique faces are found less (odds ratio 0.29–0.53, 11).
+  more often lose large parts of the character (<mark>odds ratio</mark> 0.39–0.55), and faces with closed eyes or winks · flat · black-and-white · sketch · thick paint · oblique faces are found less (<mark>odds ratio</mark> 0.29–0.53, 11).
   Only 5 of 24 backlit pictures had no major loss.
 - Where colors are almost the same, like dark clothes in front of a dark background, the background is taken conservatively so the clothes do not leak into it.
 - Places enclosed by lines are not treated as background (0.31), so background enclosed by the character with an empty middle (background seen between skirt and arm, between hair strands) and
@@ -1835,7 +1836,7 @@ Problems that came up while verifying with real pictures during development, and
 
 - Background finding uses hard thresholds on area · color distribution overlap (5% · 90% · 0.3), so pictures right next to a threshold find or miss the background under noise as small as re-saving as JPEG
   (4 of the new 342). The same file always gives the same result (11).
-- Some values are set in pixels instead of in proportion to picture size, so the same picture gives different results at different sizes. This was found by enlarging 126 pictures with a long side under 900px 2× (DCCI), splitting, mapping back, and comparing with the original-size results.
+- Some values are set in pixels instead of in proportion to picture size, so the same picture gives different results at different sizes. This was found by enlarging 126 pictures with a long side under 900px 2× (<mark>DCCI</mark>), splitting, mapping back, and comparing with the original-size results.
   - **Line detection window**: the window is $`\max(3, \mathrm{round}(4 \times \text{long side}/1000))`$px, so small pictures hit the minimum of 3px, and automatic line width measurement does not count widths under 1.8px, so it misses the 1–2px lines of small pictures,
     measures thicker dark shapes (median 6.7px), and raises the window to 5px. Enlarging the same picture 2× measures the actual pen (3.4px at original size) and the window becomes 2px at original size, so the found lines fall from 17.1% → 8.5% of the picture area,
     the line density inside the character falls, and the scene background enters clothes · hair.
@@ -1844,8 +1845,8 @@ Problems that came up while verifying with real pictures during development, and
   - **Crisp line decision**: only lines losing more than 25% of their depth when blurred by 1.5px are crisp, so the thickened lines of an enlarged picture are judged less crisp.
   - In 40 pictures, the enlarged pictures lost 840,000 character pixels relative to the original-size results, and the stages that first made them background were the scene background's margin widening 31% · scene background stage 1 28% · flat background fill 16% · color model 11%.
     Matching only the line window 2× gives 470,000 (−44%), only the color step threshold halved 720,000 (−15%), only the crisp-line blur 2× 810,000 (−5%), and all three 260,000 (−69%) (7.5).
-  - In 85 high-resolution pictures with known original canvas sizes (canvas long side median 3400px, 2076–5151px), the outline width (90th percentile of line widths measured on brightness enlarged 2× with DCCI) was a median of 1.5‰ of the long side (half within 1.2–2.2‰);
-    the larger the canvas, the thicker the lines in pixels (Spearman $`\rho = 0.62,\ p < 0.0001`$), but the ratio to the long side was unrelated to canvas size ($`\rho = -0.09,\ p = 0.44`$).
+  - In 85 high-resolution pictures with known original canvas sizes (canvas long side median 3400px, 2076–5151px), the outline width (90th percentile of line widths measured on brightness enlarged 2× with <mark>DCCI</mark>) was a median of 1.5‰ of the long side (half within 1.2–2.2‰);
+    the larger the canvas, the thicker the lines in pixels (<mark>Spearman</mark> $`\rho = 0.62,\ p < 0.0001`$), but the ratio to the long side was unrelated to canvas size ($`\rho = -0.09,\ p = 0.44`$).
     Artists choose their pen for the canvas size, so the typical width lives as a ratio to picture size, not in pixels. At this ratio, lines are 0.8px in a picture with a 540px long side and 1.8px at 1200px,
     so the smaller the picture, the less fully pixel-based rules see its lines.
   - So in 0.29 the three values were changed to ratios relative to a long side of 1200px (the size the rules are tuned to) and verified on 666 pictures. For large pictures, making the color step threshold proportional helped, so only that was added;
@@ -1854,7 +1855,7 @@ Problems that came up while verifying with real pictures during development, and
     raising line density inside the character, and that was keeping the scene background from entering the character. Matching the window to the ratio removes this protection.
     Even matching the following line density criteria to size, small pictures were worse than 0.29 (7.5), and on copies of 1200px pictures shrunk to 540px, the values best reproducing the original-size result were also the current pixel-based ones.
     In small pictures, a 0.8px outline blurs into a single pixel and a proportional window does not catch it properly, while the generous pixel window makes up for that loss. So small pictures keep the pixel-based values.
-    Enlarging to 1200px with DCCI to split and mapping back also made no difference from 0.29 (better 42 · worse 52) while tripling the time, so it was not added.
+    Enlarging to 1200px with <mark>DCCI</mark> to split and mapping back also made no difference from 0.29 (better 42 · worse 52) while tripling the time, so it was not added.
     Enlarging only 900–1200px pictures also made no difference in 130 blind-graded pictures (enlarged better 23 · original size better 33) (7.5).
     Conversely, shrinking pictures larger than 1200px to 1200px to split also made no difference in 114 blind-graded pictures (shrunk better 25 · original size better 29), so it is kept only as a setting for speed (7.5, 0.30).
 - Merely flipping the same picture left-right changes the result slightly. The background is 98.7% the same and the character count is the same in 24 of 25 pictures, but the named regions overlap the original only about halfway (11).
@@ -1867,8 +1868,8 @@ Problems that came up while verifying with real pictures during development, and
   and around 45° it is about the same with it on (of 30 real faces in the ground-truth pictures, 0.36 finds 12–16, 18–20 with it on; blind better 7 · worse 5 · same 6, 11).
 - Pictures on a canvas rotated 45° keep faces and characters but find less background than upright pictures (background found on 8 ground-truth outline pictures 12.9–15.4%, upright 44.8%).
   Even with a band filled around the corner fill, the scene background spreads less at the oblique picture edges.
-- A picture filling the canvas tilted 45° agrees with the same picture upright on only 76.1% of the character map's pixels (character IoU 69.5%; rotated with white corners 87.5%, flipped only 97.5%; 1440 real pictures, 11).
-- The boundaries splitting parts change when the picture is flipped or rotated (median IoU of the part overlapping most with the reference part: flipped 0.49, rotated 0.25–0.34, 11).
+- A picture filling the canvas tilted 45° agrees with the same picture upright on only 76.1% of the character map's pixels (character <mark>IoU</mark> 69.5%; rotated with white corners 87.5%, flipped only 97.5%; 1440 real pictures, 11).
+- The boundaries splitting parts change when the picture is flipped or rotated (median <mark>IoU</mark> of the part overlapping most with the reference part: flipped 0.49, rotated 0.25–0.34, 11).
 
 ### 10.6 Weaknesses seen through the five targets, and a call for help (0.39)
 
@@ -1888,8 +1889,8 @@ Two kinds of pictures were used to measure in which cases 0.39 separates the bac
 | Real: no problem, 80% CI | 45.2–50.1% | 73.2–77.5% | 9.5–12.6% | 43.3–48.3% | 49.5–56.1% |
 | Pictures (synthetic · real) | 10,080 · 657 | 10,080 · 650 | 10,080 · 650 | 10,080 · 644 | 8,064 · 373 |
 
-Intervals are Wilson intervals (z = 1.96 · 1.2816). Objects are counted only on the 8,064 synthetic pictures that have one, and real pictures without the target (no background to remove, no visible face, and so on) are left out.
-The synthetic pictures are not a random sample but every combination of fixed levels, so their intervals are the precision of the rates within this design.
+Intervals are <mark>Wilson intervals</mark> (z = 1.96 · 1.2816). Objects are counted only on the 8,064 synthetic pictures that have one, and real pictures without the target (no background to remove, no visible face, and so on) are left out.
+The synthetic pictures are not a random sample but every combination of fixed levels, so their intervals are the <mark>precision</mark> of the rates within this design.
 
 The weaknesses found are below. Real-picture counts are the numbers of grading sheets given that type (small problems included).
 
@@ -1947,70 +1948,70 @@ In this section:
 ### 11.1 Formulas used for evaluation
 
 - **Intervals**: "95% CI" (also "95% interval") and "80% CI" in this document are confidence intervals at that level, and the method used is given where each appears (formulas below).
-- **Reproduction PSNR**: the formula of 4.13. The PSNR recomposited with psd-tools is measured with the same formula.
+- **Reproduction <mark>PSNR</mark>**: the formula of 4.13. The <mark>PSNR</mark> recomposited with psd-tools is measured with the same formula.
 - **Comparison with pixel ground truth**: with 𝐶 the pixels the program put on the character side, 𝐺 the ground-truth character, and 𝐼 the area excluding a 3px band around the ground-truth boundary (for real pictures with drawn outlines, the difference between the ground truth dilated 3 times and eroded 3 times;
   for synthetic pictures, excluding places where the ground-truth map changes dilated 3 times; the background ground truth of synthetic pictures also excludes glow places),
 
   $`\displaystyle \mathrm{IoU}=\frac{|C\cap G|}{|C\cup G|},\qquad \text{character kept}=\frac{|C\cap G\cap I|}{|G\cap I|},\qquad \text{background found}=\frac{|\bar C\cap\bar G\cap I|}{|\bar G\cap I|}`$
 
   "Pixel total" divides the sums of numerators and denominators over several pictures, and "mean" is the mean of per-picture values. "In 24-color regions, area-weighted" counts the color model's regions weighted by area instead of pixels.
-- **Precision · recall**: with found 𝑃 and ground truth 𝑇, precision $`\lvert P \cap T\rvert/ \lvert P\rvert`$ and recall $`\lvert P \cap T\rvert/ \lvert T\rvert`$. Lines count as correct within 1px of a ground-truth line, and names are counted in pixels excluding a 3px band at material boundaries.
+- **<mark>Precision</mark> · <mark>recall</mark>**: with found 𝑃 and ground truth 𝑇, <mark>precision</mark> $`\lvert P \cap T\rvert/ \lvert P\rvert`$ and <mark>recall</mark> $`\lvert P \cap T\rvert/ \lvert T\rvert`$. Lines count as correct within 1px of a ground-truth line, and names are counted in pixels excluding a 3px band at material boundaries.
   In synthetic pictures, a face counts as found if there is a found face within $`0.35d`$ of the midpoint of the ground-truth eyes with a size ratio of 0.6–1.6.
 - **Coverage · purity** (base colors of brush paintings): the mean over materials 𝑚 of the share taken by the dominant part $`\max_k \lvert m \cap k\rvert/ \lvert m\rvert`$ (coverage), and over parts 𝑘 of the share of the dominant material $`\max_m \lvert m \cap k\rvert/ \lvert k\rvert`$ (purity).
-- **Colorfulness** (of test pictures, Hasler–Süsstrunk): on 0–255 values of the picture shrunk to a 300px long side, with $`\mathrm{rg} = R - G,\ \mathrm{yb} = (R + G)/2 - B`$,
+- **Colorfulness** (of test pictures, <mark>Hasler–Süsstrunk</mark>): on 0–255 values of the picture shrunk to a 300px long side, with $`\mathrm{rg} = R - G,\ \mathrm{yb} = (R + G)/2 - B`$,
 
   $`\displaystyle M=\sqrt{\sigma_{rg}^2+\sigma_{yb}^2}+0.3\sqrt{\mu_{rg}^2+\mu_{yb}^2}`$
 
   Dull · medium · colorful were divided at the tertiles of 𝑀 over the added 342 pixiv pictures (33.4, 52.2).
 - **Spread of a proportion**: if 𝑘 of 𝑛 pictures pass, $`p = k/n`$, per-picture standard deviation $`\sqrt{p(1 - p)}`$, standard error $`\mathrm{SE} = \sqrt{p(1 - p)/n}`$, margin of error $`z \cdot \mathrm{SE}`$ (𝑧 is 1.645 · 1.960 · 2.576 for 90 · 95 · 99%).
-- **Wilson score interval**:
+- **<mark>Wilson score interval</mark>**:
 
   $`\displaystyle \frac{p+\frac{z^2}{2n}}{1+\frac{z^2}n}\ \pm\ \frac z{1+\frac{z^2}n}\sqrt{\frac{p(1-p)}n+\frac{z^2}{4n^2}}`$
 
-- **Clopper–Pearson exact interval** (confidence level $`1 - \alpha`$): an interval inverting the binomial distribution, wider than the normal approximation, whose actual coverage never falls below $`1 - \alpha`$. $`B(q; a, b)`$ is the 𝑞 quantile of the beta distribution.
+- **<mark>Clopper–Pearson exact interval</mark>** (confidence level $`1 - \alpha`$): an interval inverting the <mark>binomial distribution</mark>, wider than the <mark>normal approximation</mark>, whose actual coverage never falls below $`1 - \alpha`$. $`B(q; a, b)`$ is the 𝑞 quantile of the beta distribution.
 
   $`\displaystyle p_L=B\!\left(\tfrac{\alpha}2;\,k,\,n-k+1\right)\ (0\text{ if }k=0),\qquad p_U=B\!\left(1-\tfrac{\alpha}2;\,k+1,\,n-k\right)\ (1\text{ if }k=n)`$
 
-  The **one-sided 95% lower bound** is $`B(0.05; k, n - k + 1)`$, and **Bonferroni** uses a $`1 - 0.05/3 \approx 98.3\%`$ interval per criterion so that the three criteria together hold at 95% overall.
-- **𝑡 interval of a mean**: from the mean $`\bar x`$ of per-picture values $`x_1 \dots x_n`$ and the sample standard deviation $`s = \sqrt{\sum(x_i - \bar x)^2/(n - 1)}`$, $`\bar x \pm t_{n-1}(1 - \alpha/2) \cdot s/\sqrt n`$ ($`t_{n-1}(q)`$ is the 𝑞 quantile of the 𝑡 distribution with $`n - 1`$ degrees of freedom; capped at 100%).
-- **Chi-square test of independence**: in a 2×2 table of two groups × (pass / other) (e.g. two pixiv groups × no major loss, face found · not found × no major loss),
-  the 𝑝 value of $`\chi^2 = \sum(\lvert O - E\rvert - 0.5)^2 / E`$ (1 degree of freedom) with expected counts $`E = \text{row sum} \times \text{column sum}/\text{total}`$ and Yates' continuity correction.
+  The **one-sided 95% lower bound** is $`B(0.05; k, n - k + 1)`$, and **<mark>Bonferroni</mark>** uses a $`1 - 0.05/3 \approx 98.3\%`$ interval per criterion so that the three criteria together hold at 95% overall.
+- **<mark>𝑡 interval of a mean</mark>**: from the mean $`\bar x`$ of per-picture values $`x_1 \dots x_n`$ and the sample standard deviation $`s = \sqrt{\sum(x_i - \bar x)^2/(n - 1)}`$, $`\bar x \pm t_{n-1}(1 - \alpha/2) \cdot s/\sqrt n`$ ($`t_{n-1}(q)`$ is the 𝑞 quantile of the 𝑡 distribution with $`n - 1`$ degrees of freedom; capped at 100%).
+- **<mark>Chi-square test of independence</mark>**: in a 2×2 table of two groups × (pass / other) (e.g. two pixiv groups × no major loss, face found · not found × no major loss),
+  the 𝑝 value of $`\chi^2 = \sum(\lvert O - E\rvert - 0.5)^2 / E`$ (1 degree of freedom) with expected counts $`E = \text{row sum} \times \text{column sum}/\text{total}`$ and <mark>Yates</mark>' continuity correction.
   𝑝 is the probability that the two groups differ this much or more by sampling error alone when their true proportions are equal; below 0.05 it was written as "hard to see as chance", above it as "no evidence of a change".
   The effect size is the phi coefficient $`\varphi = \sqrt{\chi^2/n}`$ ($`\chi^2`$ without continuity correction).
-- **Fisher's exact test**: in the same 2×2 table with row and column sums fixed, the probability that the top-left cell is 𝑎, $`P(a) = C(a + b, a) C(c + d, c) / C(n, a + c)`$, is used,
+- **<mark>Fisher's exact test</mark>**: in the same 2×2 table with row and column sums fixed, the probability that the top-left cell is 𝑎, $`P(a) = C(a + b, a) C(c + d, c) / C(n, a + c)`$, is used,
   and 𝑝 is the sum of 𝑃 over all tables no more probable than the observed one (two-sided). It is exact without approximation even with small expected counts.
-- **Difference · ratio · odds ratio of two proportions**: if group 1 passes $`k_1`$ of $`n_1`$ and group 2 passes $`k_2`$ of $`n_2`$, the 95% interval of the difference $`p_1 - p_2`$ is the Newcombe interval combining the two Wilson intervals $`[l_1, u_1],\ [l_2, u_2]`$,
-  and the intervals of the ratio $`\mathrm{RR} = p_1/p_2`$ and odds ratio $`\mathrm{OR} = k_1(n_2 - k_2) / ((n_1 - k_1)k_2)`$ are normal approximations on the log scale.
+- **Difference · ratio · <mark>odds ratio</mark> of two proportions**: if group 1 passes $`k_1`$ of $`n_1`$ and group 2 passes $`k_2`$ of $`n_2`$, the 95% interval of the difference $`p_1 - p_2`$ is the Newcombe interval combining the two <mark>Wilson intervals</mark> $`[l_1, u_1],\ [l_2, u_2]`$,
+  and the intervals of the ratio $`\mathrm{RR} = p_1/p_2`$ and <mark>odds ratio</mark> $`\mathrm{OR} = k_1(n_2 - k_2) / ((n_1 - k_1)k_2)`$ are <mark>normal approximations</mark> on the log scale.
 
   $`\displaystyle \bigl[(p_1-p_2)-\sqrt{(p_1-l_1)^2+(u_2-p_2)^2},\ (p_1-p_2)+\sqrt{(u_1-p_1)^2+(p_2-l_2)^2}\bigr]`$
 
   $`\displaystyle \mathrm{RR}\cdot e^{\pm1.96\sqrt{\frac1{k_1}-\frac1{n_1}+\frac1{k_2}-\frac1{n_2}}},\qquad \mathrm{OR}\cdot e^{\pm1.96\sqrt{\frac1{k_1}+\frac1{n_1-k_1}+\frac1{k_2}+\frac1{n_2-k_2}}}`$
 
-- **Comparison with matched conditions (Mantel–Haenszel)**: dividing pictures into strata 𝑖 by the value of one condition (e.g. no occlusion · face occluded · body occluded) and the source, with a 2×2 table $`a_i, b_i, c_i, d_i`$ (sum $`n_i`$) per stratum,
+- **Comparison with matched conditions (<mark>Mantel–Haenszel</mark>)**: dividing pictures into strata 𝑖 by the value of one condition (e.g. no occlusion · face occluded · body occluded) and the source, with a 2×2 table $`a_i, b_i, c_i, d_i`$ (sum $`n_i`$) per stratum,
 
   $`\displaystyle \mathrm{OR}_{MH}=\frac{\sum_i a_i d_i/n_i}{\sum_i b_i c_i/n_i},\qquad \chi^2_{CMH}=\frac{\bigl(\bigl|\sum_i a_i-\sum_i E[a_i]\bigr|-0.5\bigr)^2}{\sum_i \mathrm{Var}(a_i)}`$
 
-  with $`E[a_i] = (a_i + b_i)(a_i + c_i)/n_i`$, $`\mathrm{Var}(a_i) = (a_i + b_i)(c_i + d_i)(a_i + c_i)(b_i + d_i) / (n_i^2(n_i - 1))`$ (1 degree of freedom). The interval of the odds ratio uses the Robins–Breslow–Greenland variance.
+  with $`E[a_i] = (a_i + b_i)(a_i + c_i)/n_i`$, $`\mathrm{Var}(a_i) = (a_i + b_i)(c_i + d_i)(a_i + c_i)(b_i + d_i) / (n_i^2(n_i - 1))`$ (1 degree of freedom). The interval of the <mark>odds ratio</mark> uses the <mark>Robins–Breslow–Greenland</mark> variance.
   Strata where an empty cell makes the table undefined are excluded. Within a stratum the condition is the same, so apparent differences caused by differences in the condition are filtered out.
 - **Logistic regression**: pass/fail $`y \in \lbrace0, 1\rbrace`$ is modeled as $`P(y = 1) = 1 / (1 + e^{-x\beta})`$, with 𝑥 containing the factor of interest (face found · group) together with all conditions (0/1 for each value of number of people · occlusion · focus · tilt · pose · colorfulness · image quality, source, log of the long side).
-  𝛽 is fitted by iteratively reweighted least squares $`\beta \gets \beta + (X^{\mathsf T}WX)^{-1}X^{\mathsf T}(y - p)`$, $`W = \mathrm{diag}(p(1 - p))`$; the factor's odds ratio is $`e^\beta`$, its interval $`e^{\beta \pm 1.96 \mathrm{SE}}`$ ($`\mathrm{SE}`$ from the diagonal of $`(X^{\mathsf T}WX)^{-1}`$), and 𝑝 is the two-sided Wald $`z = \beta/\mathrm{SE}`$.
-- **Paired comparison (McNemar)**: when the same pictures are judged by two methods, with 𝑏 pictures passing only on one side and 𝑐 only on the other, $`\chi^2 = (\lvert b - c\rvert - 1)^2 / (b + c)`$ (1 degree of freedom);
+  𝛽 is fitted by <mark>iteratively reweighted least squares</mark> $`\beta \gets \beta + (X^{\mathsf T}WX)^{-1}X^{\mathsf T}(y - p)`$, $`W = \mathrm{diag}(p(1 - p))`$; the factor's <mark>odds ratio</mark> is $`e^\beta`$, its interval $`e^{\beta \pm 1.96 \mathrm{SE}}`$ ($`\mathrm{SE}`$ from the diagonal of $`(X^{\mathsf T}WX)^{-1}`$), and 𝑝 is the two-sided Wald $`z = \beta/\mathrm{SE}`$.
+- **Paired comparison (<mark>McNemar</mark>)**: when the same pictures are judged by two methods, with 𝑏 pictures passing only on one side and 𝑐 only on the other, $`\chi^2 = (\lvert b - c\rvert - 1)^2 / (b + c)`$ (1 degree of freedom);
   when $`b + c`$ is small, the two-sided exact 𝑝 of $`b \sim \mathrm{Binomial}(b + c, 1/2)`$ is used.
-- **Discriminating power (AUC)**: the probability that, drawing one from each of two groups (e.g. background pieces 𝑏, character pieces 𝑐), the cue value is larger on the 𝑏 side, $`\mathrm{AUC} = P(x_b > x_c) + P(x_b = x_c)/2`$. 0.5 is the same as a coin toss; the closer to 1 or 0, the better it separates.
-  Models combining several cues are measured by **cross-validation**, splitting pictures into 10 groups, fitting on 9 and measuring on the remaining 1, repeated 10 times (so pieces of the same picture are never in both fitting and measuring).
-- **Correction for multiple tests (Benjamini–Hochberg)**: ordering the 𝑝 values of 𝑚 conditions, each tested against the remaining pictures by Fisher's exact test on one metric, as $`p_1 \le \dots \le p_m`$,
+- **Discriminating power (<mark>AUC</mark>)**: the probability that, drawing one from each of two groups (e.g. background pieces 𝑏, character pieces 𝑐), the cue value is larger on the 𝑏 side, $`\mathrm{AUC} = P(x_b > x_c) + P(x_b = x_c)/2`$. 0.5 is the same as a coin toss; the closer to 1 or 0, the better it separates.
+  Models combining several cues are measured by **<mark>cross-validation</mark>**, splitting pictures into 10 groups, fitting on 9 and measuring on the remaining 1, repeated 10 times (so pieces of the same picture are never in both fitting and measuring).
+- **Correction for multiple tests (<mark>Benjamini–Hochberg</mark>)**: ordering the 𝑝 values of 𝑚 conditions, each tested against the remaining pictures by <mark>Fisher's exact test</mark> on one metric, as $`p_1 \le \dots \le p_m`$,
   $`q_k = \min_{j \ge k} m\,p_j/j`$. Choosing only conditions with $`q < 0.05`$ keeps the share of chosen conditions that truly have no difference at 5% or less on average.
   Conditions with fewer than 5 pictures measurable on that metric are excluded from testing.
-- **Ridge logistic regression**: putting many overlapping conditions in together makes coefficients unstable, so $`-(\lambda/2)\lVert \beta \rVert^2`$ (the sum of squared coefficients except the intercept, $`\lambda = 1`$) is added to the log likelihood.
+- **Ridge <mark>logistic regression</mark>**: putting many overlapping conditions in together makes coefficients unstable, so $`-(\lambda/2)\lVert \beta \rVert^2`$ (the sum of squared coefficients except the intercept, $`\lambda = 1`$) is added to the log likelihood.
   With Λ as $`\lambda I`$ with only the intercept cell 0, $`\beta \gets \beta + (X^{\mathsf T}WX + \Lambda)^{-1}(X^{\mathsf T}(y - p) - \Lambda\beta)`$ is repeated, and the intervals and 𝑝 use the diagonal of $`(X^{\mathsf T}WX + \Lambda)^{-1}`$ as $`\mathrm{SE}^2`$.
 - **Comparing mean counts** (number of fake faces): from the totals $`x_1,\ x_2`$ of two groups and picture counts $`n_1,\ n_2`$, if the rates are equal then $`x_1 \sim \mathrm{Binomial}(x_1 + x_2, n_1/(n_1 + n_2))`$, and its two-sided exact 𝑝 is used.
-- **Agreement between gradings (Cohen's kappa)**: over 𝑚 pictures graded twice, with agreement share $`p_o`$ and pass shares $`p_1,\ p_2`$ of the two gradings, chance agreement $`p_e = p_1p_2 + (1 - p_1)(1 - p_2)`$ and $`\kappa = (p_o - p_e)/(1 - p_e)`$.
+- **Agreement between gradings (<mark>Cohen's kappa</mark>)**: over 𝑚 pictures graded twice, with agreement share $`p_o`$ and pass shares $`p_1,\ p_2`$ of the two gradings, chance agreement $`p_e = p_1p_2 + (1 - p_1)(1 - p_2)`$ and $`\kappa = (p_o - p_e)/(1 - p_e)`$.
 - **Share counting only passes in both gradings**: the first-grading share 𝑝 multiplied by $`r = \text{both}/\text{first passes}`$, the share of first-grading passes that also passed the second grading in the re-graded sample, $`p \cdot r`$.
-  The 95% interval is by bootstrap: the 2.5 · 97.5 percentiles of $`p^* r^*`$ over 20,000 draws of $`p^* = \mathrm{Binomial}(n, p)/n`$, $`r^* = \mathrm{Binomial}(\text{number of first passes}, r)/\text{number of first passes}`$ (random seed 0).
+  The 95% interval is by <mark>bootstrap</mark>: the 2.5 · 97.5 percentiles of $`p^* r^*`$ over 20,000 draws of $`p^* = \mathrm{Binomial}(n, p)/n`$, $`r^* = \mathrm{Binomial}(\text{number of first passes}, r)/\text{number of first passes}`$ (random seed 0).
 
 ### 11.2 The 25 test pictures
 
-| Picture | Features | Parts | Reproduction PSNR | Time |
+| Picture | Features | Parts | Reproduction <mark>PSNR</mark> | Time |
 |---|---|---|---|---|
 | Sample picture (800×800) | cel shading, flat background | 6 | 65.1 dB | 4 s |
 | Girl on a dark background (2000×1125) | white hair, thin lines, light-beam effects | 17 | 53.8 dB | 10 s |
@@ -2043,7 +2044,7 @@ Times are the splitting time at processing resolution 2048px with default settin
 Measured alternately with 0.11 on the same computer, face finding · face-based widening take −0.1–2.4 s (median 0.6 s) more per picture. Face finding itself takes 0.4–0.6 s.
 Measured alternately with 0.16, 0.17 takes a median of +1% (−12 to +15%), similar to the variation between measurements.
 
-**PSNR recomposited with psd-tools**: 48–57 dB.
+**<mark>PSNR</mark> recomposited with psd-tools**: 48–57 dB.
 
 Of the last five pictures, the two card illustrations have only a little background separated (background 7%, 21%). The gold ornaments · clouds · lanterns of the background are drawn with the same dark, crisp lines as the characters,
 and the background colors overlap the character colors (blond hair · skin, red clothes) a lot (color distribution overlap 0.67, 0.51), so the color model stage does not act, per its safeguard.
@@ -2066,7 +2067,7 @@ Parts painted softly without lines that had gone into the background came back t
 | Others | flying hair tips, skin between skirts, hems | 0.1–0.4%p each |
 
 In exchange, a few small background pieces touching the characters came to the character too (one firework piece, a clump of grass, a lantern piece, a gap in a manga panel, two cups on the floor; each 0.1–0.7% of the whole).
-The other 15 pictures are byte-identical. Overlap (IoU) is 0.791 → 0.791 for the two people in yukata and 0.768 → 0.762 for the two people before a night view
+The other 15 pictures are byte-identical. Overlap (<mark>IoU</mark>) is 0.791 → 0.791 for the two people in yukata and 0.768 → 0.762 for the two people before a night view
 (the reference outline was drawn without the cat ear tips and counts the cups as background).
 
 Parts touching the border stay as they are: close-up of a girl in a hat (hat brim, sleeve end), Miku bust (the shoulder at the right of the screen), elf in a flower field (white skirt).
@@ -2074,7 +2075,7 @@ Painting once along the arm with **Return to character** was confirmed to bring 
 
 #### Background decisions
 
-Overlap (IoU) with the character regions confirmed by a person.
+Overlap (<mark>IoU</mark>) with the character regions confirmed by a person.
 
 | Picture | Before the color model stage | After |
 |---|---|---|
@@ -2090,9 +2091,9 @@ For the other pictures, results were compared and confirmed to be **byte-identic
 #### Verifying automatic settings
 
 Variants of the sample picture were made by redrawing it in code with different line widths · line colors · resolutions · star sizes,
-and the same picture was also drawn with "lines only in black" as the ground-truth lines. The share of found line pixels that are ground truth (1px tolerance) is precision, and the share of ground truth found is recall.
+and the same picture was also drawn with "lines only in black" as the ground-truth lines. The share of found line pixels that are ground truth (1px tolerance) is <mark>precision</mark>, and the share of ground truth found is <mark>recall</mark>.
 
-| Variant | Default precision / recall | Automatic precision / recall | Value chosen automatically |
+| Variant | Default <mark>precision</mark> / <mark>recall</mark> | Automatic <mark>precision</mark> / <mark>recall</mark> | Value chosen automatically |
 |---|---|---|---|
 | 800px, 5px lines (the sample as is) | 0.998 / 0.993 | 0.998 / 0.993 | default kept |
 | 800px, 2px lines | 0.991 / 1.000 | 0.991 / 1.000 | default kept |
@@ -2100,7 +2101,7 @@ and the same picture was also drawn with "lines only in black" as the ground-tru
 | 800px, 12px lines | 0.898 / 0.010 | 0.991 / 0.924 | line width 3 → 8 (measured pen width 13px) |
 | 500px, 9px lines | 0.990 / 0.304 | 0.974 / 0.986 | line width 3 → 7 (10px) |
 
-Variants with faint lines (gray-purple) or colored lines (reddish brown) are the same with default · automatic (recall 0.015, 0.605). Where lines are brighter than the paint, they are not "dark thin structures" and are not found.
+Variants with faint lines (gray-purple) or colored lines (reddish brown) are the same with default · automatic (<mark>recall</mark> 0.015, 0.605). Where lines are brighter than the paint, they are not "dark thin structures" and are not found.
 All 28 test pictures are fine with the default window, so automatic settings also give **byte-identical** results (measured pen width 4.7–9px, 12.3px for the 2048px enlargement).
 Measuring the picture takes about 0.3 s per picture, similar to the variation between measurements.
 
@@ -2147,7 +2148,7 @@ Naming was re-verified in 0.18.
 clothes of the hair's color, white clothes + pale skin, flesh-colored props, no lines · colored lines · thin lines, dark · gradient · flesh-colored backgrounds, landscape · portrait pictures, and two people (different hair colors · same hair color · different sizes),
 and material maps were drawn with the same shapes as ground truth. Counted in pixels excluding a 3px band at material boundaries.
 
-| | Hair precision / recall | Skin precision / recall | Eyes precision / recall | Pictures with wrong names |
+| | Hair <mark>precision</mark> / <mark>recall</mark> | Skin <mark>precision</mark> / <mark>recall</mark> | Eyes <mark>precision</mark> / <mark>recall</mark> | Pictures with wrong names |
 |---|---|---|---|---|
 | 0.17 | 98.3% / 73.5% | 90.1% / 92.7% | 100% / 51.0% | 11 |
 | 0.18 | 99.7% / 81.2% | 97.3% / 93.7% | 100% / 52.3% | 1 (dark skin: the face was not found and only a fake face remained) |
@@ -2156,7 +2157,7 @@ and material maps were drawn with the same shapes as ground truth. Counted in pi
 There were six causes of wrong names in 0.17: choosing a part with 0 votes as "hair" for hair exposing the forehead; choosing a shadow on the white of the eye as "hair"
 (in this drawing style the found eye position is 0.22𝑑 too low, so the white of the eye reaches into the bangs cell; for the 30 faces in real pictures it is −0.07 to +0.07𝑑); filtering the face of a second character with a small head as fake;
 treating two characters with a size ratio slightly over 1.8 as one character; calling a pale face + light hair in one part "skin"; and a fake face on a collar giving the clothes "skin".
-Eye recall is low because only the pupil parts that get the name are counted, while the whites of the eyes become one part with collars · shirts.
+Eye <mark>recall</mark> is low because only the pupil parts that get the name are counted, while the whites of the eyes become one part with collars · shirts.
 
 *25 real pictures*: 24 pictures got meaning names (skin 21, hair 23, eyes 3; 62 parts in all). Painting the named parts over the pictures and looking at all of them,
 all 4 eyes were eyes, and for skin · hair too, roughly 9 out of 10 parts were mostly what their names said.
@@ -2165,9 +2166,9 @@ the ribbon of the window picture · the hair piece of the autumn leaves picture 
 and the witch's blond hair in the autumn leaves picture (a lower-scoring second character) newly got "hair". The leg skin of the left girl in the window picture lost its name, which a fake face had given it.
 The remaining errors are where a part is grouped in one color with another object: the pinkish white hair of the backlit picture (one part with "skin"), and the notebook in the classroom picture (the same cream color as the hair).
 In the café and mascot picture, the pale face and blond hair are one part, so no name is given. The Miku bust and the left figure of the two people, full body picture have bangs split into several colored parts, so they have no hair name.
-Layer pixels · layer counts · reproduction PSNR are unrelated to the naming rules (in 0.18 the only picture whose pixels changed was the tea party on the moon, with a fake face removed), and both PSD parsers read the Korean names.
+Layer pixels · layer counts · reproduction <mark>PSNR</mark> are unrelated to the naming rules (in 0.18 the only picture whose pixels changed was the tea party on the moon, with a fake face removed), and both PSD parsers read the Korean names.
 
-*Left-right flipping*: splitting the left-right flipped picture, flipping the name map back, and overlapping it with the original (area-weighted IoU), only 42% of hair, 61% of skin, and 48% of eyes overlap (0.17 also 41%, 59%, 42%).
+*Left-right flipping*: splitting the left-right flipped picture, flipping the name map back, and overlapping it with the original (area-weighted <mark>IoU</mark>), only 42% of hair, 61% of skin, and 48% of eyes overlap (0.17 also 41%, 59%, 42%).
 Face scores change by up to ±1 from flipping alone (the witch's face in the autumn leaves picture is not found when flipped), and whether materials of very similar colors (white hair and pale skin, $`\Delta E`$ around 5) become one part
 changes with the color cluster samples. This is a stability problem of face finding and part splitting, not of the naming rules (10).
 In 0.19 the causes were separated. Over all 25 pictures, the background is the same for 98.7% on average (lowest picture 92.8%), and the character count is the same in 24.
@@ -2181,7 +2182,7 @@ All 7 test pictures with two people were split into [Character 1] · [Character 
 (0 cases of one-person pictures gaining characters through fake faces of knees · shoes · clothing patterns; the profile figure with closed eyes in the tea party on the moon and the small figures in the manga panels of the checked-shirt picture are not split off).
 In the four pictures with person-drawn character outlines, the share of pixels inside only one of the two characters' outlines that went to the right character folder is yukata 99.2%, party 93.2%, night view 98.1%, window 96.3%.
 The first method (spreading only from small seeds at the face centers) gave 90.0–94.1%, and raising the line cost 5–13× made even clothing pattern · hair grain lines walls, worsening it to 80–93%.
-The composite (reproduction PSNR, preview) is the same as with one folder for every picture, and in two-person pictures too, send to background · return to character · undo work as before.
+The composite (reproduction <mark>PSNR</mark>, preview) is the same as with one folder for every picture, and in two-person pictures too, send to background · return to character · undo work as before.
 In 0.19 the four pictures' results are byte-identical to 0.18, and all wrong pixels were at the seam where the two characters touch (a band one hair strand wide). Changing the size of the seed zones made no difference (7.5).
 With background separation off, the character count was the same in all 25 pictures (up to 0.18, faces were not searched, so there were no folders · names).
 
@@ -2209,7 +2210,7 @@ three people · two overlapping people, 2 figures without lines, 1 with colored 
 | Faces found (of 73) · fake faces | 57 · 7 | 70 · 8 |
 | Pictures with the right character count among 15 with two or more people | 10 | 15 |
 | Share of character pixels going to the right character folder | 95.5% | 99.8% |
-| Hair · skin name precision | 99.3% · 80.6% | 99.5% · 92.3% |
+| Hair · skin name <mark>precision</mark> | 99.3% · 80.6% | 99.5% · 92.3% |
 
 In 0.18, black flat-haired characters whose outline had the hair's color became background entirely in two-person pictures (flat · gradient · stripes · bokeh backgrounds) and on the room background drawn with lines,
 no background at all was found in front of the gradient sky, and in front of the dark flat background the purple hair · clothes became background (8 of 3.5, 7.2).
@@ -2229,7 +2230,7 @@ There are no ground-truth outlines, so each result was placed next to the origin
 
 | Item | 0.21 result (0.20) |
 |---|---|
-| Errors · hangs | 0 (in 0.20, median 6.6 s per picture, longest 14 s. Reproduction PSNR lowest 47.7 dB · median 55.2 dB) |
+| Errors · hangs | 0 (in 0.20, median 6.6 s per picture, longest 14 s. Reproduction <mark>PSNR</mark> lowest 47.7 dB · median 55.2 dB) |
 | Faces showing both eyes | 189 of 355 (53%) found. Found in 96 of 148 one-person pictures. 294 fake faces (about one per picture). Same as 0.20. Naming · folder faces of 0.22 below |
 | Background | character intact with most of the background removed 104 (102), character intact with background visibly left 118 (117), parts of the character (hair tips · hands) missing 6 (6), large parts of the character missing 65 (68), no background found 5 (5), pictures without characters 2 (2) |
 | Names (147 pictures with real faces found) | Hair: mostly named 38 (37) · partly 55 (48) · none 50 (58). Skin: mostly 41 (43) · partly 11 (13) · none 93 (89) |
@@ -2265,7 +2266,7 @@ Measured alternately with 0.20 on the same 10 pictures, it takes 1–4% longer.
 and in the 107 pictures with missed faces, all candidates scoring 7 or more were drawn to classify where the 163 missed faces dropped out.
 75 had an in-place candidate scoring 9–11, just below the threshold; 24 scored 7–9; 6 crossed the threshold but were dropped by the face-likeness filter (8 of 4.5); 1 was dropped by overlap removal.
 57 had no candidate in place (11 very small faces, 2 very large faces, and the rest faces lying sideways · glasses · bangs covering the eyes · lighting · thick-line drawing styles).
-With the 298 real faces of known position as ground truth, how well various candidate features separate real from fake (AUC) was measured to choose the mouth · eye contrast · lower eyelid · white skin adjustments (9 of 4.5),
+With the 298 real faces of known position as ground truth, how well various candidate features separate real from fake (<mark>AUC</mark>) was measured to choose the mouth · eye contrast · lower eyelid · white skin adjustments (9 of 4.5),
 and splitting the pictures alternately into two halves improved both in the same direction (faces found 95 → 97, 97 → 102, fakes 160 → 131, 144 → 118, measured on candidates before the face-likeness filter). Measuring the final results by matching positions (centers within $`0.5d`$, size 0.5–2×), the naming · folder faces are
 
 | | Real faces found (of 355) | Fake faces | Pictures with the right folder count |
@@ -2300,7 +2301,7 @@ and 342 more pixiv pictures are used as one set. The added 342 are only all-ages
 (88 in the top 10, 209 in the top 25); all artists are different, and they do not overlap the earlier 300. At most 6 pictures of the same work · tag were included.
 966 candidates were looked at one by one, excluding manga · text-centered pictures and pictures with exposure, and chosen so that the conditions below are mixed evenly.
 For quality, 114 pictures each were taken at the original size (long side 2000–7378px) · a 1200px version · a 540px low-quality version (the program's default processing resolution is a long side of 2048px).
-A person marked the conditions for all 666, and colorfulness was split into three bins by the colorfulness metric (Hasler–Süsstrunk). The pictures are not in the repository.
+A person marked the conditions for all 666, and colorfulness was split into three bins by the colorfulness metric (<mark>Hasler–Süsstrunk</mark>). The pictures are not in the repository.
 
 | Condition | Pictures |
 |---|---|
@@ -2312,7 +2313,7 @@ A person marked the conditions for all 666, and colorfulness was split into thre
 | Colorfulness | colorful 235 · medium 230 · dull 201 |
 | Quality (long side of the input file) | 2000px or more 115 · 900–2000px 431 · under 900px 120 |
 
-Splitting all 666 with 0.25 gives no errors · hangs, with reproduction PSNR lowest 44.6 dB · median 54.9 dB (running 4 at a time, median 8.6 s per picture, longest 41 s).
+Splitting all 666 with 0.25 gives no errors · hangs, with reproduction <mark>PSNR</mark> lowest 44.6 dB · median 54.9 dB (running 4 at a time, median 8.6 s per picture, longest 41 s).
 By condition, looking only at the automatic values before human grading (the share of pictures where at least one face was found · at least one "eyes · skin · hair" name was given),
 
 | | Pictures | Face found | Name given |
@@ -2330,7 +2331,7 @@ because face finding uses two crisp eyes and faces with the two eyes almost leve
 
 *Background separation rate (0.25)*: every background result of the 666 was placed next to the original and graded by a person (the 300 pixiv pictures reuse the 0.21 grading; the background maps of 0.21 and 0.25 are the same for all 300).
 On the 650 excluding the 16 without characters, for a proportion 𝑝 the per-picture standard deviation is $`\sqrt{p(1-p)}`$, the standard error $`\sqrt{p(1-p)/n}`$, the margin of error $`z \times \text{standard error}`$,
-and the confidence interval the Wilson score interval (𝑧 is 1.645 · 1.960 · 2.576 for 90 · 95 · 99%).
+and the confidence interval the <mark>Wilson score interval</mark> (𝑧 is 1.645 · 1.960 · 2.576 for 90 · 95 · 99%).
 
 | Grade | Pictures | Share | Standard deviation | Standard error | 95% margin · interval | 90% | 99% |
 |---|---|---|---|---|---|---|---|
@@ -2341,7 +2342,7 @@ and the confidence interval the Wilson score interval (𝑧 is 1.645 · 1.960 ·
 | No background found | 12 | 1.8% | 13.5%p | 0.53%p | ±1.0%p · 1.1–3.2% | 1.2–2.9% | 0.9–3.8% |
 
 It differs greatly by source. "No major loss" is 23/24 for the test pictures (95.8%, 95% interval 79.8–99.3%), 76.5% (71.4–81.0%) for the 300 pixiv pictures,
-and 60.7% (55.3–65.8%) for the 342 pixiv pictures that deliberately include difficult conditions evenly; the difference between the two pixiv sets is hard to see as chance (chi-square $`p < 0.0001`$).
+and 60.7% (55.3–65.8%) for the 342 pixiv pictures that deliberately include difficult conditions evenly; the difference between the two pixiv sets is hard to see as chance (<mark>chi-square</mark> $`p < 0.0001`$).
 So the overall rates above are values for this 666-picture composition and change with how pictures are chosen. Grading was done by one person and inter-rater agreement was not measured,
 so the confidence intervals show sampling error only.
 
@@ -2349,7 +2350,7 @@ For pictures with pixel ground truth, the mean · standard deviation of per-pict
 
 | | Pictures | Mean | Standard deviation | 95% confidence interval |
 |---|---|---|---|---|
-| Real pictures: character IoU | 8 | 74.4% | 10.1%p | 66.0–82.8% |
+| Real pictures: character <mark>IoU</mark> | 8 | 74.4% | 10.1%p | 66.0–82.8% |
 | Real pictures: character kept | 8 | 96.6% | 3.2%p | 93.9–99.2% |
 | Real pictures: background found | 8 | 53.6% | 26.8%p | 31.2–75.9% |
 | Synthetic pictures: character kept | 65 | 97.9% | 8.0%p | 96.0–99.9% |
@@ -2360,9 +2361,9 @@ The character is mostly kept, while the amount of background found varies greatl
 *Strict separation rate*: the grading above looked at one overlay image and misses small losses. So all 186 "complete separation" and 264 "background left · small loss" pictures were looked at again with sheets drawing the character layer alone (background area in magenta) · the background layer alone (character area in green)
 separately at large size. Only a 1–2px rim at the outline edge was allowed, and any hair tip · finger · prop · hem in the background layer counted as a loss.
 Looking again, 162 of the 186 "complete separation" pictures had losses or leftover background, and 24 of them (13% of the original grading) and 49 graded "small loss" actually had large parts of the character in the background layer.
-Rates are over the 650 pictures with characters, and intervals are Clopper–Pearson exact intervals, wider than the normal approximation (Bonferroni gives 95% overall when the three criteria are viewed together).
+Rates are over the 650 pictures with characters, and intervals are <mark>Clopper–Pearson exact intervals</mark>, wider than the <mark>normal approximation</mark> (<mark>Bonferroni</mark> gives 95% overall when the three criteria are viewed together).
 
-| Criterion | Pictures | Share | Standard deviation | Standard error | 95% | 99% | 99.9% | One-sided 95% lower bound | Bonferroni (98.3%) |
+| Criterion | Pictures | Share | Standard deviation | Standard error | 95% | 99% | 99.9% | One-sided 95% lower bound | <mark>Bonferroni</mark> (98.3%) |
 |---|---|---|---|---|---|---|---|---|---|
 | Perfect separation (no loss + no leftover background) | 24 | 3.7% | 18.9%p | 0.74%p | 2.4–5.4% | 2.1–6.0% | 1.7–6.8% | 2.6% | 2.1–5.9% |
 | Character without loss (background may remain) | 87 | 13.4% | 34.0%p | 1.34%p | 10.9–16.2% | 10.1–17.2% | 9.4–18.3% | 11.2% | 10.4–16.9% |
@@ -2370,7 +2371,7 @@ Rates are over the 650 pictures with characters, and intervals are Clopper–Pea
 
 The wavering of grading was also measured. Re-grading 48 random pictures without looking at the previous grading, "no major loss" agreed 90% ($`\kappa = 0.56`$),
 but "character without loss" agreed 81% ($`\kappa = 0.29`$), so the grading itself wavered (whether a small piece is a loss or an outline rim), and no picture passed "perfect separation" both times.
-Counting only pictures passing both times, "character without loss" is $`13.4\% \times 3/9 \approx 4.5\%`$ (bootstrap 95% 0–9.0%), and "no major loss" $`58.0\% \times 39/40 \approx 56.5\%`$ (51.7–61.1%).
+Counting only pictures passing both times, "character without loss" is $`13.4\% \times 3/9 \approx 4.5\%`$ (<mark>bootstrap</mark> 95% 0–9.0%), and "no major loss" $`58.0\% \times 39/40 \approx 56.5\%`$ (51.7–61.1%).
 By condition, the lowest "no major loss" is for pictures with occluded faces and occluded bodies (56 each, 41.1%, 95% 28.1–55.0%),
 and the lowest "character without loss" is occluded bodies 3.6%, left-tilted pictures 4.0%, low quality 7.0%. By source: test pictures 79.2% · 300 pixiv 61.4% · 342 pixiv 53.4%.
 In 0.27: perfect separation 20 (3.1%), character without loss 104 (16.0%), no major loss 384 (59.1%; 300 pixiv 62.4% · 342 54.6%) (*0.27* below).
@@ -2391,9 +2392,9 @@ So the 342 pixiv pictures never used while fixing the rules were verified separa
 |---|---|
 | Errors · external requests | 0 pictures (page errors · console errors · external requests all 0) |
 | Layer structure checks (names · blend modes · clipping bases · empty layers · bounds) | 0 pictures after the fix (2 before the fix: below) |
-| Reproduction PSNR (8-bit values to be stored) | lowest 42.6 dB, median 54.2 dB |
-| PSNR composited with the screen compositor | lowest 42.5 dB, median 52.8 dB |
-| PSD: psd-tools | all 342 open. Embedded merged image PSNR lowest 42.5 · median 52.8 dB, layers recomposited 42.4 · 51.3 dB. Layer · folder counts all match the screen |
+| Reproduction <mark>PSNR</mark> (8-bit values to be stored) | lowest 42.6 dB, median 54.2 dB |
+| <mark>PSNR</mark> composited with the screen compositor | lowest 42.5 dB, median 52.8 dB |
+| PSD: psd-tools | all 342 open. Embedded merged image <mark>PSNR</mark> lowest 42.5 · median 52.8 dB, layers recomposited 42.4 · 51.3 dB. Layer · folder counts all match the screen |
 | PSD: ag-psd | all 342 read. Merged images 342, Korean layer names 342, layer counts all match the screen |
 | Splitting time on screen · PSD size | median 10.2 s per picture · longest 44.6 s (4 at a time), PSD median 8.6 MB · largest 45.6 MB |
 | Determinism (the same picture twice in new pages) | all 12 (4 per quality) byte-identical. Running the saved offline copy · the re-split cache after corrections also fine |
@@ -2410,7 +2411,7 @@ That compression noise alone decided whether the background was found in 4 of th
 Only 87 of the 342 had the same number of parts, so results change slightly even with small noise on the same picture (the same input always gives the same result).
 
 *Faces · names · folders*: all 342 were graded by the same criteria as the 300 of 11 (number of human faces showing both eyes and how many were found, fake faces, hair · skin names, wrong names, number of character folders).
-Intervals are Clopper–Pearson 95%.
+Intervals are <mark>Clopper–Pearson</mark> 95%.
 
 | Item | New 342 (0.25 · 0.26) | Reference: 300 (0.21 grading) |
 |---|---|---|
@@ -2427,10 +2428,10 @@ Intervals are Clopper–Pearson 95%.
 
 Skin names increased a lot because these are results after 0.22 (fake face filtering) · 0.24 (pale skin) (the 300 grading is 0.21).
 
-Both sets were pictures that version had never seen, so the differences were tested (Yates chi-square · Fisher's exact test, Newcombe interval for the difference, formulas above).
-The new 342 deliberately included more occluded faces · tilted bodies · several people · low quality, so the odds ratios of a logistic regression including the conditions (number of people · occlusion · focus · tilt · pose · colorfulness · quality · long side) are also given.
+Both sets were pictures that version had never seen, so the differences were tested (<mark>Yates chi-square</mark> · <mark>Fisher's exact test</mark>, Newcombe interval for the difference, formulas above).
+The new 342 deliberately included more occluded faces · tilted bodies · several people · low quality, so the odds ratios of a <mark>logistic regression</mark> including the conditions (number of people · occlusion · focus · tilt · pose · colorfulness · quality · long side) are also given.
 
-| Item (per picture) | 0.21 · 300 | 0.26 · new 342 | Difference (95%) | Yates $`\chi^2`$ · 𝑝 | Condition-adjusted odds ratio (95%) · 𝑝 |
+| Item (per picture) | 0.21 · 300 | 0.26 · new 342 | Difference (95%) | <mark>Yates</mark> $`\chi^2`$ · 𝑝 | Condition-adjusted <mark>odds ratio</mark> (95%) · 𝑝 |
 |---|---|---|---|---|---|
 | Skin names (pictures with faces found) | 52/147 (35.4%) | 93/150 (62.0%) | +26.6%p (+15.3 to +37.0) | 20.01 · < 0.0001 | 6.33 (3.00–13.38) · < 0.0001 |
 | Hair names (pictures with faces found) | 93/147 (63.3%) | 102/150 (68.0%) | +4.7%p (−6.0 to +15.4) | 0.54 · 0.46 | 1.67 (0.81–3.47) · 0.17 |
@@ -2440,8 +2441,8 @@ The new 342 deliberately included more occluded faces · tilted bodies · severa
 | No fake faces | 143/300 (47.7%) | 156/342 (45.6%) | −2.1%p (−9.7 to +5.6) | 0.19 · 0.66 | 0.79 (0.50–1.24) · 0.30 |
 
 The only improvement hard to see as chance is skin names (35.4% → 62.0%, 1.75×). All the others have $`p > 0.05`$, so there is no evidence they changed.
-The share found counted per face (53% → 57.3% in the table above) also has Fisher $`p = 0.29`$, and fake faces went 0.98 → 0.95 per picture (exact $`p = 0.75`$).
-The lower share found in pictures with one face disappears with matched conditions (odds ratio 1.06), so it is because the new pictures have many difficult conditions.
+The share found counted per face (53% → 57.3% in the table above) also has <mark>Fisher</mark> $`p = 0.29`$, and fake faces went 0.98 → 0.95 per picture (exact $`p = 0.75`$).
+The lower share found in pictures with one face disappears with matched conditions (<mark>odds ratio</mark> 1.06), so it is because the new pictures have many difficult conditions.
 
 Wrong names were mostly cases where fake faces (stickers · dolls · hands · clothing patterns) were chosen as character faces and names were put around them, and cases where skin · hair parts merged with clothes · props · background of the same color.
 
@@ -2451,7 +2452,7 @@ Differences by colorfulness · quality overlapped within the intervals (faces 54
 
 *Pictures with faces found and background results*: pictures with faces found also have better background results. Among pictures with faces showing both eyes, "no major loss" of the strict separation rate is
 
-| Set | Face found | Two-eyed face present but not found | Difference (95%) · ratio · odds ratio | Yates $`\chi^2`$ · 𝑝 · Fisher 𝑝 |
+| Set | Face found | Two-eyed face present but not found | Difference (95%) · ratio · <mark>odds ratio</mark> | <mark>Yates</mark> $`\chi^2`$ · 𝑝 · <mark>Fisher</mark> 𝑝 |
 |---|---|---|---|---|
 | New 342 | 100/150 (66.7%, 58.5–74.1%) | 41/91 (45.1%, 34.6–55.8%) | +21.6%p (+8.7 to +33.7) · 1.48× (1.15–1.91) · 2.44 (1.43–4.16) | 10.03 · 0.0015 · 0.0012 |
 | 300 (0.21 grading) | 95/147 (64.6%) | 33/66 (50.0%) | +14.6%p (+0.4 to +28.4) · 1.29× · 1.83 (1.01–3.29) | 3.48 · 0.062 · 0.050 |
@@ -2459,8 +2460,8 @@ Differences by colorfulness · quality overlapped within the intervals (faces 54
 
 and pictures where large parts of the character went to the background are, in the new 342, 52.7% not found → 31.3% found ($`p = 0.0016`$). Pictures without a face showing both eyes are 34 of 87 (39.1%) in the new 342.
 This could be because pictures with faces found cluster in easy conditions (one person, no occlusion, upright pose, high quality), so it was measured again with matched conditions,
-but the Mantel–Haenszel odds ratios stratified by one condition at a time were 2.10–2.28 (number of people · occlusion · focus · tilt · pose · colorfulness · quality · source, all $`p \le 0.0004`$),
-and a logistic regression with all conditions and the long side together gave 2.16 (1.41–3.31, $`p = 0.0004`$), unchanged. This difference is not explained by chance or by the graded conditions.
+but the <mark>Mantel–Haenszel</mark> odds ratios stratified by one condition at a time were 2.10–2.28 (number of people · occlusion · focus · tilt · pose · colorfulness · quality · source, all $`p \le 0.0004`$),
+and a <mark>logistic regression</mark> with all conditions and the long side together gave 2.16 (1.41–3.31, $`p = 0.0004`$), unchanged. This difference is not explained by chance or by the graded conditions.
 
 But this difference was not made by the face-based background stages (8 · 9 of 3.5). All 666 were run again with a core that passes no faces to those two stages
 (an empty face list for the returning of 8, 9 skipped; part names · folders unchanged). Pictures whose character map changed were 390 of the 650 with characters,
@@ -2468,7 +2469,7 @@ and the 253 pictures where the pixels the faces protected as character were 0.1%
 or major-loss pictures where the pixels the faces sent to the background were 0.1% or more of the picture (pictures whose major loss might disappear only with faces off), were all re-graded with on · off side by side.
 For the other pictures, the changes were smaller than that, so their grades were treated as unchanged.
 
-| Pictures with characters | Face stages on | Face stages off | Passed thanks to faces · failed because of faces | McNemar exact 𝑝 |
+| Pictures with characters | Face stages on | Face stages off | Passed thanks to faces · failed because of faces | <mark>McNemar exact</mark> 𝑝 |
 |---|---|---|---|---|
 | All 650 | 377 (58.0%) | 383 (58.9%) | 5 · 11 | 0.21 |
 | Face found 297 | 195 (65.7%) | 196 (66.0%) | 4 · 5 | 1.00 |
@@ -2484,7 +2485,7 @@ Only 16 pictures had "no major loss" changed by the face stages, and more were t
 What the face stages actually do is find more background. The places the faces sent to the background were 1% or more of the picture area in 222 pictures and 5% or more in 60,
 and summed over pixels, this stage found 3.3% of the final background (character protected: 0.34% of the final character).
 Comparing the 253 re-graded pictures by eye, the side with the face stages on was better in 115, worse in 48, mixed in 56, and almost no difference in 34,
-so the better side is more numerous than chance would explain (sign test $`p < 0.0001`$). In pictures with faces found it is 62 vs 20 ($`p < 0.0001`$),
+so the better side is more numerous than chance would explain (<mark>sign test</mark> $`p < 0.0001`$). In pictures with faces found it is 62 vs 20 ($`p < 0.0001`$),
 but in pictures where the real face was not found or there is no two-eyed face (fake faces used), it is 46 vs 28 ($`p = 0.047`$), barely across the threshold.
 "No major loss" over the whole new 342 is 175 of 328 (53.4%, 47.8–58.9%).
 
@@ -2511,7 +2512,7 @@ Looking again, 15 of the 27 marked "character blurred" when choosing had the foc
 The values below are results of 0.29 (faces · folders are the same as 0.26; background re-graded for pictures changed in 0.27 · 0.29, names for pictures changed in 0.27 · 0.28 · 0.29). Quality is the long side of the input file.
 For the background result that changed greatly in 0.31 ("no major loss"), see the per-condition table of *0.31* below.
 In parentheses is the number of pictures on which the metric can be measured (face found: pictures with faces showing both eyes; hair · skin names: pictures with real faces found; background: pictures with characters).
-Below 10 pictures it is written as (pass / total). **▲ ▼** means the difference between pictures with that condition and the rest has $`p < 0.05`$ in Fisher's exact test and stays $`q < 0.05`$ after Benjamini–Hochberg correction for testing many conditions at once
+Below 10 pictures it is written as (pass / total). **▲ ▼** means the difference between pictures with that condition and the rest has $`p < 0.05`$ in <mark>Fisher's exact test</mark> and stays $`q < 0.05`$ after <mark>Benjamini–Hochberg</mark> correction for testing many conditions at once
 (hard to see as chance); **△ ▽** means $`p < 0.05`$ but it disappears after correction. The formulas are above.
 
 | Condition | Pictures | Face found | Hair name | Skin name | No wrong names | Right folders | No major loss | Character without loss |
@@ -2635,10 +2636,10 @@ Below 10 pictures it is written as (pass / total). **▲ ▼** means the differe
 - **Names**: white · silver hair gets hair names 53% · skin names 38%, and dull colorfulness gets skin names 42%, both low. These are cases where light hair and pale skin easily group into one part (7.1).
   "No wrong names" is higher for oblique faces (76%) · no lines (75%) than for front faces (59%), because finding fewer faces gives fewer names and fewer chances to be wrong (59.8% of the 323 pictures with real faces found, 70.3% of the 343 without).
 
-The conditions overlap one another (pictures without lines often have thick paint, and so on). So a logistic regression with all 32 conditions together (ridge $`\lambda = 1`$) measured each condition's effect with the other conditions matched (measured on 0.27 results).
+The conditions overlap one another (pictures without lines often have thick paint, and so on). So a <mark>logistic regression</mark> with all 32 conditions together (ridge $`\lambda = 1`$) measured each condition's effect with the other conditions matched (measured on 0.27 results).
 Only the ones below have $`p < 0.05`$; all other conditions (several people, tilt, pose, viewpoint, hair color, effects, background type …) had $`p \ge 0.1`$.
 
-| Metric | Conditions lowering it even with other conditions matched (odds ratio, 95%, 𝑝) |
+| Metric | Conditions lowering it even with other conditions matched (<mark>odds ratio</mark>, 95%, 𝑝) |
 |---|---|
 | No major loss (617 with characters) | no lines 0.39 (0.22–0.71, 0.002) · face occluded 0.39 (0.21–0.72, 0.003) · low quality 0.51 (0.32–0.80, 0.004) · dark scene · backlight 0.55 (0.30–0.99, 0.046) |
 | Face found (478 with two-eyed faces) | eyes closed · wink 0.29 (0.16–0.51, < 0.0001) · flat · black and white · sketch 0.40 (0.20–0.79, 0.009) · thick paint · brush 0.45 (0.23–0.89, 0.022) · oblique face 0.53 (0.33–0.85, 0.009) |
@@ -2654,9 +2655,9 @@ So 0.27 does not do face-based widening when flatness is 0.6 or more (9 of 3.5).
 
 The character map of 134 of the 666 changed (the other 532 have the same character map · names · folders), and the 133 with characters were re-graded by the strict criteria with 0.26 · 0.27 side by side.
 Better 22 (major loss → without loss 4 · major loss → small loss 3 · small loss → without loss 15), worse 5 (perfect → without loss 3 · perfect → small loss 1 · without loss → small loss 1),
-same 106; the better side is more numerous than chance would explain (sign test $`p = 0.0015`$). 13 vs 4 on the 75 white · flat backgrounds, 9 vs 1 on the other 58.
+same 106; the better side is more numerous than chance would explain (<mark>sign test</mark> $`p = 0.0015`$). 13 vs 4 on the 75 white · flat backgrounds, 9 vs 1 on the other 58.
 
-| Criterion (650 with characters) | 0.26 | 0.27 | Better · worse in 0.27 | McNemar exact 𝑝 |
+| Criterion (650 with characters) | 0.26 | 0.27 | Better · worse in 0.27 | <mark>McNemar exact</mark> 𝑝 |
 |---|---|---|---|---|
 | Perfect separation | 24 (3.7%, 95% 2.4–5.4%) | 20 (3.1%, 1.9–4.7%) | 0 · 4 | 0.13 |
 | Character without loss | 87 (13.4%, 10.9–16.2%) | 104 (16.0%, 13.3–19.0%) | 19 · 2 | 0.0002 |
@@ -2665,7 +2666,7 @@ same 106; the better side is more numerous than chance would explain (sign test 
 Keeping more of the character made names slightly worse. Re-grading the 85 pictures whose name maps changed visibly
 (faces · character folders unchanged for all 134)
 
-| Names (per picture) | 0.26 | 0.27 | Better · worse in 0.27 | McNemar exact 𝑝 |
+| Names (per picture) | 0.26 | 0.27 | Better · worse in 0.27 | <mark>McNemar exact</mark> 𝑝 |
 |---|---|---|---|---|
 | Hair names (323 with real faces found) | 226 (70.0%) | 230 (71.2%) | 8 · 4 | 0.39 |
 | Skin names (the same 323) | 183 (56.7%) | 186 (57.6%) | 3 · 0 | 0.25 |
@@ -2684,7 +2685,7 @@ and in 181 of the 369 pictures with hair names, 6.7% of the "hair" pixels moved 
 The rule was changed three times, and every changed picture was re-graded next to 0.27 (61 for the detach-only version, 198 for the version keeping nearby pieces, 43 for the final version with wider anchor faces).
 Names were graded by the same criteria as the 300 of 11.
 
-| Names (per picture) | 0.27 | 0.28 | Better · worse in 0.28 | McNemar exact 𝑝 |
+| Names (per picture) | 0.27 | 0.28 | Better · worse in 0.28 | <mark>McNemar exact</mark> 𝑝 |
 |---|---|---|---|---|
 | No wrong names (666) | 410 (61.6%) | 437 (65.6%, 95% 61.9–69.2%) | 27 · 0 | < 0.0001 |
 | Right character folders + no wrong names (666) | 337 (50.6%) | 358 (53.8%, 49.9–57.6%) | 21 · 0 | < 0.0001 |
@@ -2709,8 +2710,8 @@ and grades were aligned so that "similar" keeps the 0.28 grade, "better" does no
 |---|---|
 | Pictures whose character map changed | 106 (83 by more than 0.2%, 52 by more than 1%, 7 by more than 5%) |
 | Changed pixels | 4.27 million pixels back to character · 0.67 million became background |
-| Compared with 0.28 (80 with characters) | better 33 · worse 7 · similar 40, sign test $`p < 0.0001`$ |
-| No major loss | 57 (51.4%) → 63 (56.8%, 95% 47.0–66.1%), better 6 · worse 0, McNemar exact $`p = 0.031`$ |
+| Compared with 0.28 (80 with characters) | better 33 · worse 7 · similar 40, <mark>sign test</mark> $`p < 0.0001`$ |
+| No major loss | 57 (51.4%) → 63 (56.8%, 95% 47.0–66.1%), better 6 · worse 0, <mark>McNemar exact</mark> $`p = 0.031`$ |
 | Character without loss · perfect separation | 11 → 11, 3 → 2 |
 | Processing time per picture (4 at a time) | 18.6 s → 17.4 s |
 
@@ -2746,8 +2747,8 @@ After grading was finished, the key was used to unblind. The 103 pictures change
 
 | 666 (633 judged to have characters) | 0.30 | 0.31 | Changed pictures | 𝑝 |
 |---|---|---|---|---|
-| New version better · worse · similar (563 changed) | | | 262 · 106 · 195 | sign test $`< 10^{-15}`$ |
-| No major loss | 351 (55.5%, 95% 51.5–59.4%) | **445 (70.3%, 66.6–73.8%)** | better 123 · worse 29 | McNemar exact test $`< 10^{-14}`$ |
+| New version better · worse · similar (563 changed) | | | 262 · 106 · 195 | <mark>sign test</mark> $`< 10^{-15}`$ |
+| No major loss | 351 (55.5%, 95% 51.5–59.4%) | **445 (70.3%, 66.6–73.8%)** | better 123 · worse 29 | <mark>McNemar exact test</mark> $`< 10^{-14}`$ |
 | Character without loss | 91 | 90 | | |
 | Perfect separation | 17 | 18 | | |
 | No background found at all | 13 | 17 | | |
@@ -2783,8 +2784,8 @@ Running up to the background stages and comparing with 0.31, only 23 of the 666 
 
 | 22 pictures whose character map changed | Result |
 |---|---|
-| New version better · worse · similar | **14 · 1 · 7** (sign test $`p = 0.001`$) |
-| No major loss | 7 → 19 (better 12 · worse 0, McNemar exact $`p = 0.0005`$) |
+| New version better · worse · similar | **14 · 1 · 7** (<mark>sign test</mark> $`p = 0.001`$) |
+| No major loss | 7 → 19 (better 12 · worse 0, <mark>McNemar exact</mark> $`p = 0.0005`$) |
 | No background found at all (633 with characters) | 18 → **5** |
 | No major loss among the 633 with characters | 443 (70.0%) → **455 (71.9%, 95% 68.2–75.3%)** |
 
@@ -2825,7 +2826,7 @@ giving 168 pictures with gaps found (mean 0.38% of the picture, up to 2.6%; excl
 
 | 50 of the 134 pictures whose character map changed | Result |
 |---|---|
-| New version better · worse · similar | **17 · 6 · 27** (sign test $`p = 0.035`$) |
+| New version better · worse · similar | **17 · 6 · 27** (<mark>sign test</mark> $`p = 0.035`$) |
 | No major loss | 35 → 35 (no picture changed) |
 | Perfect separation (P) | 0 → 3 |
 | Leftover background of the 25 changed among the earlier 120 (not blind) | better 8 · worse 2, no leftover background 17 → 20, pictures with gaps left 18 → 10 |
@@ -2848,7 +2849,7 @@ What was not adopted is in 7.5 (light over lines, spreading glow, "clothes" name
 | | naming faces of the 666 · synthetic pictures | 1046 → 755. Fake faces on the 57 synthetic pictures 5 → 1 (real faces 70/73 unchanged) |
 | Third return pass ($`\Delta E \ge 5`$ · fine color bins, 4.5) | 6 synthetic dark-background pictures (ground-truth maps) | character kept 84.1% → 100%. All 57 synthetic 97.65% → 99.41% |
 | | 8 real pictures whose character map changed by more than 0.2%, blind | new version 1 · previous 3 · similar 4. Some pictures had dark background smudges around the returned black hair come to the character too |
-| Closing narrow gaps on bright flat backgrounds (4.5) | all 160 pictures whose character map changed by more than 0.2%, blind (strict grades of both versions recorded together) | new version better 63 · previous better 48 · similar 49 ($`p = 0.18`$), **no major loss 99 → 114** (resolved 27 · arose 12, McNemar $`p = 0.024`$) |
+| Closing narrow gaps on bright flat backgrounds (4.5) | all 160 pictures whose character map changed by more than 0.2%, blind (strict grades of both versions recorded together) | new version better 63 · previous better 48 · similar 49 ($`p = 0.18`$), **no major loss 99 → 114** (resolved 27 · arose 12, <mark>McNemar</mark> $`p = 0.024`$) |
 
 In gap closing, the 48 where the previous version was better are pictures where white background narrowly open between character parts (between arm and body, between hair, between flying hair tips) stayed in the character layer,
 and the 63 where the new version was better are pictures where white clothes · white hair · pale skin leaked into the background through broken outlines.
@@ -2864,9 +2865,9 @@ gap closing targeted the first of these (9 of the 17 changed; 3 of the 8 unchang
 
 | Overall check (0.33 → 0.34) | Result |
 |---|---|
-| 57 synthetic (ground-truth maps) | background found 93.2 → 93.1%, character kept 97.65 → 99.41%, real faces 70/73 → 70/73, fake faces 5 → 1, character folders 15/15, glow recall 6.8 → 8.8% (precision 100%) |
+| 57 synthetic (ground-truth maps) | background found 93.2 → 93.1%, character kept 97.65 → 99.41%, real faces 70/73 → 70/73, fake faces 5 → 1, character folders 15/15, glow <mark>recall</mark> 6.8 → 8.8% (<mark>precision</mark> 100%) |
 | Left-right flipping (25 real pictures) | background agreement 99.24 → 99.24%, same character count 22 → 23, name overlap hair 46 → 47% · skin 53 → 53% · eyes 59 → 59% |
-| Reproduction PSNR · processing time on the 666 | lowest 44.6 dB. Median per picture 9.4 s → 10.8 s (4 at a time, face finding done twice) |
+| Reproduction <mark>PSNR</mark> · processing time on the 666 | lowest 44.6 dB. Median per picture 9.4 s → 10.8 s (4 at a time, face finding done twice) |
 
 ### 11.7 Base colors of brush paintings (synthetic pictures)
 
@@ -2883,7 +2884,7 @@ and the difference between base color and ground-truth color ($`\Delta E`$) were
 In 0.16, the blue hair part of brush paintings swallowed pale skin · whites of the eyes · pupils · the jacket (color relations with white · gray on one side), and hair with grain strokes was split into 6–8 parts (hair coverage 36–54% → 97–100% in 0.17).
 The cel-shaded picture is unchanged. The problem of lineless faces · clothes going to the background in grain-stroked pictures (10) is not included in these values.
 The share of lines with the same color on both sides is 86–88% in grain-stroked pictures and 4–31% in the 25 real pictures, so in real pictures the grain rule does not act and only the color relation rules change.
-Reproduction PSNR of the real pictures averages 55.67 → 55.62 dB, the mean number of parts 26.1 → 26.5, and the share of base color boundaries where there is neither a line nor a color edge 6.3% → 6.3%.
+Reproduction <mark>PSNR</mark> of the real pictures averages 55.67 → 55.62 dB, the mean number of parts 26.1 → 26.5, and the share of base color boundaries where there is neither a line nor a color edge 6.3% → 6.3%.
 Visibly better pictures: close-up of a girl in a hat (face · hands that were one part with cream pieces became pink skin), qipao card illustration (skin separated from the white dress · silver hair),
 two people at the window (white blouse and skin separated), two people, full body (face and white jacket separated), café and mascot (ice cream colors separated).
 
@@ -2915,7 +2916,7 @@ The mean over materials (with at least 100 remaining pixels) of each material's 
 \mathrm{BER}_{\text{base}}=\frac1{|M|}\sum_{m\in M}\frac{|\lbrace p\in m:\ \Delta E(F_p,\ F^{\text{true}}_m)\ge10\rbrace|}{|m|},\qquad \text{base-color resolving power}=\frac1{\overline{\mathrm{BER}}_{\text{base}}}
 ```
 
-and the reciprocal of its mean over the 117 pictures is the base-color resolving power. The 95% CI of the ratio is a picture-level paired bootstrap (10,000 draws, seed 20261002).
+and the reciprocal of its mean over the 117 pictures is the base-color resolving power. The 95% CI of the ratio is a picture-level <mark>paired bootstrap</mark> (10,000 draws, seed 20261002).
 
 | Version | 57 background · face synthetic | 48 naming synthetic | 12 brush paintings | All 117 | Base-color resolving power | Coverage | Purity | Mean base color $`\Delta E`$ | Parts |
 |---|---|---|---|---|---|---|---|---|---|
@@ -2950,16 +2951,16 @@ the version adding the lit-side base color was compared with it on 20 pictures: 
 | Character folder counts | identical for all 642. In the character folder maps, at most 0.014% of the character pixels moved to the neighboring character in 11 pictures (the moving of part pieces under 64 pixels depends on the parts) |
 | Names (blind, the 99 hold-out pictures whose name maps changed) | wrong names 93 → 93 (fewer in 8 pictures · more in 7, $`p = 1`$). Pictures without wrong names 35 → 33 (gained 1 · lost 3, $`p = 0.63`$). Pictures with a hair name 61 → 63 (better 3 · worse 3), skin 63 → 63 (better 3 · worse 0, $`p = 0.25`$). Which is better: 0.38 11 · 0.39 28 · same 60 ($`p = 0.009`$) |
 | Names, by set | 300 (50 pictures): wrong names 36 → 33, better side 0.38 5 · 0.39 20 ($`p = 0.004`$). 342 (49 pictures): 57 → 60 (fewer in 3 · more in 5, $`p = 0.73`$), pictures without wrong names 14 → 11 ($`p = 0.25`$), better side 6 · 8 ($`p = 0.79`$) |
-| Reproduction PSNR | mean over 642: 54.820 → 54.821 dB (difference +0.001, 95% CI −0.007 to +0.011), lowest 44.60 → 44.60 dB. On the 319 hold-out pictures, up 132 · down 154 (sign test $`p = 0.21`$). Over all 642, slightly lower pictures are more common (244 · 332, $`p = 0.0003`$; median size of the change 0.005 dB) |
+| Reproduction <mark>PSNR</mark> | mean over 642: 54.820 → 54.821 dB (difference +0.001, 95% CI −0.007 to +0.011), lowest 44.60 → 44.60 dB. On the 319 hold-out pictures, up 132 · down 154 (<mark>sign test</mark> $`p = 0.21`$). Over all 642, slightly lower pictures are more common (244 · 332, $`p = 0.0003`$; median size of the change 0.005 dB) |
 | Part counts (mean over 642) | parts 21.97 → 23.16, "small parts" 1.75 → 4.22 (pictures with small parts 221 → 320), pictures reaching the maximum of 32 parts 108 → 133 |
 | Pictures where the rules applied (642) | splitting colors off white · gray materials 438 (300 set 213 · 342 set 225; 3.0 new materials per picture on average, the moved tones a median 0.4% of the picture), keeping small colored areas 432 (225 · 207), lit-side base color 517 (245 · 272; 6.0 materials per picture on average). On the 117 ground-truth pictures: 5 · 73 · 37 |
 | Processing time | the background stage (2–4 s) is unchanged; the later stages took 2% more in total on 12 hold-out pictures (the shorter of two alternating runs in the same process; median 2.95 → 2.90 s) |
-| Screen verification (28 test pictures) | 0 errors · external requests, both psd-tools · ag-psd read all 28 (merged image PSNR 48.76–61.87 dB; 0.38: 48.79–61.86 dB), splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine. Mean layer count 113.3 → 121.7 |
+| Screen verification (28 test pictures) | 0 errors · external requests, both psd-tools · ag-psd read all 28 (merged image <mark>PSNR</mark> 48.76–61.87 dB; 0.38: 48.79–61.86 dB), splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine. Mean layer count 113.3 → 121.7 |
 
 ### 11.9 Tilted pictures (0.37)
 
 Pictures with ground truth were rotated and measured. The 57 synthetic pictures (character · material · two-eye ground truth) and 25 test pictures (35 two-eye positions marked by a person; 8 of them with character outline ground truth)
-were rotated about the center with Catmull–Rom (clockwise +) in three ways: corners of the enlarged canvas filled with white, filled with transparency, and only the largest rectangle inside the rotated picture cropped to fill the canvas.
+were rotated about the center with <mark>Catmull–Rom</mark> (clockwise +) in three ways: corners of the enlarged canvas filled with white, filled with transparency, and only the largest rectangle inside the rotated picture cropped to fill the canvas.
 Results were mapped back to the original coordinates to match the ground truth, excluding pixels outside the rotated picture. On the 82 upright pictures, the tilt part left the character map · name map · faces byte-identical to 0.36 (0 differing pictures).
 Table cells are 0.36 → 0.37 (faces: found / ground truth; folders: pictures with the right character count / pictures with two or more people).
 
@@ -2995,7 +2996,7 @@ Turning the setting on for the 82 upright ground-truth pictures gives real faces
 
 *Blind tests (real pictures)*: the 666 were split into three bins by original long side (under 900px · 900–1600px · 1600px or more), and 20 per bin were chosen for each of two tests (T1, T2), 120 different pictures.
 The picture size ratio 𝑟 was set independently of the original size as $`r = 2^u,\ u \sim U(-1, 1)`$ (density $`f(r) = 1/(2r \ln 2),\ 1/2 \le r \le 2`$, cumulative $`F(r) = (1 + \log_2 r)/2`$), with $`u_i = -1 + (2i - 1)/20`$ shuffled within each bin
-so that small · large are mixed evenly. The processing long side is $`L = \min(r \cdot \text{stored long side}, 4096)`$; enlarging repeats DCCI 2× until past the target and then area-averages, shrinking area-averages (long side 280–3957px, 60 enlarged · 60 shrunk).
+so that small · large are mixed evenly. The processing long side is $`L = \min(r \cdot \text{stored long side}, 4096)`$; enlarging repeats <mark>DCCI</mark> 2× until past the target and then area-averages, shrinking area-averages (long side 280–3957px, 60 enlarged · 60 shrunk).
 T1 rotated by ±15 · ±30 · ±45° with white · transparent corners, T2 by ±45 · ±60 · ±90° filling the canvas. The two results (pictures with places gone to the background painted, character folder counts, names) were placed left/right at random (separately drawn random numbers, unblinded after grading)
 and graded by the same criteria, looking first at how well the character was kept and the background removed, then at faces · names.
 
@@ -3026,18 +3027,18 @@ On the upright ground-truth pictures, the 25 real pictures are the same on every
 
 *Enlargement methods (used for future verification)*: 16 pictures per bin (48) from the 666 were halved by area averaging · by taking every other pixel, enlarged back 2×, and compared with the original.
 
-| Method | PSNR (dB, shrunk by area averaging) | Edge PSNR (top 10% of brightness gradient) | SSIM | Pictures where closest |
+| Method | <mark>PSNR</mark> (dB, shrunk by area averaging) | Edge <mark>PSNR</mark> (top 10% of brightness gradient) | <mark>SSIM</mark> | Pictures where closest |
 |---|---|---|---|---|
 | Nearest pixel | 28.42 | 20.09 | 0.9029 | 1 |
-| Bilinear | 28.13 | 20.43 | 0.8945 | 0 |
+| <mark>Bilinear</mark> | 28.13 | 20.43 | 0.8945 | 0 |
 | B-spline | 26.86 | 19.31 | 0.8614 | 0 |
 | Mitchell (1/3, 1/3) | 28.55 | 20.82 | 0.9026 | 0 |
-| Catmull–Rom | 29.31 | 21.54 | 0.9167 | 0 |
-| Lanczos 2 | 29.34 | 21.62 | 0.9168 | 0 |
-| Lanczos 3 | 29.66 | 22.04 | 0.9201 | 6 |
-| DCCI | 29.96 | 22.29 | 0.9244 | 41 |
+| <mark>Catmull–Rom</mark> | 29.31 | 21.54 | 0.9167 | 0 |
+| <mark>Lanczos</mark> 2 | 29.34 | 21.62 | 0.9168 | 0 |
+| <mark>Lanczos</mark> 3 | 29.66 | 22.04 | 0.9201 | 6 |
+| <mark>DCCI</mark> | 29.96 | 22.29 | 0.9244 | 41 |
 
-When shrunk by taking every other pixel, DCCI was also highest at 30.07 dB (47 of 48 pictures).
+When shrunk by taking every other pixel, <mark>DCCI</mark> was also highest at 30.07 dB (47 of 48 pictures).
 
 ### 11.11 12-category blind test · reverse verification (0.37)
 
@@ -3045,10 +3046,10 @@ Using condition tags people assigned to the 666 real pictures (number of people 
 12 categories were made, and for each category 120 samples mixing variations were made from 25 pictures (the standard category has only 14 matching pictures), 1440 in all (289 pictures) (fixed seed).
 
 - Size: $`r = 2^u`$, with 𝑢 divided evenly over −1 to 1 within a category and shuffled (the size category only $`\lvert u\rvert \ge 0.5`$). Long side $`L = \min(r \cdot \text{stored long side}, 2048)`$ (272–2048px, 231 capped at 2048).
-  Enlarging repeats DCCI 2× and then area-averages; shrinking area-averages.
-- Rotation: 0 · ±15 · ±45° (clockwise +) in equal numbers, rotated about the center with Catmull–Rom; half of the rotated ones cropped to the largest rectangle inside the rotated picture, half with corners filled white.
+  Enlarging repeats <mark>DCCI</mark> 2× and then area-averages; shrinking area-averages.
+- Rotation: 0 · ±15 · ±45° (clockwise +) in equal numbers, rotated about the center with <mark>Catmull–Rom</mark>; half of the rotated ones cropped to the largest rectangle inside the rotated picture, half with corners filled white.
   Left-right mirroring on · off also in equal numbers. The "opposite situation" category is not rotated but flipped left-right · top-bottom · both.
-- Version A splits the picture as is; version B enlarges 2× horizontally · vertically with DCCI, splits, and returns to the original size by 2×2 majority vote.
+- Version A splits the picture as is; version B enlarges 2× horizontally · vertically with <mark>DCCI</mark>, splits, and returns to the original size by 2×2 majority vote.
 
 The two results (pictures with places gone to the background painted, character folder counts) were placed left/right at random (separately drawn random numbers, unblinded after all 1440 were graded) and graded by the same criteria, first how well the character was kept and the background removed, then faces · names.
 
@@ -3068,14 +3069,14 @@ The two results (pictures with places gone to the background painted, character 
 | Other (viewpoint · focus · paint · line style) | 25 | 24 | 16 | 80 | $`p = 0.2682`$ |
 | All | 289 | 326 | 165 | 949 | $`p < 0.0001`$ |
 
-Of the 491 with differing results, enlarging was better in 33.6% (95% Wilson interval 29.6–37.9%). By processing long side, A : B was 54 : 28 under 600px, 88 : 39 at 600–900px, 52 : 29 at 900–1200px,
+Of the 491 with differing results, enlarging was better in 33.6% (95% <mark>Wilson interval</mark> 29.6–37.9%). By processing long side, A : B was 54 : 28 under 600px, 88 : 39 at 600–900px, 52 : 29 at 900–1200px,
 42 : 32 at 1200–1600px, and 90 : 37 at 1600px or more, so enlarging was not better at any size, and the difference was largest for ±45° filled (94 : 22). Splitting time averages 10.2 s → 32.6 s (3.2×).
 The character maps of the two versions agree on an average of 93.0% of opaque pixels (the bottom 10% at 85.1% or less), and character folder counts agree in 96.2%. The current approach of not enlarging pictures to split is kept (the same conclusion as the 0.29 experiment in 7.5).
 
 *Reverse verification*: for rotated or flipped samples, the picture at the same size without rotation · flipping (the reference) was split separately, and its result was moved into the sample's coordinates and compared on the sample's opaque pixels (agreement is the share of pixels with the same character/not-character decision).
 Filled-and-cropped samples lose edges the reference had, so the difference also includes border rules applying differently.
 
-| Variation | Samples | A agreement % | A character IoU % | B agreement % | B character IoU % |
+| Variation | Samples | A agreement % | A character <mark>IoU</mark> % | B agreement % | B character <mark>IoU</mark> % |
 |---|---|---|---|---|---|
 | Flip only | 251 | 97.5 | 96.1 | 93.4 | 88.4 |
 | ±15°, white corners | 234 | 91.3 | 85.7 | 88.7 | 80.8 |
@@ -3083,7 +3084,7 @@ Filled-and-cropped samples lose edges the reference had, so the difference also 
 | ±45°, white corners | 244 | 87.5 | 80.8 | 86.3 | 79.0 |
 | ±45°, filled | 236 | 76.1 | 69.5 | 71.2 | 64.3 |
 
-For parts, 120 reference parts (area 0.1% or more) were drawn per category, and the IoU with the most-overlapping part in the sample was measured. Medians were 24–42% (A) by category, with 22–42% of parts at 0.5 or more.
+For parts, 120 reference parts (area 0.1% or more) were drawn per category, and the <mark>IoU</mark> with the most-overlapping part in the sample was measured. Medians were 24–42% (A) by category, with 22–42% of parts at 0.5 or more.
 Over all reference parts, even flip-only samples have a median of 0.49 (49% at 0.5 or more), and rotated samples 0.25–0.34, so the boundaries splitting parts change by about half even from flipping alone. The background layer and the character map had neither overlapping pixels nor pixels in neither for every sample of A (B overlaps 0.2% on average from returning by majority vote).
 
 ### 11.12 Returning islands in the scene background (0.38)
@@ -3092,7 +3093,7 @@ The 642 pixiv pictures (300 · 342) were stratified by set and 0.34 grade and sp
 The rule and thresholds (a quarter, faces) were set by looking only at the development pictures, and the hold-out pictures were graded once, after the rule was set.
 Pictures whose background map changed by more than 0.1% (127 development · 114 hold-out) were laid out as original · left · right (left/right at random, without knowing which is the new version),
 and with the character layer emptied to a checkerboard (or black) where the background was decided, both versions were graded separately, then unblinded.
-Gained · lost are the numbers of pictures that newly pass · newly miss the criterion from 0.37 → 0.38, and 𝑝 is McNemar's exact test (picture counts are pictures with characters).
+Gained · lost are the numbers of pictures that newly pass · newly miss the criterion from 0.37 → 0.38, and 𝑝 is <mark>McNemar</mark>'s exact test (picture counts are pictures with characters).
 
 | Set | Pictures | No major loss (gained · lost, 𝑝) | Character without loss (gained · lost, 𝑝) | Perfect separation | Grade up · down |
 |---|---|---|---|---|---|
@@ -3108,7 +3109,7 @@ Comparing the same 114 hold-out pictures side by side and choosing the better on
 When background shapes attached to the character were mixed into the returned islands, the 0.37 side with less leftover background was chosen (10); by grade, no hold-out picture lost "no major loss".
 The earlier version that also returned floating decorations (7.5) was better 66 · worse 28 · same 43 than 0.37 on the development pictures, and the version adding the quarter condition was better 47 · worse 9 · same 4 than that one.
 
-Over all 642 (the 401 unchanged use the stored 0.37 grades, the 241 changed use this blind grading for both versions), 0.37 → 0.38 is as follows (95% Wilson intervals in parentheses).
+Over all 642 (the 401 unchanged use the stored 0.37 grades, the 241 changed use this blind grading for both versions), 0.37 → 0.38 is as follows (95% <mark>Wilson intervals</mark> in parentheses).
 
 | Set | Pictures | No major loss | Character without loss | Perfect separation | Major loss | No background found |
 |---|---|---|---|---|---|---|
@@ -3196,7 +3197,7 @@ and the share of materials with wrong base colors (under 80% of pixels right) is
 *666 real pictures (blind grading)*: Each 0.39 result became one grading sheet (original, character side, base-color layer, found faces, parts, what went to the background);
 these were shuffled together with the sheets of 168 of the synthetic pictures above (chosen so that every pair of levels of any two variables appears at least twice), numbered, and the 834 sheets were graded in order.
 The sheets show no file names, sets, or conditions, and the grading rules (A good · B small problem · C large problem · N not found (background and faces only) · - not applicable, plus problem types per target) were fixed before grading and not changed.
-For objects, things the character holds or wears belong with the character, and loose items and furniture with the background. "No problem" is A or B; intervals are Wilson 95%.
+For objects, things the character holds or wears belong with the character, and loose items and furniture with the background. "No problem" is A or B; intervals are <mark>Wilson 95%</mark>.
 
 | Target | No problem | 95% CI | 80% CI | A · B · C · N | Test 24 · pixiv 300 · pixiv 342 (%) |
 |---|---|---|---|---|---|
@@ -3222,7 +3223,7 @@ Faces with dark skin ($`L^* = 43`$) were never found, like the skin lightness 57
 With wide shadows the shadow-side color becomes the base color of the hair in 82% and of the shoes in 70% of the pictures, and the buttons, painted mostly in shade, take the shade color (the ground truth is the lit color).
 The back hair is painted in a shade color (darker than the lit side) below the face; in the half-risen and squatting poses the shaded part of the back hair showing above the shoulders is the larger one, so the back hair takes the shade color as its base color (hair base color wrong, without wide shadows: half-risen 84%, squatting 86%, standing 22%).
 
-Split by the condition tags (the detailed conditions above), some of the differences from the rest that are significant (Fisher exact test, Benjamini–Hochberg 5%) are listed per target (no-problem rate, passed/total).
+Split by the condition tags (the detailed conditions above), some of the differences from the rest that are significant (<mark>Fisher exact</mark> test, <mark>Benjamini–Hochberg</mark> 5%) are listed per target (no-problem rate, passed/total).
 
 | Target | Lower than the rest | Higher than the rest |
 |---|---|---|
@@ -3243,13 +3244,13 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 Every version from 0.1 to 0.40 was measured again with the same pictures and the same scoring.
 Each version's `index.html` at its commit was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
-For each picture the balanced error rate
+For each picture the <mark>balanced error rate</mark>
 
 ```math
 \mathrm{BER}=\frac{(1-\text{character kept})+(1-\text{background found})}2,\qquad \text{resolving power}=\frac1{\overline{\mathrm{BER}}},\qquad \text{× version 0.1}=\frac{\overline{\mathrm{BER}}_{0.1}}{\overline{\mathrm{BER}}_v}
 ```
 
-is measured ($`\mathrm{BER}`$ is 0.5 when nothing is split and 0 when perfect), and the reciprocal of the mean $`\mathrm{BER}`$ over the 185 pictures is the resolving power. The 95% interval is the 2.5 · 97.5 percentiles of a bootstrap resampling the same pictures in pairs (10,000 draws, seed 20261002).
+is measured ($`\mathrm{BER}`$ is 0.5 when nothing is split and 0 when perfect), and the reciprocal of the mean $`\mathrm{BER}`$ over the 185 pictures is the resolving power. The 95% interval is the 2.5 · 97.5 percentiles of a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002).
 Rough generation does not change the background layer (confirmed pixel-identical background maps on 8 versions · 2–3 pictures each), so some versions were run with the rough turned off to save time.
 The posed synthetic pictures are the most numerous and weigh the most, so the multiplier per group (synthetic · real · posed) is also given. There are only 8 real pictures, so their values vary a lot.
 
@@ -3304,7 +3305,7 @@ From 0.4, finding scene backgrounds let the real pictures' backgrounds be found 
 
 To compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the three latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the four versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), and then the key was opened.
-"No major loss" is perfect separation · character intact · small pieces lost, "character without loss" is perfect separation · character intact, and the parentheses give picture counts and 95% Wilson intervals.
+"No major loss" is perfect separation · character intact · small pieces lost, "character without loss" is perfect separation · character intact, and the parentheses give picture counts and 95% <mark>Wilson intervals</mark>.
 
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
@@ -3352,7 +3353,7 @@ Newest versions are at the top. Each version lists its last commit; downloading 
 | Blind test 95% CI | 30–54% | 46–70% | 46–70% | 46–70% |
 | Blind test 80% CI | 34–50% | 50–66% | 50–66% | 50–66% |
 
-Resolving power is relative to version 0.1 (= 100%); its intervals come from a bootstrap resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with Wilson intervals. Versions 0.39 · 0.40 have background maps byte-identical to 0.38 on the 60 pictures, so 0.38's grades were used as they are (11).
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with <mark>Wilson intervals</mark>. Versions 0.39 · 0.40 have background maps byte-identical to 0.38 on the 60 pictures, so 0.38's grades were used as they are (11).
 
 ### 0.39 (2026-10-02) Base colors: colors buried in white · small colored areas · shadow base colors
 
@@ -3365,7 +3366,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
   0.39 better 123 · 0.38 better 20 · same 133 ($`p = 2.8 \times 10^{-19}`$); set of 300: 60 · 12 · 55, set of 342: 63 · 8 · 78 (11).
 - Background maps are byte-identical to 0.38 for all 642 pictures · 185 ground-truth pictures, so the background results (strict separation grades · background resolving power) are unchanged, and the character folder counts are identical for all 642.
   In a blind review of the 99 pictures whose names changed, wrong names went 93 → 93 ($`p = 1`$). In the set of 342 they rose 57 → 60, which cannot be told apart from chance ($`p = 0.73`$).
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image PSNR 48.76 dB or more), splitting the same picture twice byte-identical for all 28,
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image <mark>PSNR</mark> 48.76 dB or more), splitting the same picture twice byte-identical for all 28,
   offline copy · re-split cache after corrections fine.
 - Commit `8864512` (code)
 
@@ -3378,7 +3379,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 | Blind test 95% CI | 30–54% | 39–64% | 46–70% | 46–70% |
 | Blind test 80% CI | 34–50% | 43–60% | 50–66% | 50–66% |
 
-Resolving power is relative to version 0.1 (= 100%); its intervals come from a bootstrap resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with Wilson intervals (11).
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with <mark>Wilson intervals</mark> (11).
 
 ### 0.38 (2026-10-02) Returning lineless clothes · legs that went into the scene background
 
@@ -3389,7 +3390,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
   "No major loss" 85 → 96 (gained 11 · lost 0, $`p = 0.001`$), "character without loss" 60 → 85 (25 · 0); by set, 300: 45 → 50 · 342: 40 → 46 (11).
   "No major loss" over all 642 is 300: 78.9 → 84.6% · 342: 68.7 → 75.4% · all 73.5 → 79.6% (same grading criteria, 11).
 - Background shapes drawn attached to the character come back too, so "perfect separation" decreased (hold-out 4 → 1, 10).
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image PSNR 48.8 dB or more), splitting the same picture twice byte-identical for all 28,
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image <mark>PSNR</mark> 48.8 dB or more), splitting the same picture twice byte-identical for all 28,
   offline copy · re-split cache after corrections fine.
 - Commit `7c053ca` (code)
 
@@ -3402,7 +3403,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 | Blind test 95% CI | 30–54% | 38–62% | 39–64% | 46–70% |
 | Blind test 80% CI | 34–50% | 42–58% | 43–60% | 50–66% |
 
-Resolving power is relative to version 0.1 (= 100%); its intervals come from a bootstrap resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with Wilson intervals (11).
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with <mark>Wilson intervals</mark> (11).
 
 ### 0.37 (2026-10-01) Tilted pictures, keeping black clothes from leaking into the background
 
@@ -3411,9 +3412,9 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
   The corners are kept as background, and the background is found even if the corners are transparent. When faces point strongly to one side, the bottom border rule follows the picture's actual bottom.
 - Added the "Tilted picture" setting (off by default). For pictures tilted while filling the whole canvas without corners, faces are searched at 0 · ±30 · ±60 · ±90°. The chosen tilt appears in the result line.
 - The scene background no longer crosses crisp color edges at the flat background's border. Black stockings · clothes · hair of the lines' color leak into the background less (real-picture blind grading: better 86 · worse 20).
-- Verification: 82 ground-truth pictures rotated by ±15 · ±45 · ±90°, 120 real pictures graded blind (size ratio $`2^{U(-1,\,1)}`$, DCCI enlargement · area-average shrinking), posed synthetic pictures, background stages on the 666 real pictures (11).
+- Verification: 82 ground-truth pictures rotated by ±15 · ±45 · ±90°, 120 real pictures graded blind (size ratio $`2^{U(-1,\,1)}`$, <mark>DCCI</mark> enlargement · area-average shrinking), posed synthetic pictures, background stages on the 666 real pictures (11).
   Upright pictures do not change because of the tilt part.
-- Additional verification (code unchanged): in a 12-category blind test of 1440 samples from real pictures, splitting at the original size against enlarging 2× with DCCI to split was better 326 · worse 165 · same 949 ($`p < 0.0001`$),
+- Additional verification (code unchanged): in a 12-category blind test of 1440 samples from real pictures, splitting at the original size against enlarging 2× with <mark>DCCI</mark> to split was better 326 · worse 165 · same 949 ($`p < 0.0001`$),
   and reverse verification matched rotated and flipped results back to the reference coordinates (11).
 - Commit `e27e195` (code)
 
@@ -3450,7 +3451,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 - Names · character folders use only faces found in both the picture and its left-right flip (10 of 4.5). Blind grading of the 89 pictures whose names changed: better 44 · worse 27 ($`p = 0.057`$),
   wrong names 78 → 34 places; 6 one-person pictures that had been split into two folders were resolved, and 5 two- or three-person pictures lost one folder (11).
 - Black hair of almost the background's color is returned once more with fainter edges · fine color bins (8 of 3.5, 4.5). Character kept on 6 synthetic dark-background pictures 84.1% → 100%.
-- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image PSNR 48.8 dB or more), splitting the same picture twice byte-identical for all 28,
+- Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs (merged image <mark>PSNR</mark> 48.8 dB or more), splitting the same picture twice byte-identical for all 28,
   offline copy · re-split cache after corrections fine.
 - Commit `0f4c00c` (code)
 
@@ -3485,8 +3486,8 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 - A seventh cue, "enclosed by lines", was added to background finding (2.5, 4.5). The line map is reduced to 240 cells on the long side, rays are cast from each cell in 16 directions up to 25% of the long side,
   and places blocked by lines in 15 or more directions are not taken by scene background stage 1 · margin widening · color model · face-based widening, even if lines are sparse.
   White clothes · skirts · flat-colored hair without lines inside, dark clothes in front of dark backgrounds, and faces · hair the color model used to take stay as character.
-- **All 563 pictures whose character map changed were graded blind against 0.30: new version better 262 · worse 106 · similar 195** (sign test $`p < 10^{-15}`$).
-  **No major loss 351 (55.5%) → 445 (70.3%)** (633 judged to have characters, better 123 · worse 29, McNemar exact $`p < 10^{-14}`$).
+- **All 563 pictures whose character map changed were graded blind against 0.30: new version better 262 · worse 106 · similar 195** (<mark>sign test</mark> $`p < 10^{-15}`$).
+  **No major loss 351 (55.5%) → 445 (70.3%)** (633 judged to have characters, better 123 · worse 29, <mark>McNemar exact</mark> $`p < 10^{-14}`$).
   Every group of quality · background type · lines · paint improved: no lines 31% → 50%, thick paint · brush 35% → 57%, painted scene backgrounds 45% → 68% (11).
 - In exchange, background gaps enclosed by the character · background props stay on the character side slightly more often, and pictures with no background found at all went 13 → 17 (10).
   Names: on 60 random pictures, better 23 · worse 20, no difference; processing time is the same.
@@ -3514,14 +3515,14 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 - For pictures with a long side over 1200px, the thresholds of color difference between neighboring pixels where the flat background fill and the scene background's margin widening stop (0.035, 0.03) are multiplied by 1200/long side (4.5).
   In large pictures the same boundary spreads its color change over several pixels, so the one-step difference fell below the threshold and the background leaked into hair tips · hems · sleeves.
   If the background found with the reduced thresholds falls short of the area criteria (flat 3%, scene 5% after margin widening), it is redone with the original thresholds.
-- **115 high-resolution pictures: of 80 re-graded next to 0.28, better 33 · worse 7** (sign test $`p < 0.0001`$), no major loss 57 → 63 (better 6 · worse 0, McNemar exact $`p = 0.031`$).
+- **115 high-resolution pictures: of 80 re-graded next to 0.28, better 33 · worse 7** (<mark>sign test</mark> $`p < 0.0001`$), no major loss 57 → 63 (better 6 · worse 0, <mark>McNemar exact</mark> $`p = 0.031`$).
   No major loss over all 666: 384 (59.1%) → 390 (60.0%). Names: pictures without wrong names 437 → 434 (7 · 10, $`p = 0.63`$), no difference. Pictures of 1200px or less give the same results.
 - Making the three size-sensitive values (line detection window · color step threshold · crisp-line blur) proportional at every size was also verified on the 666, but in small pictures the line detection window shrinks to 2px
   and more character is lost (no major loss under 900px 57 → 38, $`p = 0.0005`$), worsening the total 384 → 367 ($`p = 0.012`$), so it was not added.
   The crisp-line blur · pen width measurement of large pictures were also left as they are, with no evidence or worse results (7.5, 10, 11).
 - Making the three values proportional in small pictures while also matching the line density criteria (scene background · color model) with 540px copies was verified again, but on the 168 pictures smaller than 1200px it was better 26 · worse 60 than 0.29,
   with no major loss 84 → 69 ($`p = 0.006`$), still worse, so it was not added. Even on the shrunk copies, the current pixel-based values reproduced the original-size results best (7.5, 10).
-- Enlarging small pictures with DCCI to a long side of 1200px to split and mapping back was also verified on the 168, but against 0.29 it was better 42 · worse 52 ($`p = 0.35`$) and no major loss 84 → 82, no difference,
+- Enlarging small pictures with <mark>DCCI</mark> to a long side of 1200px to split and mapping back was also verified on the 168, but against 0.29 it was better 42 · worse 52 ($`p = 0.35`$) and no major loss 84 → 82, no difference,
   with 3× the processing time (under 900px 2.6 s → 7.9 s), so it was not added (7.5).
 - Enlarging only 900–1200px pictures was also re-graded blind (without knowing which result was enlarged) on 42 real pictures and 88 shrunk copies of 1200px pictures,
   but enlarged better 23 · original size better 33 · similar 74 ($`p = 0.23`$), no major loss 84 → 80, no difference, so it was not added (7.5).
@@ -3537,7 +3538,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
   Now only pieces connected to or near (within 2.5 times the face's eye distance) the head zone of a face stay "hair", and the rest are split off as separate parts of the same color (color names) (3.9, 9 of 4.8).
   Long hair · twin tails cut off by arms · sleeves stay because they are near, while ties · ribbons · legs in the middle of the body are split off even if near.
   Layer pixels and composites, background, faces, and character folder counts do not change; only part layers are split.
-- **Pictures without wrong names 410 (61.6%) → 437 (65.6%)** (of 666, better 27 · worse 0, McNemar exact $`p < 0.0001`$), wrong places 339 → 292,
+- **Pictures without wrong names 410 (61.6%) → 437 (65.6%)** (of 666, better 27 · worse 0, <mark>McNemar exact</mark> $`p < 0.0001`$), wrong places 339 → 292,
   right character folders + no wrong names 337 → 358 (21 · 0, $`p < 0.0001`$): an improvement hard to see as chance (11).
   Also better than 0.26 (419, 330 places) (28 · 10, $`p = 0.005`$).
 - Pictures with hair names did not decrease, 230 → 232 (of 323, $`p = 0.50`$), and skin · eye names are unchanged.
@@ -3552,7 +3553,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 - Resolving power: 1.31× version 0.1 (95% CI 1.09–1.59×, 11)
 - The 666 were looked at again at original size and the conditions marked in 12 fields (people · size, face direction · eyes, occlusion location · what occludes, focus, what tilts · how much · direction, pose · waist · viewpoint,
   paint · lines, background type · similar colors, hair color · length, effects, lighting, props · appearance), and face · name · folder · background results were measured per condition (11).
-  - By a ridge logistic regression with all other conditions matched, the conditions that often lose large parts of the character are no lines (odds ratio 0.39) · occluded faces (0.39) · low quality (0.51) · dark scenes · backlight (0.55),
+  - By a <mark>ridge logistic regression</mark> with all other conditions matched, the conditions that often lose large parts of the character are no lines (<mark>odds ratio</mark> 0.39) · occluded faces (0.39) · low quality (0.51) · dark scenes · backlight (0.55),
     and the conditions that find fewer faces are eyes closed · wink (0.29) · flat · black and white · sketch (0.40) · thick paint (0.45) · oblique faces (0.53) (all $`p < 0.05`$).
     Tilt · pose · viewpoint · hair color · effects · background type showed no difference once the other conditions were matched.
   - Looked at alone, the lowest "no major loss" values are backlight 21% (24 pictures), blurred scene backgrounds 30%, no lines 35%, occluded faces 37%,
@@ -3561,15 +3562,15 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
   Splitting 0.26's on · off comparison of 253 pictures by background flatness, the 67 flat ones showed no gain from the face stages (better 19 · worse 20)
   (the 186 non-flat ones: 96 · 28), and 5 of the 11 major losses caused by the face stages were here.
   - The character map changed in 134 of the 666 (all 24 test pictures unchanged), and re-grading the 133 with characters side by side gave
-    better 22 · worse 5 · same 106 (sign test $`p = 0.0015`$).
-  - Over the 650 with characters, **character without loss 87 (13.4%) → 104 (16.0%)** (better 19 · worse 2, McNemar exact $`p = 0.0002`$)
+    better 22 · worse 5 · same 106 (<mark>sign test</mark> $`p = 0.0015`$).
+  - Over the 650 with characters, **character without loss 87 (13.4%) → 104 (16.0%)** (better 19 · worse 2, <mark>McNemar exact</mark> $`p = 0.0002`$)
     and **no major loss 377 (58.0%) → 384 (59.1%)** (7 · 0, $`p = 0.016`$): improvements hard to see as chance.
     Perfect separation went 24 → 20 (0 · 4, $`p = 0.13`$): 3 pictures with a little background left and 1 with a small loss.
   - In exchange, clothes · legs · hands · props newly kept on the character side were grouped into hair · skin parts more often, and pictures without wrong names went 419 → 410 (of 666, 3 · 12, $`p = 0.035`$).
     There is no evidence that hair names (226 → 230) · skin names (183 → 186) changed ($`p = 0.39`$, 0.25), and faces · character folders are unchanged.
     Lost character must be painted with the correction brush while a wrong name only needs the layer renamed, so the background improvement was chosen.
 - Screen verification (28 test pictures): 0 errors · external requests, both psd-tools · ag-psd read all 28 PSDs, splitting the same picture twice byte-identical for all 28, offline copy · re-split cache after corrections fine.
-- Added to 11 the detailed condition table and the formulas for multiple-test correction (Benjamini–Hochberg) · ridge logistic regression.
+- Added to 11 the detailed condition table and the formulas for multiple-test correction (<mark>Benjamini–Hochberg</mark>) · <mark>ridge logistic regression</mark>.
 - Commit `d35c9ad` (code)
 
 ### 0.26 (2026-09-29) Verification on 342 new pictures, empty background layer in pictures without background, the relation between faces and background results
@@ -3582,30 +3583,30 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
   All other layers' pixels are unchanged.
 - **Pictures with faces found also have better background results, which is hard to see as chance** (11). Among the new pictures with faces showing both eyes, "no major loss" of the strict separation rate is
   66.7% for the 150 with faces found and 45.1% for the 91 without.
-  - Difference +21.6%p (95% +8.7 to +33.7), 1.48× (1.15–1.91), odds ratio 2.44 (1.43–4.16).
-    Yates-corrected chi-square $`\chi^2 = 10.03`$ (1 degree of freedom), $`p = 0.0015`$, Fisher exact $`p = 0.0012`$. If the two groups' true proportions were equal, the probability of a gap this large is about 1 in 650.
+  - Difference +21.6%p (95% +8.7 to +33.7), 1.48× (1.15–1.91), <mark>odds ratio</mark> 2.44 (1.43–4.16).
+    <mark>Yates-corrected chi-square</mark> $`\chi^2 = 10.03`$ (1 degree of freedom), $`p = 0.0015`$, <mark>Fisher exact</mark> $`p = 0.0012`$. If the two groups' true proportions were equal, the probability of a gap this large is about 1 in 650.
   - Pictures with large parts of the character gone to the background: not found 52.7% → found 31.3% (0.59×, $`p = 0.0016`$).
-  - The 300 (0.21 grading) go the same direction (64.6% vs 50.0%, Fisher $`p = 0.050`$), and the two sets combined give 65.7% vs 47.1% (+18.5%p, $`\chi^2 = 13.84,\ p = 0.0002`$).
-  - Mantel–Haenszel odds ratios matching number of people · occlusion · focus · tilt · pose · colorfulness · quality · source one at a time are 2.10–2.28 (all $`p \le 0.0004`$),
-    and a logistic regression with all of them gives 2.16 (1.41–3.31, $`p = 0.0004`$), so it is not explained by differences in the graded conditions either.
+  - The 300 (0.21 grading) go the same direction (64.6% vs 50.0%, <mark>Fisher</mark> $`p = 0.050`$), and the two sets combined give 65.7% vs 47.1% (+18.5%p, $`\chi^2 = 13.84,\ p = 0.0002`$).
+  - <mark>Mantel–Haenszel</mark> odds ratios matching number of people · occlusion · focus · tilt · pose · colorfulness · quality · source one at a time are 2.10–2.28 (all $`p \le 0.0004`$),
+    and a <mark>logistic regression</mark> with all of them gives 2.16 (1.41–3.31, $`p = 0.0004`$), so it is not explained by differences in the graded conditions either.
 - **But this difference is not thanks to the face-based background stages** (11). All 666 were run again with a core that does not pass faces to the background stages (8 · 9 of 3.5),
   and the 253 pictures whose results could change were re-graded with on · off side by side.
-  - "No major loss" is 58.0% on · 58.9% off (650 pictures): 5 passed thanks to the face stages · 11 failed because of them (McNemar exact $`p = 0.21`$, no difference).
+  - "No major loss" is 58.0% on · 58.9% off (650 pictures): 5 passed thanks to the face stages · 11 failed because of them (<mark>McNemar exact</mark> $`p = 0.21`$, no difference).
   - Even with the face stages off, the found · not found difference stays at 66.0% vs 47.8% ($`\chi^2 = 13.43,\ p = 0.0002`$).
     Pictures where faces are easy to find are also easy to separate from the background (which property outside the graded conditions separates both together was not measured).
   - What the face stages actually improve is **finding more background**. 222 pictures had 1% or more of their area newly found as background, and this stage found 3.3% of the final background pixels.
-    Compared by eye, the side with them on was better in 115 · worse in 48 (mixed 56, almost the same 34), an improvement hard to see as chance (sign test $`p < 0.0001`$).
+    Compared by eye, the side with them on was better in 115 · worse in 48 (mixed 56, almost the same 34), an improvement hard to see as chance (<mark>sign test</mark> $`p < 0.0001`$).
     In pictures with faces found alone, 62 vs 20.
   - What the face stages took into the background in the 11 failures were character parts similar in color to the background, like black hair · white dresses · legs · gloved hands · small figures within the picture (10).
 - **Improvement rates compared with the first 0.21 grading (300 pictures)** (11): both sets were pictures that version had never seen.
   - The only improvement hard to see as chance is **skin names**: in pictures with faces found 35.4% → 62.0% (+26.6%p, 95% +15.3 to +37.0, 1.75×),
-    $`\chi^2 = 20.01,\ p < 0.0001`$, condition-adjusted odds ratio 6.33 (3.00–13.38).
+    $`\chi^2 = 20.01,\ p < 0.0001`$, condition-adjusted <mark>odds ratio</mark> 6.33 (3.00–13.38).
   - Hair names 63.3% → 68.0% ($`p = 0.46`$), character folders 77.3% → 81.0% ($`p = 0.30`$), no wrong names 64.3% → 62.6% ($`p = 0.70`$),
     and fake faces per picture 0.98 → 0.95 ($`p = 0.75`$) give no evidence of change.
-  - The share of pictures with one face where that face was found is lower, 64.9% → 57.2% ($`p = 0.19`$), but the condition-adjusted odds ratio is 1.06 (0.54–2.10), so it is because the new pictures have many difficult conditions.
+  - The share of pictures with one face where that face was found is lower, 64.9% → 57.2% ($`p = 0.19`$), but the condition-adjusted <mark>odds ratio</mark> is 1.06 (0.54–2.10), so it is because the new pictures have many difficult conditions.
 - Whether the background is found differed between the screen (input re-saved as JPEG quality 95) and code (lossless input) in 4 of the 342.
   All were right next to a threshold (scene background area 5% · 90%, color distribution overlap 0.3); moving the thresholds would bring other pictures to that spot, so the code was kept and this was written in the limitations (10).
-- The statistical formulas used in verification (Fisher's exact test, intervals of the difference · ratio · odds ratio of two proportions, Mantel–Haenszel, logistic regression, McNemar, comparison of mean counts) were added to 11.
+- The statistical formulas used in verification (<mark>Fisher's exact test</mark>, intervals of the difference · ratio · <mark>odds ratio</mark> of two proportions, <mark>Mantel–Haenszel</mark>, <mark>logistic regression</mark>, <mark>McNemar</mark>, comparison of mean counts) were added to 11.
 - Commit `52f6c7b` (code)
 
 ### 0.25 (2026-09-29) Removing the "skin" color name in pictures without faces
@@ -3618,8 +3619,8 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
   but as many pictures got worse (detached hair grouped with logs · trees · tablecloths of the same color) as got better, so it was not adopted (7.5, 10).
 - The verification set was enlarged to 666 pictures (24 test pictures + 300 pixiv + 342 from the top 50 of the pixiv rankings), chosen so that number of characters · occlusion · focus · tilt · pose · colorfulness · quality
   are mixed evenly; all 666 split without errors (11).
-- Every formula the program uses was written in its section: input · processing resolution (4.0), Lab ↔ sRGB matrices (4.1), blur · distance transform · k-means · random numbers · interpolation (4.2),
-  face finding's Hessian differences · face frame coordinates · sample grids (4.5), color names · skin color decision (4.8), stored layer values (4.12), the rough's Sobel · thinning (4.14),
+- Every formula the program uses was written in its section: input · processing resolution (4.0), Lab ↔ sRGB matrices (4.1), blur · <mark>distance transform</mark> · <mark>k-means</mark> · random numbers · interpolation (4.2),
+  face finding's <mark>Hessian</mark> differences · face frame coordinates · sample grids (4.5), color names · skin color decision (4.8), stored layer values (4.12), the rough's <mark>Sobel</mark> · thinning (4.14),
   PSD byte layout · PackBits (4.15), screen zoom (4.16), correction tools · cache hash (4.17), verification metrics and statistics (11). The program's behavior did not change.
 - Commit `1f866af`
 
@@ -3696,7 +3697,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 
 - Resolving power: 1.00× version 0.1 (95% CI 0.83–1.21×; lower than the previous version (0.17), 11)
 - Eye · skin · hair names were re-verified with 48 synthetic pictures with ground truth and 25 real pictures, and the defects found were fixed (4.8, 11).
-  On synthetic pictures, hair precision 98.3% → 99.7%, skin precision 90.1% → 97.3%, pictures with wrong names 11 → 1.
+  On synthetic pictures, hair <mark>precision</mark> 98.3% → 99.7%, skin <mark>precision</mark> 90.1% → 97.3%, pictures with wrong names 11 → 1.
 - Only character faces give names. Wrong "hair" · "skin" · "eyes" on clothes · ribbons · props (black dress, teal apron, yellow clothes, ribbon) are gone,
   and a second, lower-scoring character (the witch in the autumn leaves picture) also gets names.
 - For hair exposing the forehead, hair is searched above the forehead, and shadows on the whites of the eyes · pupils are not called hair (the sample picture's "hair 2" is gone).
@@ -3712,7 +3713,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 - When merging shadow surfaces across lines, a shadow must not be brighter than the lit surface in any channel and must be close to the lit surface's hue (4.8).
   In pictures where a gray dress · cream clothes and skin had become one part (qipao card illustration, close-up of a girl in a hat), the skin is now split off.
 - In pictures where brush marks · hair grain are caught as lines, grain with the same color on both sides of the line is not treated as a material boundary (4.6). It does not apply to line-art pictures.
-- On 10 synthetic pictures with ground truth, material coverage 77.0% → 96.6%, part purity 85.0% → 99.3%, base color error 25.4 → 18.2 (11). Reproduction PSNR of real pictures is almost the same (mean 55.67 → 55.62 dB).
+- On 10 synthetic pictures with ground truth, material coverage 77.0% → 96.6%, part purity 85.0% → 99.3%, base color error 25.4 → 18.2 (11). Reproduction <mark>PSNR</mark> of real pictures is almost the same (mean 55.67 → 55.62 dB).
 - Long hair and the leg skin of full-body pictures also get names (4.8), and in pictures with faces found only parts confirmed by faces are called "skin".
 - Commit `c0a9600`
 
@@ -3795,8 +3796,8 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 ### 0.7 (2026-09-27) Automatic separation of backgrounds drawn with lines
 
 - Resolving power: 0.95× version 0.1 (95% CI 0.80–1.15×, 11)
-- In pictures whose background is also drawn with lines, like fireworks · food stalls · graffiti, the background and character colors are learned per picture to widen the background (graph cut).
-  Character region overlap (IoU): graffiti 0.72 → 0.90, fireworks 0.71 → 0.79, night view 0.68 → 0.77.
+- In pictures whose background is also drawn with lines, like fireworks · food stalls · graffiti, the background and character colors are learned per picture to widen the background (<mark>graph cut</mark>).
+  Character region overlap (<mark>IoU</mark>): graffiti 0.72 → 0.90, fireworks 0.71 → 0.79, night view 0.68 → 0.77.
 - The "content hint" approach, where a person marks character outlines and part names, needed human hands, so it was removed and replaced by the automatic approach above.
 - This document was rewritten from easy explanations to algorithms · formulas.
 - Commit `230ab4f`
@@ -3822,13 +3823,13 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a b
 
 - Resolving power: 0.90× version 0.1 (95% CI 0.77–1.05×; lower than the previous version (0.3), 11)
 - Scene backgrounds painted without lines are found by line density, and finely detailed backgrounds drawn blurred (shelves, writing) are found too (café interior background 19% → 41%).
-- Colored lines (color trace) are reproduced exactly (magical girl reproduction PSNR 38 → 60 dB).
+- Colored lines (color trace) are reproduced exactly (magical girl reproduction <mark>PSNR</mark> 38 → 60 dB).
 - Commit `f975896`
 
 ### 0.3 (2026-09-27) Refining with real pictures, work-file layers
 
 - Resolving power: 1.04× version 0.1 (95% CI 1.01–1.08×, 11)
-- Refined with real illustrations: parts were cleaned up from 168 to 9, and reproduction PSNR rose from 41 to 47 dB.
+- Refined with real illustrations: parts were cleaned up from 168 to 9, and reproduction <mark>PSNR</mark> rose from 41 to 47 dB.
 - Added rim light, reflected light, gradient, background effect, silhouette (for selection) layers and [Character] · [Background] · [Line art] folders.
 - Commit `1e81f4e`
 
