@@ -1026,7 +1026,7 @@ Removed line pixels are restored to their original colors and left in the backgr
 \begin{cases}
 \text{true} & \Delta E<\varepsilon_s\\
 |L_1-L_2|<3\varepsilon_s & C_1<12,\ C_2<12\\
-|h_1-h_2|<\varepsilon_h,\ \ 0.3<C_1/C_2<3.3 & C_1\ge 12,\ C_2\ge 12\\
+|h_1-h_2|<\varepsilon_h,\ \ 0.3< C_1/C_2<3.3 & C_1\ge 12,\ C_2\ge 12\\
 \text{rules below} & \text{only one side achromatic}
 \end{cases}
 \qquad \varepsilon_h=14+40m,\ \ \varepsilon_s=5+12m
