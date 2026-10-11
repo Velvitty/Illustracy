@@ -3473,6 +3473,9 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
     so dark furniture · signs · floors come back too. By picture, better 37 · worse 29 ($`p = 0.39`$).
   - Widened blocking before dark places (vs the version with the other three rules, 90 of 625 places): +0.75 (+0.12 to +1.40), with equal weights +0.23 (−0.03 to +0.49), by picture 34 · 28 ($`p = 0.53`$).
   - The fallback floor line · rectangular objects changed only 1 of the 777 (the floor under a desk went to the background, together with a few skirt-edge pixels).
+- On the 10,080 synthetic pictures (the method of 11.13, same pictures as 0.41): background good 7,834 → 9,391 (better 1,566 · worse 9), body good 7,366 → 9,193 (1,827 · 0), objects good 6,416 → 6,666 (of the 8,064 with objects, 684 · 434, $`p = 7.6 \times 10^{-14}`$), and faces unchanged.
+  Background good on the 1,680 scene backgrounds rose 0 → 1,565, and body good on the 1,680 dark backgrounds 191 → 1,568.
+  Base color good fell 2,455 → 1,725 (68 · 798, $`p = 6.8 \times 10^{-159}`$). 689 of the 798 worse pictures have dark backgrounds: the dark shoes · skirts · hair that used to go to the background and were left out of scoring are now scored as character, and their base colors were often wrong (wrong material: shoes 553 · skirts 273 · hair 247 pictures).
 - The blind test (11.15) graded 0.1 · 0.41 · 0.42 · 0.43 again together. 0.43 differed from 0.42 on 24 of the 60 pictures, with 22 "no major loss" (0.42: 21), gained 1 · lost 0 ($`p = 1.0`$), 1 picture graded higher and 0 lower.
 - The five-target results on pixiv pictures (10.6, 11.13) were graded at 0.39 and were not graded again.
 - Remaining weaknesses: busy real backgrounds stay as they were (the ground-truth picture t17 has 5% background found). Returning dark character parts also returns dark furniture · floors,
