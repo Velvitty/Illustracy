@@ -3370,16 +3370,16 @@ For each picture, only the distinct results were collected (versions with identi
 
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
-| 0.1 | **21.7%** (13/60, 13.1–33.6) | 20.0% | 21.7% | 56.7% | 7/30 · 6/30 |
-| 0.41 | **33.3%** (20/60, 22.7–45.9) | 30.0% | 65.0% | 1.7% | 11/30 · 9/30 |
-| 0.42 | **35.0%** (21/60, 24.2–47.6) | 30.0% | 63.3% | 1.7% | 11/30 · 10/30 |
-| 0.43 | **36.7%** (22/60, 25.6–49.3) | 31.7% | 61.7% | 1.7% | 12/30 · 10/30 |
+| 0.1 | **20.0%** (12/60, 11.8–31.8) | 18.3% | 23.3% | 56.7% | 6/30 · 6/30 |
+| 0.41 | **33.3%** (20/60, 22.7–45.9) | 26.7% | 65.0% | 1.7% | 11/30 · 9/30 |
+| 0.42 | **35.0%** (21/60, 24.2–47.6) | 26.7% | 63.3% | 1.7% | 11/30 · 10/30 |
+| 0.43 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
 
 This time four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). Pictures had 2 (23 pictures) · 3 (15) · 4 (22) distinct panels, and 0.43 differs from 0.42 on 24 pictures.
 As same-picture pairs, 0.42 → 0.43 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$) and 1 · 0 in "character without loss", with 1 picture graded higher and 0 lower ($`p = 1.0`$).
 0.41 → 0.42 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$), with 1 picture graded higher and 0 lower.
-Version 0.1 found no background in 34 pictures and leaves them as they are, so it has few major losses (13); 0.1 → 0.43 gained 11 · lost 2 in "no major loss" ($`p = 0.022`$).
-The four versions were graded again from scratch together, so the rates differ from the 0.42 entry's grading (0.1 · 0.40 · 0.41 · 0.42 graded together): 0.42 went from 48.3 to 35.0%, 0.41 from 48.3 to 33.3%, and 0.1 from 31.7 to 21.7%.
+Version 0.1 found no background in 34 pictures and leaves them as they are, so it has few major losses (14); 0.1 → 0.43 gained 12 · lost 2 in "no major loss" ($`p = 0.013`$).
+The four versions were graded again from scratch together, so the rates differ from the 0.42 entry's grading (0.1 · 0.40 · 0.41 · 0.42 graded together): 0.42 went from 48.3 to 35.0%, 0.41 from 48.3 to 33.3%, and 0.1 from 31.7 to 20.0%.
 These graders also counted crowds and faintly drawn large figures in the background as characters and graded their losses as major, so every version's rate is lower. Read this as the difference between four versions graded together by the same standard rather than as the size of the rates.
 The table at the end of the 0.43 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
@@ -3428,9 +3428,9 @@ Newest versions are at the top.
 | Resolving power | 100% | 214% | 225% | 591% |
 | Resolving power 95% CI | — | 179–260% | 189–275% | 433–863% |
 | Resolving power 80% CI | — | 190–242% | 200–256% | 482–754% |
-| Blind test | 22% | 33% | 35% | 37% |
-| Blind test 95% CI | 13–34% | 23–46% | 24–48% | 26–49% |
-| Blind test 80% CI | 16–29% | 26–41% | 28–43% | 29–45% |
+| Blind test | 20% | 33% | 35% | 37% |
+| Blind test 95% CI | 12–32% | 23–46% | 24–48% | 26–49% |
+| Blind test 80% CI | 14–27% | 26–41% | 28–43% | 29–45% |
 
 Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with <mark>Wilson intervals</mark>. The four versions were graded again from scratch together, so the rates differ from the table of the 0.42 entry (11).
 
