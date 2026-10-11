@@ -1,0 +1,173 @@
+# Illustracy — 4. Algorithms and formulas (4/4): Rough · PSD · preview · manual correction
+
+[← README](../README.en.md#4-algorithms-and-formulas) · Section 4 [1](4-1-basics.en.md) · [2](4-2-background.en.md) · [3](4-3-regions-layers.en.md) · **4** · [한국어](4-4-rough-psd-tools.md)
+
+---
+
+## 4.14 Rough generation
+
+Rough 1 · rough 2 go through the same steps and differ only in the values of the table below. They use their own random numbers (<mark>mulberry32</mark>, seed 20261011 for rough 1 and 20261012 for rough 2), so the same picture always gives the same roughs regardless of the other layers.
+Below, $`s' = \max(1, s)`$ is the size factor for stroke width · offsets, $`s_g = \max(0.5, s)`$ the size factor for blurs · tolerances · length thresholds (small pictures hold the same shape in fewer pixels), 𝑢 is a new random number in $`[0, 1)`$ each time it is used, and 𝑣 one in $`[-1, 1)`$.
+
+| Value | Rough 1 (concept) | Rough 2 (refined) | Step |
+|---|---|---|---|
+| Part blur $`\sigma_p`$ · large-part threshold $`a_{min}`$ | $`6s_g`$ · 0.8% of the character area | $`2.5s_g`$ · 0.2% | 1 |
+| Inner color boundaries · silhouette where line art exists | drawn if line art lies under them · drawn | not drawn · drawn by the line art | 2 |
+| Composition offset | rotation $`0.05v`$ rad, scale $`1 + 0.04v`$, warp 3.5% of the character size | none | 3 |
+| Inner lines (line alpha threshold · length · density) | 0.3 · at least $`40s_g`$ (where sparse on a wider view, $`12s_g`$) · at most 0.11 | 0.25 · at least $`12s_g`$ (outside the character, $`25s_g`$) · at most 0.18 (where sparse on a wider view, even if dense) | 4 |
+| Inner lines near mass lines | dropped | drawn | 4 |
+| Background composition | not drawn | brightness edges of at least $`40s_g`$, strength 0.45 | 5 |
+| Skin color · guessed face areas | a* at least 4 · one mass in pictures with no face found at all | a* at least 2 and a* + b* at least 6 · every mass without a found face | 6 |
+| Stroke fitting | break at bends over 0.8 rad, cubic (tolerance $`3s_g`$, faces $`1.2s_g`$) | break at bends over 0.9 rad, fit cubics (tolerance $`3.5s_g`$, faces $`0.7s_g`$) between corners (0.65 rad), then join pieces bending 1.2 rad or less into one stroke | 7 |
+| Stroke length · overlap | $`(110 + 60u)s_g`$ · 18% | $`(90 + 50u)s_g`$ · 10% | 7 |
+| Mass-line radius · offset (first · later passes) · silhouette / inner strength | $`1.2s'`$ · $`0.8s'`$ · $`2.2s'`$ · 0.9 / 0.7 | $`1.7s'`$ · $`0.3s'`$ · $`0.5s'`$ · 1 / 0.85 | 8 |
+| Inner line radius · passes · strength factor | $`1.15s'`$ · 2 · 0.8 | $`1.6s'`$ · 1 (2 with 50%) · 1 | 8 |
+| Face stroke radius · darkness · offset | $`1.1s'`$ · $`0.35 + 0.65\bar\ell`$ · $`0.35s'`$, $`0.9s'`$ | $`1.8s'`$ · $`0.8 + 0.2\bar\ell`$ · $`0.12s'`$, $`0.35s'`$ | 8 |
+| Pressure floor at stroke ends $`p_0`$ · construction line darkness | 0.18 · ×1.3 | 0.35 · ×0.5 | 8, 9 |
+
+**Face area** 𝐹: for each naming · folder face (step 9 of face finding in 4.5) with eye center $`(c_x, c_y)`$, eye distance 𝑑, unit eye direction 𝐞 and the downward direction 𝐟 perpendicular to it, the pixels with $`\lvert u\rvert \le 1.1`$ and $`-0.6 \le v \le 1.6`$ where $`u = (\mathbf p - \mathbf c)\cdot\mathbf e / d`$, $`v = (\mathbf p - \mathbf c)\cdot\mathbf f / d`$ (from eyebrows to chin).
+
+1. **Mass map**: character pixels (alpha > 0.02 and not the background tone) are split into base-color groups, and groups of at least $`a_{min}`$ of the character area $`N_c`$ and at least $`150s_g^2`$ pixels are the large parts.
+   The background · character indicator functions are blurred by $`\sigma_p`$ and the places where the character side is larger form the inside of the silhouette (the silhouette is set by the whole character only); inside it, each pixel takes whichever of the large parts and "the rest" (small pieces · frills) has the largest blurred indicator, giving the map $`L_2`$.
+   Painting with the large parts only would leave places full of small pieces empty like background and break the masses apart.
+2. **Mass lines**: where the $`L_2`$ of a pixel and its right · lower neighbor differ, it is a silhouette if one side is outside the character and an inner boundary if the two large parts' base colors have $`\Delta E \ge 15`$ (except where they touch the rest, and inside 𝐹).
+   Lines are traced as in step 7 (pieces of at least $`20s_g`$ pixels, spurs trimmed by $`5s_g`$ steps, loops under $`30s_g`$ pixels dropped), and an inner boundary line is used only if at least 60% of its points lie within $`r_k = \max(2, 2.5s_g)`$px of line art (line alpha ≥ 0.25).
+   Color boundaries without a line, such as the same hair split into light and shadow, are not in an artist's rough. Rough 2 draws no inner boundaries (in complex pictures they become a cell-like polygon mesh).
+   Rough 2, as if redrawing the real outline over rough 1's masses, cuts each silhouette line at points with line art within $`r_k`$ and keeps as mass lines only the stretches without line art (at least $`10s_g`$). Outlines where line art exists are drawn by the line-art lines of step 4.
+3. **Composition offset** (rough 1): with the character's center of mass 𝐦 and the diagonal 𝑆 of its bounding box, every stroke point is moved to
+   $`\mathbf p' = \mathbf m + z\,R_\theta(\mathbf p - \mathbf m) + 0.035S\,\big(n_x(\mathbf p),\ n_y(\mathbf p)\big)`$ before drawing, where $`n_x, n_y`$ are value noise (4.2) with cell size $`\max(8, 0.45S)`$.
+4. **Inner lines**: the center lines of pixels outside 𝐹 with line alpha at least the threshold are traced. Rough 1 drops lines with more than half their points within $`4s_g`$px of a drawn mass line.
+   **Density**: the share ρ of center-line · mass-line pixels in a window of radius $`r_d = \max(2, \mathrm{round}(10s_g))`$, averaged along the line, is compared as $`\rho\,(2r_d + 1)/21`$, which in terms of the spacing of parallel lines does not depend on size.
+   Lines in dense places like patterns · hatching · hair grain are not in a rough and are dropped, but lines whose same value in a 4× wider window ($`4r_d`$) is at most 0.12 (lines gathered in small clusters that are sparse on a wider view: eyes · mouths · fingers) are kept even if short or dense.
+   Lines shorter than the outside-the-character threshold (table) are used only if at least half their points lie inside the silhouette (dropping signatures · background lettering).
+   **Pattern loops**: for each closed line with a perimeter up to $`60s_g`$ pixels, its center and mean radius 𝑟 are measured; if at least two other closed lines have a radius ratio within 2× and a center distance of at most $`6\max(r_i, r_j)`$, it is taken as a repeated pattern (sweater pattern · snowflakes · petals · railing cells · window rows) and not drawn.
+5. **Background composition** (rough 2): the lines of the background picture have moved to the background layer, so the brightness of background-tone pixels (0.299R + 0.587G + 0.114B) is blurred by $`1.5s'`$, the magnitude · direction of the <mark>Sobel</mark> gradient are measured and only maxima along the gradient direction are kept,
+   and edges are obtained by starting at magnitude 0.045 and continuing into neighbors of at least 0.02 (<mark>hysteresis</mark>) (excluding within $`3s_g`$px of drawn mass lines).
+   These are traced as in step 7, and only lines of at least $`40s_g`$ (closed lines at least $`80s_g`$) that pass the density · pattern-loop filters of step 4 are drawn once with strength 0.45 (halftone · grass · cloud texture drops out).
+6. **Face details**: inside 𝐹 and the guessed face areas, the center lines of pixels with line alpha ≥ 0.25 are traced without spur trimming down to 4-pixel pieces, dropping only loops under $`8s_g`$ pixels.
+   - **Guessing face areas**: skin-colored groups (lightness ≥ 55, a* from the threshold to 30, b* 0–35) are closed with radius $`r = \max(3, 0.035\sqrt{N_c})`$ (widened and narrowed by distance transforms), and among the resulting masses,
+     those covering at least 0.4% (rough 2: 0.2%) of the character and with dark lines (line alpha ≥ 0.5) in their non-skin holes covering at least 1% of the mass are used, by their inside (more than $`2s_g`$ from the edge).
+     In pictures with no face found at all, the one with the most lines in its holes is taken as the face; rough 2 also uses every mass without a found face (unfound faces · hands).
+   - **Contours of painted shapes**: in the face-area lines, thick cores whose inner radius (<mark>distance transform</mark> to outside the line) is at least $`\tau = \max(1.5,\ 2.5s_g)`$ are grouped into blobs, and only those whose largest radius is $`\rho_{max} \ge 2\tau`$ and whose long side is at most $`4\rho_{max} + 4`$px (gathered roundly) are chosen (thick lines · line ends drop out).
+     The shape formed by the disks of each core pixel's inner radius (holes filled) is removed from the lines, and its outer contour is traced as a closed line and drawn as face strokes. Thinning a painted iris to a line would leave a single dot. Thin attached eyelash · eyelid lines are still drawn as center lines.
+7. **Lines and strokes**: the material is widened by 1px with a 3×3 window to close gaps, a 1px center line is obtained by <mark>**Zhang–Suen thinning**</mark>, and short spurs are trimmed by deleting end points a set number of steps and growing them back (not inside 𝐹).
+   End points (at most one 8-neighbor) and junctions (three or more 0 → 1 changes around the 8-neighborhood) are nodes, chains are taken between nodes, and pairs of ends within $`3s' + 1.5`$px whose outward directions have a dot product under $`-0.766`$ (continuing straight within 40°) are joined into one line.
+   - With 𝑛 points in a line, a moving average with half-window $`\mathrm{clamp}(\mathrm{round}(n/25), 2, 6)`$ (1 for rough 2's mass · inner lines, 2 for face lines) is applied twice and the line is resampled at 1.5px.
+   - **Bends**: a line is cut at points where the angle between the directions $`i - 4 \to i`$ and $`i \to i + 4`$ exceeds the threshold, is not smaller than at the neighbors, and lies at least 4 points from the previous cut. People lift the pencil and start a new stroke at a bend.
+   - **Gentle curves**: between bends, cubics $`x(t), y(t)`$ in arc length $`t \in [0, 1]`$ are fitted by <mark>least squares</mark>; if the error at the farthest point exceeds the tolerance, the line is split there and fitted again (under 9 points it is kept as is).
+   - **Corners of rough 2**: between bends the line is first reduced to straight segments within the tolerance by splitting at the farthest point (<mark>Ramer–Douglas–Peucker</mark>), and vertices next to a segment shorter than $`10s_g`$ are removed, least deviating first, up to $`2\times`$ the tolerance (removing small teeth).
+     The line is split at remaining vertices bending more than 0.65 rad and the cubic above is fitted in between. Closed lines with a perimeter up to $`60s_g`$ (eyes · buttons) are not split at corners but fitted smoothly with the face tolerance.
+   - **Continuous strokes** (rough 2): among the fitted pieces, those whose end points meet with a bend of 1.2 rad or less between them are joined into one stroke without lifting the pencil. Corners are turned within one stroke, and a new stroke starts only at sharp bends.
+   - A curve longer than the stroke length is split into $`k = \min(3, \lceil \text{length} / \text{stroke length}\rceil)`$ strokes overlapping their neighbors by the overlap share (one curve drawn with 2–3 strokes).
+8. **Drawing**: each stroke is drawn the set number of times (mass lines 2 (3 with 30%), face strokes 2 (3 with 45%), construction lines 1–2). The 𝑘-th pass ($`k = 0, 1, 2`$) is:
+   - Start · end: with $`\ell_e = \min(9s_g, 0.2\,\text{stroke length})`$, the first pass has $`e_0, e_1 = -0.6u\,\ell_e`$ and later passes $`e_0, e_1 = (1.6u - 0.6)\,\ell_e`$. Positive values start that much later or stop that much earlier (falling short), negative values extend that much along the tangent (overshooting). Face strokes never fall short.
+   - Sideways offset: along the stroke with $`t \in [0, 1]`$, the stroke is moved along the normal by $`o(t) = g_0 + g_l(t - 0.5) + g_1\sin(\pi t + \varphi)`$, with $`g_0 = 0.9\,\sigma_k v`$, $`g_l = 1.6\,\sigma_k v`$, $`g_1 = 1.4\,\sigma_k v`$, $`\varphi = \pi u`$ and $`\sigma_k`$ the offset of the table (first · later passes).
+   - Pressure: with $`\tau(t) = \mathrm{smoothstep}(0, t_a, t)\,\big(1 - \mathrm{smoothstep}(1 - t_b, 1, t)\big)`$, $`t_a = 0.12 + 0.18u`$, $`t_b = 0.15 + 0.2u`$,
+
+     $`\displaystyle \mathrm{pr}(t) = P_k\,\big(p_0 + (1 - p_0)\,\tau(t)\big)\,\big(0.88 + 0.12\sin(2\pi f t + \psi)\big),\qquad P_0 = 0.75 + 0.3u,\quad P_{k \ge 1} = 0.5 + 0.3u,\quad f = 1 + 2u,\quad \psi = 2\pi u`$
+
+     $`p_0`$ is the pressure floor of the table (rough 2 is the settled line, so its ends taper less).
+   - Width: with the stroke radius 𝑅 (table) and the end width ratio $`\lambda = 0.45 + 0.4\,\mathrm{clamp}\big((R/s' - 1.5)/2,\ 0,\ 1\big)`$, $`r = R\,\big(\lambda + (1.3 - \lambda)\min(1, \mathrm{pr})\big)`$.
+   - Darkness: $`a = o_k\,(0.35 + 0.65\,\mathrm{pr})`$, $`o_k = (1 \text{ or } 0.75 \text{ for later passes}) \cdot w`$. The strength 𝑤 is $`0.2 + 0.8\,c^2`$ for mass lines (𝑐 the strongest boundary strength within $`\mathrm{tol} + 2`$px of the stroke: silhouette · inner), $`0.2 + 0.8\min(1, \bar\ell)\cdot\text{the table's strength factor}`$ for inner lines,
+     the table's value for face strokes (ℓ̄ the mean line alpha along the stroke), and the table's strength for the background composition.
+   - Painting: each pair of neighboring points is drawn as a round-capped segment along which 𝑟 · 𝑎 change linearly. With 𝑑 the distance from a pixel center to the nearest point of the segment (parameter $`t^*`$),
+     the coverage is $`c = \min\big(1,\ r(t^*) + 0.5 - d\big)`$ (not covered if 0 or less) and the value $`c \cdot a(t^*)`$ (<mark>anti-aliasing</mark>).
+     Within one pass each pixel takes its largest value 𝑥, and passes stack by screen: $`\mathrm{acc} \gets 1 - (1 - \mathrm{acc})(1 - x)`$.
+9. **Face construction**: among the character faces (chosen as in the character split of 4.8), faces where at least three of the four places cheeks $`(\pm0.6, 0.7)`$ · under the nose $`(0, 0.5)`$ · chin $`(0, 1.1)`$ are skin colored (lightness ≥ 55, a* · b* −2 to 35) or with a score ≥ 12.5 (if none, the highest-scoring such face),
+   and only if the face center lies on the character, get a skull circle (center $`(0, -0.5)`$, radius $`1.3d`$, three arcs of $`2\pi/3 + 0.3`$ rad), a vertical center line ($`v = -1.9`$ to $`1.9`$) and an eye line ($`u = -1.5`$ to $`1.5`$), drawn faintly (circle 0.3, lines 0.25, times the table's factor).
+10. **Alpha**: $`a = \min\big(1,\ \mathrm{acc}\,(0.92 + 0.08\,n)\big)`$, where 𝑛 is value noise (4.2) with cell size $`2.5s'`$, a soft pencil grain 2–3px in size.
+   Pixels with $`\mathrm{acc} < 0.01`$ are left empty and the 8-bit alpha is $`\mathrm{round}(255a)`$. Rough color (default `#2F6FE0`), opacity $`115/255 \approx 45\%`$, hidden. The two layers go into the [Rough] folder with rough 1 below and rough 2 above.
+
+## 4.15 PSD format
+
+| Part | Content |
+|---|---|
+| Header | `8BPS`, version 1, 6 reserved bytes, 3 channels (4 for transparent pictures), height, width, 8 bits, color mode 3 (RGB), color mode data length 0 |
+| Image resources | resolution info (`8BIM`, `0x03ED`, length 16): horizontal · vertical 72 dpi as 16.16 fixed point $`72 \cdot 2^{16}`$, unit 1 (inch) · 1 |
+| Layer info | layer count (negative for transparent pictures: the first alpha of the merged image is the transparency), per layer the bounds (top, left, $`\text{bottom} = \text{top} + \text{height}`$, $`\text{right} = \text{left} + \text{width}`$) · 4 channels (ID −1 for alpha, 0 · 1 · 2 for R · G · B, each with its data length) · `8BIM` · blend key · opacity (0–255) · clipping (0 / 1) · flags (hidden 2, folder records add `0x18`) · 0 |
+| Layer extra info | mask length 0, blending ranges (length 40: source · destination ranges `0x0000FFFF` for gray + 4 channels, 10 values), Pascal name, `luni` (Unicode name), `lsct` for folders |
+| Channel data | per layer, alpha, R, G, B in order, PackBits RLE per row (compression 1 + row length table + data) |
+| Merged image | the same composite as the preview (on a white backing for opaque pictures), channels R, G, B(, A) all RLE |
+
+- **Lengths and alignment**: the Pascal name is the name with only ASCII kept (if empty, the English kind name + number, at most 250 characters) as `[1-byte length][characters]`, zero-padded to a multiple of 4 bytes.
+  `luni` has length $`4 + 2n`$ (𝑛 = number of UTF-16 characters) rounded up to a multiple of 4, then `[n][UTF-16BE characters][padding]`; `lsct` is length 4 (`3`) for an end marker, and length 12 (`1` open folder / `2` closed folder, `8BIM`, blend key) for a folder.
+  The whole layer info length is also padded to a multiple of 4, and the global mask info length is 0.
+- **PackBits**: a row is read from the front; if the same value repeats 3 or more times (at most 128), it is written as `[257 − n][value]`, otherwise as `[n − 1][n values]` until the next run of 3 identical values starts (at most 128).
+  The largest size of one row is reserved as $`w + \lceil w/128\rceil + 2`$ bytes. Empty layers (folder records) write only the 2-byte compression method per channel.
+- The folder tree is flattened into a bottom-to-top list, and for each folder the `</Layer group>` end marker (`lsct` 3) is placed before the folder's content and the folder record after it.
+- The blend keys used are `norm`, `mul `, `scrn`, `pass`.
+
+### Fixing layer names in old PSDs (`PSD.rename`)
+
+When a PSD · PSB comes in as input (extension `.psd` · `.psb`, or type `image/vnd.adobe.photoshop`), this is done instead of splitting a picture.
+For each entry of the old name → current name list (`색트레스` → `색 트레이스`), the file is read byte by byte as below and only the layer records containing the name are rewritten;
+if any layer changed, it is saved under the same file name (0.4 s apart for several files). Below, `from` is the old name and `to` the current name.
+
+1. After the header (26 bytes), the color mode data · image resources are skipped by their lengths and the layer and mask info is entered. In PSB, the layer and mask · layer info · channel lengths are 8 bytes.
+2. The 8-bit layer info, and `Lr16` · `Lr32` · `Layr` (layer info of 16 · 32-bit pictures) in the global extra info after it, are read the same way.
+   For each layer, the channel lengths are summed to get the total channel data length, and every `from` inside the `luni` names of the extra info is replaced with `to`.
+   The Pascal name is also read as EUC-KR, and if it contains `from`, the changed name is written in EUC-KR (when 255 bytes or less; files re-saved by the Korean edition of Photoshop).
+   The EUC-KR table is built in reverse by decoding all two-byte codes `0xA1A1`–`0xFEFE` with `TextDecoder('euc-kr')`.
+3. The length width of extra info blocks (4 or 8 bytes in PSB) and the padding after blocks (none · multiple of 2 · 4) differ between programs, so
+   the combination whose block end is the section end or matches the next `8BIM` · `8B64` signature is chosen (in PSB, the document's 8-byte keys and `cinf` try 8 first, the rest try 4 first).
+4. A changed `luni` is rewritten with length $`4 + 2n`$ rounded up to a multiple of 4, and only that layer's extra info length, the layer info length (padded to 4 if it was originally a multiple of 4, otherwise to a multiple of 2; `Lr16` etc. to a multiple of 4),
+   and the layer and mask info length are written anew. Channel pixels · merged image · image resources · global mask are copied byte for byte. If no layer needs changing, nothing is saved and the program says so.
+
+## 4.16 Preview compositing
+
+Layers are stacked with the canvas 2D `globalCompositeOperation` (`multiply`, `screen`) and $`\texttt{globalAlpha} = \text{opacity}/255`$.
+Clipping groups work like Photoshop: the clipping layers are blended over the base layer made opaque (all alpha 255), then cut once by the base layer's alpha (`destination-in`) and drawn with the base layer's blend mode · opacity.
+If the base layer is hidden, its clipping layers are hidden too. A folder is drawn separately and stacked as one sheet if its opacity is below 255 or its blend mode is not pass-through · normal; otherwise its layers are stacked as they are.
+PNG · PSD merged images of opaque pictures are composited on a white backing.
+
+### Screen
+
+- **Difference view**: shows the difference magnified 8× as $`\min(255, 8\lvert \text{composite} - \text{original} \rvert)`$ (8-bit) per channel.
+- **Fit zoom**: $`z = \min((W_{view} - 32)/W, (H_{view} - 32)/H, 4)`$, centered $`t = (W_{view} - Wz)/2`$ (vertically likewise).
+- **Wheel zoom**: $`z' = \mathrm{clamp}(z\,e^{-0.0015\Delta},\ 0.05,\ 32)`$ (Δ = wheel amount), $`t' = c - (c - t) \cdot z'/z`$ to keep the point under cursor 𝑐 fixed. At zoom 2 or more, pixels are enlarged as they are.
+- The picture pixel at screen coordinates $`(x_s, y_s)`$ is $`(\lfloor(x_s - \text{left})/z \rfloor, \lfloor(y_s - \text{top})/z \rfloor)`$, and correction strokes are recorded densely at 3px intervals by adding points (rounded) dividing the distance from the previous point into $`\lceil \text{distance}/3 \rceil`$ parts.
+- Thumbnails in the layer list are 44px on the long side ($`44 / \max(W, H)`$×), and the opacity slider is $`\mathrm{round}(\text{opacity}/2.55)`$%.
+
+## 4.17 Manual correction algorithms
+
+**Send to background**
+
+The line alpha is the largest 8-bit alpha $`\alpha_8`$ (0–255) among all line art layers. "On a line" is $`\alpha_8 \ge 110`$ (about 0.43), and "surrounding line" is $`\alpha_8 \ge 20`$ (about 0.08).
+The **brush width** is $`R_b = \max(24, \mathrm{round}(0.05 \cdot \max(W, H)))`$, and the distance from the stroke is the number of 4-neighbor breadth-first steps starting from the stroke's points (up to $`R_b`$).
+If all points of the stroke are within $`\lvert \Delta x\rvert + \lvert \Delta y\rvert \le 4`$ of the first point, it is a **single click**; otherwise it is rubbing. The length of rubbing is the sum of distances between neighboring points,
+and if it is 48px or more, points within 12px of both ends (distance measured along the stroke) are treated as **stroke ends**.
+
+**Sending to background**
+
+- For each point that is not a stroke end, filling starts at places not on a line and not yet background.
+- The allowed parts are the parts the stroke touched plus the parts with $`\Delta E < 12 \land \Delta ab < 9`$ from them (generous on brightness difference, narrow on hue difference).
+  A part's color is the Lab of the first opaque pixel met in the base color layer, $`\Delta ab = \sqrt{\Delta a^{*2} + \Delta b^{*2}}`$.
+- The fill widens with 4-neighbors inside the brush width, not on lines, inside allowed parts, with neighboring original color difference $`\max_c \lvert \Delta O_c\rvert \le 40`$ (26 if there is one part, 8-bit).
+- Fills that the middle of the stroke passed through for less than 10px are discarded (grazing the edge). For each fill, the distance between two neighboring non-end points is added to the fill containing the later point.
+- If a single click lands on a line, it starts at the nearest non-line point within 13×13 (±6px), but does not choose if the two sides of the line within it are different parts (part to part, or part and background).
+- Surrounding line pixels follow the nearest painted side within 10 steps (this object / background / the rest of the character), and move together if on this object's side and inside the brush width.
+  Background-side lines connected to the lines being moved also move together, up to 8 steps, if inside the brush width.
+- Surrounding line pixels within 4 steps of the remaining character pixels, and edges whose color continues smoothly ($`\max_c \lvert \Delta O_c\rvert < 16`$), are kept on the character side.
+- Nothing is done if fewer than 16 pixels are chosen. Chosen pixels are put in the background layer with their original colors (alpha 255), and the alpha of the other layers (except background effects · rough) is set to 0.
+  Only the changed rectangle is saved for undo. Pictures that had no background layer are recorded in the mask and split again.
+
+**Return to character**: chosen inside the background the same way (tolerance 40, no part distinction), 2 steps toward the background (anti-aliased edge) within the brush width are added, then recorded in the "character" mask and split again.
+
+**Loop**: with 30 or more points, a stroke length of 120px or more, and the end point within $`\max(24, 0.2 \times \text{diagonal of the bounding rectangle})`$ of the start point, it is treated as a closed loop.
+For each row, the 𝑥 where the loop's edges cross height $`y + 0.5`$ ($`x = x_a + (y + 0.5 - y_a)(x_b - x_a)/(y_b - y_a)`$, edges whose two end points are on different sides of that height) are sorted and
+the paired spans $`[\lceil x_1 - 0.5\rceil, \lfloor x_2 - 0.5\rfloor]`$ are filled (even-odd rule). If the inside is under 400px, it is not treated as a loop.
+The inside is matched per piece surrounded by lines (4-connected pieces of the same part for sending to background, 4-connected pieces of the background for returning to character):
+if the share 𝑓 of the piece's pixels inside the loop is $`f \ge 0.6`$, the whole piece; if $`f \le 0.4`$, excluded; in between, only the inside of the loop is chosen.
+Sending to background uses up to 12 steps from the loop; returning to character widens the chosen place by 2 steps but uses only up to 2 steps from the loop.
+
+**Re-split cache**: the automatic background result is reused if $`(W, H, \text{picture hash}, \text{line width}, \text{line sensitivity}, \text{line color mode}, \text{background separation})`$ are the same.
+The picture hash is a two-way FNV-1a (32-bit multiplication) over the RGBA bytes $`v_i`$, plus the length.
+
+```math
+h_1\leftarrow (h_1\oplus v_i)\cdot 16777619,\quad h_1^{(0)}=\mathtt{0x811c9dc5};\qquad
+h_2\leftarrow (h_2\oplus v_i)\cdot 2246822519+i,\quad h_2^{(0)}=\mathtt{0x9747b28c}\qquad(\bmod 2^{32})
+```
+
+---
+
+[← README](../README.en.md#4-algorithms-and-formulas)
