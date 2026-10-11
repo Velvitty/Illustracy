@@ -31,6 +31,7 @@
 10. [한계](#10-한계)
 11. [검증](#11-검증)
 12. [업데이트 내역](#12-업데이트-내역)
+13. [참고 문헌](#13-참고-문헌)
 
 ---
 
@@ -297,6 +298,8 @@ flowchart TD
 $`\text{클로징} - \text{원본}`$(**블랙 탑햇**)이 선의 깊이입니다. 깊이가 큰 픽셀에서 시작해 조금 약한 픽셀까지 이어 붙이고(**히스테리시스**), 너무 작은 조각은 버립니다.
 선이 모이는 교차점처럼 클로징 창보다 넓어진 어두운 덩어리는 선에서 이어서 채우되, 선 굵기를 넘어 계속되는 어두운 면(검은 옷)은 채우지 않습니다.
 
+**풀이** — **왜**: 선은 "둘레보다 어둡고 펜 굵기보다 가는 것"이라, 굵기를 기준으로 어두운 구조만 골라냅니다(자세한 식은 4.3). **원리**: 클로징은 창보다 좁은 어두운 골짜기를 둘레의 밝은 값으로 메우므로, 클로징 − 원본(블랙 탑햇)에는 가는 어두운 구조만 남습니다. 센 문턱에서 시작해 약한 문턱까지 잇는 히스테리시스는 캐니 경계 검출과 같은 방법입니다. **참고**: [R15 Soille 2003](#r15) · [R18 Canny 1986](#r18)
+
 진하고, 살짝 흐리면 깊이가 크게 줄어드는 선은 **선명한 선**으로 따로 표시합니다. 배경을 가를 때 캐릭터 선과 흐린 배경 자국을 구분하는 데 씁니다.
 
 ### 3.3 선 아래 색 복원
@@ -309,6 +312,8 @@ $`\text{클로징} - \text{원본}`$(**블랙 탑햇**)이 선의 깊이입니�
 픽셀마다 $`\text{원본} = \text{선 알파} \times \text{선 색} + (1 - \text{선 알파}) \times \text{아래 색}`$을 풀어 알파를 구하고,
 기본 선 색으로 원본이 맞지 않는 곳(빛 받은 선, 색 선)은 그 자리의 실제 선 색을 따로 구해 **색 트레이스** 층에 넣습니다.
 색 트레이스는 선화에 클리핑된 층이라, 선화의 알파 안에서 선 색만 바꿉니다.
+
+**풀이** — **왜**: 선화 층을 따로 떼려면 픽셀마다 선이 얼마나 덮었는지(알파)를 알아야 합니다(자세한 식은 4.4). **원리**: 불투명한 잉크가 픽셀의 𝑎만큼을 덮는 표준 합성식 $`O = aK + (1 - a)U`$를 알파 𝑎에 대해 풉니다. 선 색 𝐾와 아래 색 𝑈를 알면 𝑎가 정해지고, 기본 선 색으로 원본이 맞지 않는 곳만 실제 선 색을 따로 구합니다. **참고**: [R1 Porter · Duff 1984](#r1) · [R2 Smith 1995](#r2)
 
 ### 3.5 배경 찾기
 
@@ -437,6 +442,8 @@ $`\text{클로징} - \text{원본}`$(**블랙 탑햇**)이 선의 깊이입니�
 
 픽셀마다 $`\text{밑색} \times \text{1차} \times \text{2차} \to \text{하이라이트}`$까지 칠한 색과 선 아래 복원색을 비교합니다.
 
+**풀이** — **왜**: 밑색 · 그림자 층이 만든 색과 원본의 남은 차이를 곱하기 · 스크린 층에 담아, 층을 다 합치면 원본이 돌아오게 합니다(자세한 식은 4.9\~4.11). **원리**: 그림자는 곱하기라 밑색에 1차 · 2차 그림자 색을 차례로 곱하고, 하이라이트 톤은 그 색으로 덮습니다. 남은 어두워짐은 곱하기를, 밝아짐은 스크린을 거꾸로 풀어 구합니다. **참고**: [R1 Porter · Duff 1984](#r1) · [R3 ISO 32000-1 2008](#r3)
+
 - 더 어두우면 남은 **어두워짐**을, 넓게 깔린 부분(**그라데이션**)과 나머지(**명암**)로 나눕니다. 둘 다 곱하기라서 곱하면 원래 어두워짐이 됩니다.
 - 더 밝으면 남은 **밝아짐**을 반짝임 → 림라이트 → 가는 반짝임 → 반사광 → 빛 순서로 떼어 냅니다. 스크린끼리 겹친 결과가 원래 밝아짐과 같도록 나눕니다.
 
@@ -527,6 +534,8 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
 | **피사계 심도**: 초점 밖 물체는 착란원만큼 퍼져 흐리게 찍힘 | 흐리게 그린 배경 | "선명한 선"(살짝 흐리면 크게 약해지는 선)의 유무 |
 | **사람의 색 지각**: 눈은 초록에 가장 민감하고, 색 차이를 밝기와 색상으로 나눠 느낌 | 모든 색 비교 | 밝기 가중치 0.299 · 0.587 · 0.114, Lab과 $`\Delta E`$(약 2.3이 겨우 구분되는 차이 → 파츠 합침 기준 2.5) |
 
+**풀이** — **왜**: 층의 혼합 모드를 물리 현상에 대응시키면, 왜 그 혼합식이 그 층에 맞는지와 층을 고치면 어떻게 보일지를 예측할 수 있습니다. **원리**: 곱하기 $`x \cdot g`$는 투과율 𝑔인 필터를 지난 빛이고, 필터 두 장은 투과율의 곱입니다(비어–람베르트 법칙에서 흡광도가 더해지면 투과율은 곱해짐). 스크린 $`1 - (1 - a)(1 - b)`$는 두 빛 중 적어도 하나가 닿을 확률과 같은 꼴이라 더해도 1을 넘지 않습니다. 표준 합성 $`aK + (1 - a)U`$는 넓이 𝑎를 덮는 불투명 잉크입니다. 2.5는 CIELAB에서 겨우 구별되는 차이(약 2.3)에 맞춘 문턱입니다. **참고**: [R12 Beer 1852](#r12) · [R1 Porter · Duff 1984](#r1) · [R3 ISO 32000-1 2008](#r3) · [R8 Mahy et al. 1994](#r8)
+
 곱하기 · 스크린은 포토샵과 같이 **감마 부호화된 sRGB 값**에 대해 계산합니다.
 물리적으로 정확한 선형 공간 합성은 아니지만, PSD를 열었을 때 포토샵이 같은 식으로 합성하므로 원본이 그대로 재현됩니다.
 색 비교(<mark>k-평균</mark>, $`\Delta E`$)만 선형화를 거친 Lab 공간에서 합니다.
@@ -589,6 +598,8 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
 ## 7. 이슈와 해결
 
 개발 중 실제 그림으로 검증하며 드러난 문제와 해결 방법입니다.
+
+**풀이** — **왜**: 이 절의 수치(𝑝, 구간, 나아짐 · 나빠짐 수)는 문제마다 같은 식을 되풀이해 적지 않고 11.1의 식으로 구했습니다. **원리**: 비율의 구간은 윌슨 구간, 같은 그림을 두 판으로 본 비교는 맥니마 · 부호 검정(갈린 그림만 세는 이항 검정), 작은 표는 피셔 정확 검정입니다. 판정 기준 자체(큰 손실 없음 등)는 11.1과 11.15에 있습니다. **참고**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R63 Fisher 1922](#r63) · [R85 Dixon · Mood 1946](#r85)
 
 ### 7.1 분해 품질
 
@@ -787,6 +798,8 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
 | (0.47) 러프 2에서 선화의 모든 선을 따라 긋기(짧은 닫힌 고리 · 얼굴 밖의 두꺼운 칠 모양 둘레까지) | 처음 보는 40장 눈가림에서 0.46 러프 2보다 작가가 그렸을 법함 3 : 22, 사람 손 2 : 28로 크게 지고 형태는 9 : 10로 차이가 없었음. 메모가 "무늬를 작은 닫힌 고리로 따 넣어 기계적"으로 모여, 되풀이되는 작은 고리를 빼고 칠한 모양 둘레는 얼굴 자리 안에서만 땀 |
 | (0.47) 눈동자를 색으로 찾아 타원으로 긋기(찾은 눈 점 둘레에서 흰자 · 살색이 아닌 덩어리) | 개발용 그림에서 맞은 눈도 있었지만 볼 홍조 · 눈 일부를 눈동자로 잡는 경우가 많았고, 무엇보다 눈을 알아보아 기호로 바꾸는 방식을 버리고 선화를 따라 긋기로 함 |
 
+**풀이** — **왜**: 채택하지 않은 방법도 같은 기준으로 재야 왜 지금 방식이 남았는지 알 수 있습니다. 표의 𝑝는 짝지은 판정의 부호 검정 · 정확 검정 값입니다(식은 11.1). **원리**: 선 검출 창 $`\max(1, \mathrm{round}(4s))`$는 긴 변 1000px에서 4px인 창을 크기 비율 𝑠에 비례시키되 바닥 3을 없앤 시도입니다. 작은 그림에서 창이 2px까지 줄어 선이 덜 잡혀 결과가 나빠졌습니다. **참고**: [R85 Dixon · Mood 1946](#r85) · 이 프로그램에서 정한 규칙
+
 ---
 
 ## 8. 최적화
@@ -807,6 +820,8 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
 | 보정 되돌리기 | 바뀐 사각형 줄만 저장 | 큰 그림에서도 되돌리기 메모리가 작음 |
 | 단계 격리 | 단계별 고정 난수 씨앗, 동작 조건 밖에서는 즉시 반환 | 새 단계가 기존 그림 결과를 바꾸지 않음(회귀 검증이 바이트 비교로 가능) |
 | 보정 뒤 다시 나누기 | 자동 배경 판정 결과(배경 · 되돌린 부분 표시, 얼굴)를 워커에 저장. 그림 내용의 해시와 선 설정이 같으면 그대로 씀 | 보정 한 번에 코어 계산 중앙값 8.0 → 5.1초, 화면에서 10.0 → 8.3초(시험 그림 세 장에서 17~35% 빠름). 저장하는 것은 그림 크기 바이트 표시 두 장뿐 |
+
+**풀이** — **왜**: 브라우저에서 큰 그림을 몇 초 안에 처리하려면 반지름 · 그림 크기에 따라 계산량이 늘지 않는 방법이 필요합니다. **원리**: $`O(1)`$은 픽셀 하나당 계산이 반지름과 상관없이 일정하다는 뜻이고, $`O(N)`$은 픽셀 수 𝑁에 비례한다는 뜻입니다. 슬라이딩 최대/최소는 단조 덱으로 원소마다 몇 번의 비교만 하고, 상자 흐림은 누적 합으로 창 크기와 상관없이 한 번의 덧셈 · 뺄셈입니다. **참고**: [R16 Lemire 2006](#r16) · [R17 Wells 1986](#r17) · [R27 Dinic 1970](#r27)
 
 ---
 
@@ -841,6 +856,7 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
   밝고 채도가 아주 높은 형광($`L^* > 60,\ C^* > 45`$)만 글로우로 보므로, 옅은 청록 · 어두운 배경 위에 옅게 번진 분홍 · 가는 주황 글로우는 나누지 않고 배경 층에 남깁니다(합성 글로우 5장 중 1장만 나눔, 11).
   윤곽선 밖으로 옅게 번진 글로우를 "배경의 제 색보다 물든 정도가 선에서 멀어질수록 옅어짐"으로 찾는 방법은 합성 그림에서는 맞았지만, 실제 그림에서 새로 찾은 24장이 모두 단색 배경의 띠 · 장면 조각이었습니다(7.5).
   흰 스티커 테두리, 배경을 조금만 찾은 그림의 테두리(유카타 두 사람의 무지개 테두리)는 나누지 못하고 캐릭터 쪽이나 배경 쪽에 남습니다.
+  - **풀이** — **왜**: 글로우로 나누는 조건이 엄격해 옅은 글로우는 배경 층에 남는다는 한계를 설명합니다(식은 4.5 외곽 글로우). **원리**: $`L^*`$은 밝기, $`C^* = \sqrt{a^{*2} + b^{*2}}`$는 채도라, 두 문턱을 함께 넘는 밝고 진한 색만 형광으로 봅니다. **참고**: [R7 CIE 2004](#r7)
 
 ### 10.2 배경과 캐릭터 가르기
 
@@ -947,6 +963,7 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
   - **선 검출 창**: 창은 $`\max(3, \mathrm{round}(4 \times \text{긴 변}/1000))`$px라 작은 그림에서는 최소 3px에 걸리고, 자동 선 굵기 재기는 폭 1.8px 미만을 세지 않아 작은 그림의 1~2px 선을 보지 못하고
     더 굵은 어두운 모양을 재(중앙값 6.7px) 창을 5px로 올립니다. 같은 그림을 2배로 키우면 실제 펜(원래 크기로 3.4px)을 재고 창은 원래 크기로 2px가 되어, 찾은 선이 그림 넓이의 17.1% → 8.5%로 줄고
     캐릭터 안의 선 밀도가 낮아져 장면 배경이 옷 · 머리카락으로 들어갑니다.
+    - **풀이** — **왜**: 작은 그림에서 선 검출 창이 최소값에 걸려 생기는 한계를 설명합니다. **원리**: 창 $`\max(3, \mathrm{round}(4 \times \text{긴 변}/1000))`$는 긴 변 1000px에서 4px인 길이를 크기에 비례시키되 3px 아래로 내려가지 않게 한 것입니다. 작은 그림에서는 3px 바닥이 실제 펜보다 커져 선 아닌 어두운 모양까지 잽니다. **참고**: [R15 Soille 2003](#r15) · 이 프로그램에서 정한 규칙
   - **색 걸음 문턱**: 단색 배경 채우기와 장면 배경의 여백 넓히기는 이웃 픽셀 한 칸의 색 차(0.035, 0.03)로 멈추는데, 그림을 키우면 같은 경계의 색 변화가 여러 칸에 나뉘어 한 칸의 차가 작아지므로 경계를 넘어갑니다.
     0.29부터 긴 변이 1200px보다 큰 그림은 이 문턱을 크기에 비례해 줄입니다(4.5).
   - **선명한 선 판정**: 1.5px로 흐려 깊이가 25% 넘게 사라지는 선만 선명하다고 보므로, 키운 그림의 굵어진 선은 덜 선명하게 판정됩니다.
@@ -956,6 +973,7 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
     캔버스가 클수록 픽셀 굵기는 굵어지지만(<mark>스피어만</mark> $`\rho = 0.62,\ p < 0.0001`$) 긴 변에 대한 비율은 캔버스 크기와 관계가 없었습니다($`\rho = -0.09,\ p = 0.44`$).
     작가들은 캔버스 크기에 맞춰 펜을 고르므로, 굵기의 중앙값은 픽셀이 아니라 그림 크기에 대한 비율로 있습니다. 이 비율이면 선은 긴 변 540px 그림에서 0.8px, 1200px에서 1.8px라,
     작은 그림일수록 픽셀 단위 규칙이 선을 온전히 보지 못합니다.
+    - **풀이** — **왜**: 캔버스 크기와 선 굵기가 함께 커지는지 보되, 값의 분포가 치우쳐 있고 관계가 곧은 직선이라는 보장이 없어 순위로 잽니다. **원리**: 스피어만 상관 𝜌는 두 값을 각각 순위로 바꾼 뒤의 피어슨 상관이라, 한쪽이 커질 때 다른 쪽도 커지는지(단조 관계)만 보고 몇몇 큰 값에 흔들리지 않습니다. 𝑝는 상관이 0이라는 가설에서 이만큼 큰 𝜌가 나올 확률입니다. 선 폭은 윤곽이 번지지 않는 <mark>DCCI</mark>(방향성 3차 보간)로 2배 키운 밝기에서 잽니다. **참고**: [R82 Spearman 1904](#r82) · [R49 Zhou et al. 2012](#r49)
   - 그래서 0.29에서 세 값을 긴 변 1200px(규칙을 맞춘 크기) 기준 비율로 바꿔 666장으로 검증했습니다. 큰 그림은 색 걸음 문턱을 비율로 바꾸면 나아져 그것만 넣었고,
     작은 그림은 비율로 바꾸면 선 검출 창이 2px로 줄어 캐릭터를 더 잃어(900px 미만에서 큰 손실 없음 50% → 33%) 픽셀 단위로 둡니다(7.5).
     펜 굵기는 그림 크기에 대한 비율로 모여 있지만, 작은 그림에서 넉넉한 픽셀 창이 윤곽선 밖의 어두운 무늬 · 머리카락 결까지 선으로 잡아(900px 미만 무작위 24장에서 찾은 선이 그림 넓이의 중앙값 12.3%, 비율 창이면 8.4%)
@@ -1034,6 +1052,8 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
 층 구조(이름, 혼합 모드, 클리핑 기반, 빈 층, 캔버스 범위) 점검에서 문제는 0건이었고, 같은 그림을 두 번 분리하면 모든 층의 픽셀이 바이트 단위로 같았습니다.
 브라우저의 외부 네트워크 요청을 모두 막은 상태로도 실행해 확인했습니다(외부 요청 0건).
 
+**풀이** — **왜**: 이 절에 적은 통계값(비율, 구간, 𝑝, 오즈비, 𝜅, 분해능)이 어떤 식에서 나왔는지를 한곳에 모았습니다. **원리**: 모든 값은 11.1의 식으로 구했습니다. 재현 정확도는 PSNR(4.13), 분리 정확도는 BER과 그 역수인 분해능(11.14), 비율의 구간은 윌슨 구간, 버전끼리의 구간은 그림 단위 짝 부트스트랩입니다. **참고**: [R55 Huynh-Thu · Ghanbari 2008](#r55) · [R56 Wilson 1927](#r56) · [R80 Efron 1979](#r80)
+
 이 절의 항목:
 
 - [11.1 평가에 쓴 식](#111-평가에-쓴-식)
@@ -1062,37 +1082,48 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
   $`\displaystyle \mathrm{IoU}=\frac{|C\cap G|}{|C\cup G|},\qquad \text{지킨 캐릭터}=\frac{|C\cap G\cap I|}{|G\cap I|},\qquad \text{찾은 배경}=\frac{|\bar C\cap\bar G\cap I|}{|\bar G\cap I|}`$
 
   "픽셀 합계"는 여러 그림의 분자 · 분모를 각각 더해 나눈 값, "평균"은 그림별 값의 평균입니다. "24색 영역 단위, 넓이 가중"은 픽셀 대신 색 모델의 영역을 넓이로 가중해 센 값입니다.
+  - **풀이** — **왜**: 분리 결과를 정답과 픽셀 단위로 견주는 기본 척도입니다. 캐릭터를 지킨 정도와 배경을 찾은 정도를 따로 재야 한쪽만 좋은 결과를 가려낼 수 있습니다. **원리**: IoU(자카드 지수)는 교집합 넓이를 합집합 넓이로 나눈 겹침 비율입니다. 지킨 캐릭터는 정답 캐릭터 중 캐릭터로 둔 비율(캐릭터의 재현율), 찾은 배경은 정답 배경 중 배경으로 둔 비율입니다. 정답 경계 3px 띠 𝐼를 빼는 것은 사람이 그린 정답 윤곽 자체가 몇 픽셀 흔들리기 때문입니다. 픽셀 합계는 큰 그림에 무게가 실리고, 평균은 그림마다 같은 무게입니다. **참고**: [R52 Jaccard 1912](#r52) · 이 프로그램에서 정한 규칙
 - **<mark>정밀도</mark> · <mark>재현율</mark>**: 찾은 것 𝑃, 정답 𝑇일 때 <mark>정밀도</mark> $`\lvert P \cap T\rvert/ \lvert P\rvert`$, <mark>재현율</mark> $`\lvert P \cap T\rvert/ \lvert T\rvert`$입니다. 선은 정답 선에서 1px 안이면 맞은 것으로, 이름은 재질 경계 3px 띠를 빼고 픽셀로 셉니다.
   합성 그림에서 얼굴은 정답 두 눈의 가운데에서 $`0.35d`$ 안이고 크기 비가 0.6~1.6인 찾은 얼굴이 있으면 찾은 것으로 셉니다.
+  - **풀이** — **왜**: 찾은 것 중 맞은 비율과 정답 중 찾은 비율은 서로 다른 실패(잘못 찾음, 놓침)를 잽니다. **원리**: 정밀도 $`|P \cap T|/|P|`$는 찾은 것 중 정답인 비율, 재현율 $`|P \cap T|/|T|`$는 정답 중 찾은 비율입니다. 얼굴은 정답 두 눈 가운데에서 $`0.35d`$ 안(눈 사이 거리의 35%)이고 크기가 비슷해야 같은 얼굴로 칩니다. **참고**: [R53 van Rijsbergen 1979](#r53) · [R51 Manning et al. 2008](#r51)
 - **덮음 · 순도**(붓 그림 밑색): 재질 𝑚마다 가장 많이 차지한 파츠의 비율 $`\max_k \lvert m \cap k\rvert/ \lvert m\rvert`$(덮음), 파츠 𝑘마다 가장 많은 재질의 비율 $`\max_m \lvert m \cap k\rvert/ \lvert k\rvert`$(순도)의 평균입니다.
+  - **풀이** — **왜**: 붓 그림의 밑색이 재질을 얼마나 잘 나눴는지를, 쪼개짐(덮음)과 섞임(순도) 두 방향으로 잽니다. **원리**: 덮음은 재질마다 가장 많이 차지한 파츠의 몫이라 한 재질이 여러 파츠로 쪼개지면 낮아지고, 순도는 파츠마다 가장 많은 재질의 몫이라 여러 재질이 한 파츠로 섞이면 낮아집니다. **참고**: 이 프로그램에서 정한 규칙
 - **색감**(시험 그림의 색채도, <mark>Hasler–Süsstrunk</mark>): 긴 변 300px로 줄인 그림의 0~255 값에서 $`\mathrm{rg} = R - G,\ \mathrm{yb} = (R + G)/2 - B`$일 때
 
   $`\displaystyle M=\sqrt{\sigma_{rg}^2+\sigma_{yb}^2}+0.3\sqrt{\mu_{rg}^2+\mu_{yb}^2}`$
 
   더한 픽시브 342장의 𝑀을 세 등분한 경계(33.4, 52.2)로 단조로움 · 중간 · 컬러풀을 나눴습니다.
+  - **풀이** — **왜**: 시험 그림을 색이 단조로운 것과 화려한 것으로 나눠 조건별로 결과를 보려면, 사람의 "색이 화려하다"는 느낌과 맞는 한 수가 필요합니다. **원리**: $`rg = R - G`$, $`yb = (R + G)/2 - B`$는 사람 시각의 빨강–초록, 노랑–파랑 맞섬 축을 RGB로 근사한 것입니다. 색채도 𝑀은 두 축의 표준편차(색이 얼마나 다양한지)와 평균(전체가 얼마나 한쪽 색으로 치우쳤는지)을 0.3의 무게로 더한 값으로, 사람의 화려함 평가와 상관이 높게 맞춘 식입니다. **참고**: [R11 Hasler · Süsstrunk 2003](#r11)
 - **비율의 흩어짐**: 𝑛장 중 𝑘장이 통과하면 $`p = k/n`$, 그림 단위 표준편차 $`\sqrt{p(1 - p)}`$, 표준오차 $`\mathrm{SE} = \sqrt{p(1 - p)/n}`$, 오차범위 $`z \cdot \mathrm{SE}`$(𝑧는 90 · 95 · 99%에서 1.645 · 1.960 · 2.576)입니다.
+  - **풀이** — **왜**: 통과 비율 하나만 적으면 그림 수에 따른 불확실성이 보이지 않으므로, 흩어짐과 오차범위를 함께 적습니다. **원리**: 그림마다 통과(1) · 실패(0)인 베르누이 변수의 표준편차가 $`\sqrt{p(1 - p)}`$이고, 𝑛장 평균의 표준오차는 $`\sqrt{n}`$으로 나눈 값입니다. 중심극한정리로 비율은 근사적으로 정규분포를 따르므로 오차범위는 표준오차에 정규 분위수 𝑧(95%에서 1.96)를 곱합니다. **참고**: [R78 Agresti 2013](#r78)
 - **<mark>윌슨 점수 구간</mark>**:
 
   $`\displaystyle \frac{p+\frac{z^2}{2n}}{1+\frac{z^2}n}\ \pm\ \frac z{1+\frac{z^2}n}\sqrt{\frac{p(1-p)}n+\frac{z^2}{4n^2}}`$
+  - **풀이** — **왜**: 𝑝가 0이나 1에 가깝거나 𝑛이 작으면 $`p \pm z\cdot\mathrm{SE}`$ 구간이 0 아래 · 1 위로 나가거나 실제 포함 확률이 모자랍니다. 윌슨 구간은 이런 경우에도 잘 맞습니다. **원리**: $`|p - \pi| \le z\sqrt{\pi(1 - \pi)/n}`$를 참 비율 𝜋에 대한 2차 부등식으로 풀어 얻은 구간입니다. 표준오차에 관측값 𝑝 대신 미지의 𝜋를 넣었기 때문에 가운데가 $`1/2`$ 쪽으로 당겨지고, 늘 0\~1 안에 있습니다. **참고**: [R56 Wilson 1927](#r56) · [R78 Agresti 2013](#r78)
 
 - **<mark>클로퍼–피어슨 정확 구간</mark>**(신뢰수준 $`1 - \alpha`$): <mark>이항 분포</mark>를 뒤집은 구간이라 <mark>정규 근사</mark>보다 넓고, 실제 포함 확률이 $`1 - \alpha`$ 아래로 내려가지 않습니다. $`B(q; a, b)`$는 베타 분포의 𝑞 분위수입니다.
 
   $`\displaystyle p_L=B\!\left(\tfrac{\alpha}2;\,k,\,n-k+1\right)\ (k=0\text{이면 }0),\qquad p_U=B\!\left(1-\tfrac{\alpha}2;\,k+1,\,n-k\right)\ (k=n\text{이면 }1)`$
 
   **한쪽 95% 하한**은 $`B(0.05; k, n - k + 1)`$, <mark>**본페로니**</mark>는 세 기준을 함께 볼 때 전체 95%가 되도록 기준마다 $`1 - 0.05/3 \approx 98.3\%`$ 구간을 씁니다.
+  - **풀이** — **왜**: 근사 없이 "참 비율이 이 구간 밖일 확률이 𝛼 이하"를 보장해야 할 때(작은 표본, 하한 주장) 씁니다. **원리**: 이항 분포의 누적 확률이 정확히 𝛼/2가 되는 𝜋를 찾는 것인데, 이항 누적과 베타 분포 누적 사이의 항등식 덕분에 베타 분위수로 바로 구해집니다. 이산 분포라 포함 확률이 1 − 𝛼 이상으로 보수적입니다. 본페로니는 세 기준을 함께 주장할 때 각 기준의 오류를 0.05/3으로 줄여 전체 오류가 0.05를 넘지 않게 합니다(합집합 한계). **참고**: [R57 Clopper · Pearson 1934](#r57) · [R58 Dunn 1961](#r58)
 - **<mark>평균의 𝑡 구간</mark>**: 그림별 값 $`x_1 \dots x_n`$의 평균 $`\bar x`$, 표본 표준편차 $`s = \sqrt{\sum(x_i - \bar x)^2/(n - 1)}`$에서 $`\bar x \pm t_{n-1}(1 - \alpha/2) \cdot s/\sqrt n`$($`t_{n-1}(q)`$는 자유도 $`n - 1`$인 𝑡 분포의 𝑞 분위수, 100%를 넘으면 100%로)입니다.
+  - **풀이** — **왜**: 그림별 값(예: 지킨 캐릭터 %)의 평균에 대한 구간입니다. 표준편차를 표본에서 추정하므로 정규 분위수 대신 𝑡 분위수를 씁니다. **원리**: 표본 표준편차는 평균을 추정하느라 자유도 하나를 잃어 $`n - 1`$로 나눕니다(불편 분산). 표준편차를 추정한 만큼 불확실성이 커지므로, 꼬리가 더 두꺼운 스튜던트 𝑡 분포의 분위수를 곱합니다. 𝑛이 크면 𝑡 분위수는 정규 분위수(1.96)에 가까워집니다. **참고**: [R59 Student 1908](#r59)
 - **<mark>카이제곱 독립성 검정</mark>**: 두 묶음 × (통과 / 그 밖)의 2×2 표(예: 두 픽시브 묶음 × 큰 손실 없음, 얼굴 찾음 · 못 찾음 × 큰 손실 없음)에서
   기대 도수 $`E = \text{행 합} \times \text{열 합}/\text{전체}`$와 <mark>예이츠 연속성 보정</mark>을 쓴 $`\chi^2 = \sum(\lvert O - E\rvert - 0.5)^2 / E`$(자유도 1)의 𝑝 값입니다.
   𝑝는 두 묶음의 참 비율이 같을 때 표본 오차만으로 이만큼 이상 벌어질 확률이고, 0.05보다 작으면 "우연으로 보기 어렵다", 크면 "달라졌다고 할 근거가 없다"고 적었습니다.
   효과 크기는 파이 계수 $`\varphi = \sqrt{\chi^2/n}`$(연속성 보정 없는 $`\chi^2`$)입니다.
+  - **풀이** — **왜**: 두 묶음의 통과 비율이 다를 때, 그 차이가 표본 오차로 설명되는지 확인합니다. **원리**: 두 변수가 독립이면 칸마다 기대 도수는 행 합 × 열 합 / 전체입니다. 관측과 기대의 차를 제곱해 기대로 나눠 더한 값은 근사적으로 자유도 1의 카이제곱 분포를 따릅니다. 예이츠 보정(−0.5)은 이산 도수를 연속 분포로 근사할 때 𝑝가 지나치게 작아지는 것을 막습니다. 파이 계수는 표본 크기와 상관없는 연관의 크기(0\~1)입니다. **참고**: [R60 Pearson 1900](#r60) · [R61 Yates 1934](#r61) · [R62 Yule 1912](#r62)
 - **<mark>피셔 정확 검정</mark>**: 같은 2×2 표에서 행 합 · 열 합을 고정했을 때 왼쪽 위 칸이 𝑎일 확률 $`P(a) = C(a + b, a) C(c + d, c) / C(n, a + c)`$를 쓰고,
   관측한 표보다 확률이 크지 않은 모든 표의 𝑃를 더한 값(양측)이 𝑝입니다. 기대 도수가 작아도 근사 없이 맞습니다.
+  - **풀이** — **왜**: 칸의 기대 도수가 작아(5 미만) 카이제곱 근사가 맞지 않을 때 쓰는 정확 검정입니다. **원리**: 행 합 · 열 합을 고정하면 왼쪽 위 칸 𝑎는 초기하 분포를 따르고, 그 확률이 조합 수의 비 $`\binom{a + b}{a}\binom{c + d}{c}/\binom{n}{a + c}`$입니다. 관측보다 일어나기 어려운(확률이 크지 않은) 모든 표의 확률을 더하면 양측 𝑝가 됩니다. **참고**: [R63 Fisher 1922](#r63)
 - **두 비율의 차이 · 배율 · <mark>오즈비</mark>**: 묶음 1이 $`n_1`$장 중 $`k_1`$장, 묶음 2가 $`n_2`$장 중 $`k_2`$장 통과하면 차이 $`p_1 - p_2`$의 95% 구간은 두 <mark>윌슨 구간</mark> $`[l_1, u_1],\ [l_2, u_2]`$를 합친 뉴컴 구간,
   배율 $`\mathrm{RR} = p_1/p_2`$와 <mark>오즈비</mark> $`\mathrm{OR} = k_1(n_2 - k_2) / ((n_1 - k_1)k_2)`$의 구간은 로그 척도의 <mark>정규 근사</mark>입니다.
 
   $`\displaystyle \bigl[(p_1-p_2)-\sqrt{(p_1-l_1)^2+(u_2-p_2)^2},\ (p_1-p_2)+\sqrt{(u_1-p_1)^2+(p_2-l_2)^2}\bigr]`$
 
   $`\displaystyle \mathrm{RR}\cdot e^{\pm1.96\sqrt{\frac1{k_1}-\frac1{n_1}+\frac1{k_2}-\frac1{n_2}}},\qquad \mathrm{OR}\cdot e^{\pm1.96\sqrt{\frac1{k_1}+\frac1{n_1-k_1}+\frac1{k_2}+\frac1{n_2-k_2}}}`$
+  - **풀이** — **왜**: 두 비율이 "얼마나" 다른지를 차이 · 배율 · 오즈비와 그 구간으로 보여 줍니다. 검정의 𝑝만으로는 차이의 크기를 알 수 없기 때문입니다. **원리**: 뉴컴 구간은 각 비율의 윌슨 구간 끝까지의 거리를 제곱해 더한 제곱근으로 차이의 구간을 만들어, 비율이 0 · 1 가까이에서도 잘 맞습니다. 배율 · 오즈비는 곱셈 척도라 로그를 취하면 정규에 가깝고, 로그 배율의 분산 $`1/k_1 - 1/n_1 + 1/k_2 - 1/n_2`$(카츠)와 로그 오즈비의 분산 $`\sum 1/\text{칸}`$(울프)로 구간을 만든 뒤 지수로 되돌립니다. **참고**: [R64 Newcombe 1998](#r64) · [R65 Katz et al. 1978](#r65) · [R66 Woolf 1955](#r66)
 
 - **조건을 맞춘 비교(<mark>맨텔–헨젤</mark>)**: 그림을 한 조건의 값(예: 가림 없음 · 얼굴 가림 · 몸 가림)과 출처로 층 𝑖로 나누고, 층마다 2×2 표 $`a_i, b_i, c_i, d_i`$(합 $`n_i`$)를 만들면
 
@@ -1100,21 +1131,30 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
 
   이고, $`E[a_i] = (a_i + b_i)(a_i + c_i)/n_i`$, $`\mathrm{Var}(a_i) = (a_i + b_i)(c_i + d_i)(a_i + c_i)(b_i + d_i) / (n_i^2(n_i - 1))`$입니다(자유도 1). <mark>오즈비</mark>의 구간은 <mark>로빈스–브레슬로–그린랜드</mark> 분산으로 구합니다.
   한 칸이 비어 표가 성립하지 않는 층은 뺍니다. 층 안에서는 조건이 같으므로, 조건의 차이 때문에 생긴 겉보기 차이를 걸러 냅니다.
+  - **풀이** — **왜**: 묶음 사이의 차이가 사실은 조건(가림, 출처 등)의 구성 차이 때문일 수 있으므로, 조건이 같은 그림끼리만 견준 결과를 합칩니다. **원리**: 층마다의 2×2 표에서 $`a_id_i/n_i`$와 $`b_ic_i/n_i`$를 따로 더해 나누면 층마다의 오즈비를 넓이(정보량)로 가중 평균한 공통 오즈비가 됩니다. 검정 통계량은 층마다 칸 𝑎의 관측 − 기대(초기하 분포의 평균 · 분산)를 모두 더해 표준화한 것이라, 층 안의 비교만 모입니다. **참고**: [R67 Mantel · Haenszel 1959](#r67) · [R68 Robins et al. 1986](#r68)
 - **<mark>로지스틱 회귀</mark>**: 통과 여부 $`y \in \lbrace0, 1\rbrace`$를 $`P(y = 1) = 1 / (1 + e^{-x\beta})`$로 놓고, 𝑥에 보려는 요인(얼굴 찾음 · 묶음)과 모든 조건(인원 · 가림 · 초점 · 기울기 · 자세 · 색감 · 화질의 값마다 0/1, 출처, 긴 변의 로그)을 함께 넣습니다.
   𝛽는 <mark>반복 재가중 최소제곱</mark> $`\beta \gets \beta + (X^{\mathsf T}WX)^{-1}X^{\mathsf T}(y - p)`$, $`W = \mathrm{diag}(p(1 - p))`$로 맞추고, 요인의 <mark>오즈비</mark>는 $`e^\beta`$, 구간은 $`e^{\beta \pm 1.96 \mathrm{SE}}`$($`\mathrm{SE}`$는 $`(X^{\mathsf T}WX)^{-1}`$의 대각), 𝑝는 왈드 $`z = \beta/\mathrm{SE}`$의 양측 값입니다.
+  - **풀이** — **왜**: 여러 조건이 함께 섞인 그림들에서, 한 요인(예: 얼굴을 찾음)의 효과를 다른 조건을 모두 고정한 채로 재려면 회귀가 필요합니다. **원리**: 통과 확률을 로지스틱 함수로 두면 로그 오즈 $`\ln(p/(1 - p)) = x\beta`$가 요인들의 1차식이 되어, 계수 𝛽의 지수 $`e^\beta`$가 다른 요인을 고정했을 때의 오즈비입니다. 최대우도는 뉴턴법으로 풀며, 이것이 가중치 $`W = \mathrm{diag}(p(1 - p))`$의 반복 재가중 최소제곱과 같습니다. $`(X^{\mathsf T}WX)^{-1}`$은 피셔 정보의 역행렬이라 그 대각이 계수의 분산이고, 구간은 왈드 근사입니다. **참고**: [R69 Cox 1958](#r69) · [R70 McCullagh · Nelder 1989](#r70) · [R71 Wald 1943](#r71)
 - **짝지은 비교(<mark>맥니마</mark>)**: 같은 그림을 두 방법으로 판정해 한쪽만 통과한 그림 수가 𝑏, 다른 쪽만 통과한 수가 𝑐이면 $`\chi^2 = (\lvert b - c\rvert - 1)^2 / (b + c)`$(자유도 1)이고,
   $`b + c`$가 작으면 $`b \sim \mathrm{Binomial}(b + c, 1/2)`$의 양측 정확 𝑝를 씁니다.
+  - **풀이** — **왜**: 같은 그림을 두 방법으로 판정한 짝 자료는 독립이 아니므로, 두 방법의 결과가 갈린 그림만으로 견줍니다. **원리**: 두 방법이 같은 판정을 낸 그림은 차이에 대한 정보가 없습니다. 차이가 없다면 갈린 𝑏 + 𝑐장은 어느 쪽으로든 반반이라 𝑏가 이항분포 $`\mathrm{B}(b + c, 1/2)`$를 따르고, 크면 카이제곱 근사(연속성 보정 −1)를 씁니다. **참고**: [R72 McNemar 1947](#r72)
 - **구분력(<mark>AUC</mark>)**: 두 무리(예: 배경 조각 𝑏, 캐릭터 조각 𝑐)에서 하나씩 뽑았을 때 단서 값이 𝑏 쪽이 더 클 확률 $`\mathrm{AUC} = P(x_b > x_c) + P(x_b = x_c)/2`$입니다. 0.5면 동전 던지기와 같고, 1이나 0에 가까울수록 잘 가릅니다.
   여러 단서를 합친 모형은 그림을 10묶음으로 나눠 9묶음으로 맞추고 남은 1묶음으로 재는 일을 10번 되풀이한 <mark>**교차 검증**</mark>으로 잽니다(같은 그림의 조각이 맞추기와 재기에 함께 들지 않게).
+  - **풀이** — **왜**: 단서 하나가 두 무리(배경 조각 · 캐릭터 조각)를 얼마나 잘 가르는지를, 문턱을 정하기 전에 한 수로 잽니다. **원리**: AUC는 ROC 곡선(모든 문턱에서의 참 양성률 대 거짓 양성률) 아래 넓이이고, 두 무리에서 하나씩 뽑았을 때 순서가 맞을 확률(만–휘트니 통계량을 나눈 값)과 같습니다. 같은 값은 반으로 칩니다. 여러 단서를 합친 모형을 맞춘 그림으로 재면 지나치게 좋게 나오므로, 10겹 교차 검증으로 맞추지 않은 그림에서 잽니다. **참고**: [R73 Hanley · McNeil 1982](#r73) · [R74 Stone 1974](#r74)
 - **여러 검정의 보정(<mark>벤야미니–호흐베르크</mark>)**: 한 지표에서 조건 𝑚개를 각각 나머지 그림과 <mark>피셔 정확 검정</mark>한 𝑝를 작은 순서로 $`p_1 \le \dots \le p_m`$으로 놓으면
   $`q_k = \min_{j \ge k} m\,p_j/j`$입니다. $`q < 0.05`$인 조건만 고르면, 고른 조건 중 실제로는 차이가 없는 것의 비율이 평균 5% 이하입니다.
   그 지표를 잴 수 있는 그림이 5장 미만인 조건은 검정에서 뺍니다.
+  - **풀이** — **왜**: 조건 여러 개를 한꺼번에 검정하면 우연히 𝑝 < 0.05가 나오는 조건이 생기므로, 고른 것 중 거짓 발견의 비율을 묶어야 합니다. **원리**: 𝑝를 정렬해 𝑘번째에 $`m/k`$를 곱하면, 모든 귀무가설이 참일 때 𝑝 값들이 균등분포라는 성질에서 거짓 발견률(FDR)을 조절하는 문턱이 됩니다. 뒤쪽 최솟값을 취해 𝑞가 순서대로 커지게(단조) 합니다. 본페로니보다 덜 보수적이라 진짜 차이를 덜 놓칩니다. **참고**: [R75 Benjamini · Hochberg 1995](#r75)
 - **<mark>릿지 로지스틱 회귀</mark>**: 서로 겹치는 조건을 많이 함께 넣으면 계수가 불안정해, 로그 우도에 $`-(\lambda/2)\lVert \beta \rVert^2`$(절편을 뺀 계수의 제곱합, $`\lambda = 1`$)를 더해 맞춥니다.
   Λ를 절편 칸만 0인 $`\lambda I`$로 두고 $`\beta \gets \beta + (X^{\mathsf T}WX + \Lambda)^{-1}(X^{\mathsf T}(y - p) - \Lambda\beta)`$를 되풀이하며, 구간과 𝑝는 $`(X^{\mathsf T}WX + \Lambda)^{-1}`$의 대각을 $`\mathrm{SE}^2`$로 써서 구합니다.
+  - **풀이** — **왜**: 조건이 서로 겹쳐(예: 인원과 가림) 함께 넣으면 계수가 크게 흔들리거나 무한대로 가므로, 계수를 0 쪽으로 조금 당겨 안정시킵니다. **원리**: 로그 우도에서 $`(\lambda/2)\lVert\beta\rVert^2`$를 빼면 뉴턴법의 행렬에 $`\lambda I`$가 더해져 역행렬이 언제나 존재하고 조건수가 좋아집니다. 이것은 계수에 평균 0 · 분산 $`1/\lambda`$의 정규 사전분포를 둔 최대 사후 추정과 같습니다. 절편은 당기지 않습니다. **참고**: [R76 Hoerl · Kennard 1970](#r76) · [R77 le Cessie · van Houwelingen 1992](#r77)
 - **평균 개수의 비교**(가짜 얼굴 수): 두 묶음의 합계 $`x_1,\ x_2`$와 그림 수 $`n_1,\ n_2`$에서 비율이 같다면 $`x_1 \sim \mathrm{Binomial}(x_1 + x_2, n_1/(n_1 + n_2))`$이므로 그 양측 정확 𝑝를 씁니다.
+  - **풀이** — **왜**: 가짜 얼굴 수처럼 그림마다 0, 1, 2…개인 개수의 평균을 두 묶음에서 견줍니다. **원리**: 개수가 포아송 분포를 따르고 두 묶음의 그림당 비율이 같다면, 전체 합 $`x_1 + x_2`$가 주어졌을 때 묶음 1의 몫은 그림 수 비율 $`n_1/(n_1 + n_2)`$의 이항분포를 따릅니다(포아송 조건부 검정). 그래서 이항 정확 검정을 씁니다. **참고**: [R78 Agresti 2013](#r78)
 - **판정 일치도(<mark>코언의 카파</mark>)**: 두 번 판정한 𝑚장에서 일치 비율 $`p_o`$, 두 판정의 통과 비율 $`p_1,\ p_2`$일 때 우연 일치 $`p_e = p_1p_2 + (1 - p_1)(1 - p_2)`$, $`\kappa = (p_o - p_e)/(1 - p_e)`$입니다.
+  - **풀이** — **왜**: 같은 그림을 두 번 판정했을 때 얼마나 일치하는지를, 우연히 맞을 몫을 빼고 잽니다. **원리**: 두 판정이 서로 상관없이 통과 비율만 같아도 $`p_1p_2 + (1 - p_1)(1 - p_2)`$만큼은 우연히 일치합니다. 카파는 실제 일치에서 그 몫을 빼고 가능한 최대치로 나눈 값이라 0이면 우연 수준, 1이면 완전 일치입니다. **참고**: [R79 Cohen 1960](#r79)
 - **두 판정 모두 통과만 인정한 비율**: 1차 비율 𝑝에, 재판정 표본에서 1차 통과 중 2차도 통과한 비율 $`r = \text{둘 다}/\text{1차 통과}`$를 곱한 $`p \cdot r`$입니다.
   95% 구간은 <mark>부트스트랩</mark>으로, $`p^* = \mathrm{Binomial}(n, p)/n`$, $`r^* = \mathrm{Binomial}(\text{1차 통과 수}, r)/\text{1차 통과 수}`$를 2만 번 뽑은 $`p^* r^*`$의 2.5 · 97.5 백분위입니다(난수 씨앗 0).
+  - **풀이** — **왜**: 두 비율을 곱한 값처럼 분포가 간단한 식으로 나오지 않는 통계량의 구간은 다시 뽑기로 구합니다. **원리**: <mark>부트스트랩</mark>은 관측한 비율로 이항 표본을 다시 뽑아 같은 통계량을 2만 번 계산하고, 그 분포의 2.5 · 97.5 백분위를 구간으로 씁니다(백분위 방법). 두 비율을 서로 독립으로 다시 뽑아 곱의 불확실성이 저절로 합쳐집니다. **참고**: [R80 Efron 1979](#r80) · [R81 Efron · Tibshirani 1993](#r81)
 
 ### 11.2 시험 그림 25장
 
@@ -1303,6 +1343,8 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
 글로우가 없는 합성 52장에서 잘못 나눈 글로우는 0이었습니다. 실제 그림에서 글로우가 없는 그림도 캐릭터 쪽 띠의 형광 비율이 35%까지 올라가(주방 35%, 유카타 · 꽃밭의 엘프 30%),
 형광 조건을 넓히지 않았습니다(10).
 
+**풀이** — **왜**: 합성 글로우 중 나뉘지 않은 것이 어느 조건에서 빠졌는지 보입니다. **원리**: 형광은 $`L^* > 60`$(밝기)과 $`C^* > 45`$(채도)를 모두 넘어야 하므로, 채도 40인 청록이나 밝기 60 미만인 분홍은 빠집니다(4.5 외곽 글로우). **참고**: [R7 CIE 2004](#r7)
+
 ### 11.3 합성 정답 그림 57장(0.19)
 
 예제 그림의 인물을 코드로 다시 그리면서 캐릭터 영역 · 캐릭터 번호 · 글로우 · 눈 위치 정답을 함께 그렸습니다.
@@ -1439,6 +1481,8 @@ PSD는 외부 라이브러리 없이 직접 씁니다(RGB 8비트, 폴더, 클�
 *배경 분리율(0.25)*: 666장의 배경 결과를 모두 원본과 나란히 놓고 사람이 판정했습니다(픽시브 300장은 0.21 판정을 그대로 씀. 0.21과 0.25의 배경 지도는 300장 모두 같음).
 캐릭터가 없는 16장을 뺀 650장에서, 비율 𝑝의 그림 단위 표준편차는 $`\sqrt{p(1-p)}`$, 표준오차는 $`\sqrt{p(1-p)/n}`$, 오차범위는 $`z \times \text{표준오차}`$이고,
 신뢰구간은 <mark>윌슨 점수 구간</mark>입니다(90 · 95 · 99%에서 𝑧는 1.645 · 1.960 · 2.576).
+
+**풀이** — **왜**: 배경 분리율에 그림 수에 따른 불확실성을 함께 적기 위한 식입니다(11.1과 같음). **원리**: 그림 단위 표준편차 $`\sqrt{p(1 - p)}`$를 $`\sqrt n`$으로 나눈 표준오차에 𝑧를 곱한 것이 오차범위이고, 구간은 0 · 1 근처에서도 맞는 윌슨 구간입니다. **참고**: [R56 Wilson 1927](#r56) · [R78 Agresti 2013](#r78)
 
 | 판정 | 그림 수 | 비율 | 표준편차 | 표준오차 | 95% 오차범위 · 신뢰구간 | 90% | 99% |
 |---|---|---|---|---|---|---|---|
@@ -2024,6 +2068,8 @@ $`p < 0.05`$인 것은 아래뿐이고 나머지 조건(여러 사람, 기울기
 \mathrm{BER}_{\text{밑색}}=\frac1{|M|}\sum_{m\in M}\frac{|\lbrace p\in m:\ \Delta E(F_p,\ F^{\text{정답}}_m)\ge10\rbrace|}{|m|},\qquad \text{밑색 분해능}=\frac1{\overline{\mathrm{BER}}_{\text{밑색}}}
 ```
 
+**풀이** — **왜**: 밑색이 정답 재질 색과 얼마나 맞는지를 분해능과 같은 꼴의 한 수로 재기 위해서입니다. **원리**: 재질 𝑚마다 밑색이 정답 색과 $`\Delta E \ge 10`$(분명히 다른 색)인 픽셀의 비율을 오류율로 두고 재질 평균을 냅니다. 재질마다 같은 무게라 작은 재질(눈, 리본)의 실패도 크게 잡힙니다. 그 역수가 밑색 분해능입니다. **참고**: [R7 CIE 2004](#r7) · 이 프로그램에서 정한 규칙
+
 117장 평균의 역수를 밑색 분해능으로 둡니다. 배수의 95% 구간은 그림 단위 <mark>짝 부트스트랩</mark>(10,000번, 씨앗 20261002)입니다.
 
 | 판 | 배경 · 얼굴 합성 57장 | 이름 합성 48장 | 붓 그림 12장 | 전체 117장 | 밑색 분해능 | 덮음 | 순도 | 밑색 $`\Delta E`$ 평균 | 파츠 |
@@ -2108,6 +2154,8 @@ $`p < 0.05`$인 것은 아래뿐이고 나머지 조건(여러 사람, 기울기
 T1은 흰색 · 투명 모서리로 ±15 · ±30 · ±45°, T2는 꽉 채워 ±45 · ±60 · ±90°로 돌렸습니다. 두 결과(배경으로 간 곳을 칠한 그림, 캐릭터 폴더 수, 이름)를 좌우 무작위(따로 뽑은 난수, 판정 뒤에 풂)로 놓고,
 캐릭터를 지키고 배경을 뺀 정도를 먼저, 얼굴 · 이름을 그다음으로 보는 같은 기준으로 판정했습니다.
 
+**풀이** — **왜**: 그림 크기를 줄이기와 키우기에 고르게 나눠야, 크기에 따른 효과가 한쪽으로 치우치지 않습니다. **원리**: $`r = 2^u`$에서 𝑢를 −1\~1에 고르게 뽑으면 로그 척도에서 고른 분포라 ½배와 2배가 같은 확률입니다. 변수 변환으로 밀도는 $`f(r) = 1/(2r\ln 2)`$, 누적은 $`(1 + \log_2 r)/2`$입니다. $`u_i = -1 + (2i - 1)/20`$은 구간을 20칸으로 나눈 가운데 점(층화 표본)이라 무작위 뽑기보다 고르게 퍼집니다. 처리 긴 변은 메모리 한도로 4096에서 자릅니다. 키울 때 쓴 <mark>DCCI</mark>는 윤곽 방향을 따라 보간해 경계가 번지지 않는 방향성 3차 보간입니다. **참고**: 이 프로그램에서 정한 규칙 · [R49 Zhou et al. 2012](#r49)
+
 | 시험 | 0.37이 나음 | 0.36이 나음 | 같음 | <mark>부호 검정</mark> 𝑝 | 각도별(나음 : 나쁨 : 같음) |
 |---|---|---|---|---|---|
 | T1 돌린 캔버스(설정 없이) | 37 | 12 | 11 | 0.0005 | 15° 11 : 3 : 4 · 30° 16 : 2 : 3 · 45° 10 : 7 : 4 |
@@ -2155,6 +2203,7 @@ T1은 흰색 · 투명 모서리로 ±15 · ±30 · ±45°, T2는 꽉 채워 ±4
 
 - 크기: $`r = 2^u`$, 분류 안에서 𝑢를 −1\~1에 고르게 나눠 섞음(크기 분류는 $`\lvert u\rvert \ge 0.5`$만). 긴 변 $`L = \min(r \cdot \text{저장 긴 변}, 2048)`$(272\~2048px, 231개가 2048에 걸림).
   키울 때는 <mark>DCCI</mark> 2배를 되풀이한 뒤 면적 평균, 줄일 때는 면적 평균으로 맞췄습니다.
+  - **풀이** — **왜**: 12분류 역검증에서도 크기 비율을 로그 척도로 고르게 나눕니다. **원리**: $`r = 2^u`$(𝑢를 −1\~1에 고르게)라 줄이기 · 키우기가 대칭이고, 긴 변은 2048px에서 자릅니다. **참고**: 이 프로그램에서 정한 규칙
 - 회전: 0 · ±15 · ±45°(시계 방향 +)를 같은 수로, 가운데를 기준으로 <mark>Catmull–Rom</mark>으로 돌리고, 돌린 것의 절반은 돌린 그림 안의 가장 큰 직사각형으로 꽉 채워 자르고 절반은 모서리를 흰색으로 채움.
   좌우 반전 있음 · 없음도 같은 수. "반대 상황" 분류는 돌리지 않고 좌우 · 상하 · 둘 다 뒤집었습니다.
 - 판 A는 그 그림을 그대로 나누고, 판 B는 <mark>DCCI</mark>로 가로 · 세로 2배 키워 나눈 뒤 2×2칸 다수결로 원래 크기에 되돌렸습니다.
@@ -2358,6 +2407,8 @@ T1은 흰색 · 투명 모서리로 ±15 · ±30 · ±45°, T2는 꽉 채워 ±4
 \mathrm{BER}=\frac{(1-\text{지킨 캐릭터})+(1-\text{찾은 배경})}2,\qquad \text{분해능}=\frac1{\overline{\mathrm{BER}}},\qquad \text{0.1 대비}=\frac{\overline{\mathrm{BER}}_{0.1}}{\overline{\mathrm{BER}}_v}
 ```
 
+**풀이** — **왜**: 배경 · 캐릭터 분리의 오류를 한 수로 재야 버전끼리 견줄 수 있습니다. 배경이 넓은 그림과 좁은 그림이 섞여 있으므로 두 쪽 오류를 같은 무게로 봅니다. **원리**: 균형 오분류율 BER은 캐릭터를 잃은 비율과 배경을 놓친 비율의 평균이라, 한쪽이 대부분인 그림에서도 "모두 한쪽"으로 답하는 결과가 좋게 나오지 않습니다(그러면 BER = 0.5). 분해능은 평균 BER의 역수이고, 0.1 대비 배수는 두 평균 BER의 비입니다. 구간은 그림 단위 짝 부트스트랩(같은 그림 표본을 두 판에 함께 다시 뽑음)으로 구합니다. **참고**: [R54 Guyon et al. 2004](#r54) · [R80 Efron 1979](#r80)
+
 를 재고($`\mathrm{BER}`$은 아무것도 나누지 않으면 0.5, 완벽하면 0), 185장 평균 $`\mathrm{BER}`$의 역수를 분해능으로 둡니다. 95% 구간은 같은 그림을 짝지어 다시 뽑은 <mark>부트스트랩</mark>(10,000번, 씨앗 20261002)의 2.5 · 97.5 백분위입니다.
 러프 생성은 배경 층을 바꾸지 않아(판 8개 · 그림 2\~3장씩에서 배경 지도가 픽셀 단위로 같음을 확인, 0.44의 새 러프도 그림 6장에서 러프를 켜고 끈 결과의 다른 층이 모두 같음) 시간을 줄이려 일부 판은 러프를 끄고 돌렸습니다.
 그림 수가 많은 자세 합성의 비중이 크므로 묶음(합성 · 실제 · 자세)마다의 배수도 적었습니다. 실제 그림은 8장뿐이라 그 값은 흔들림이 큽니다.
@@ -2451,6 +2502,8 @@ T1은 흰색 · 투명 모서리로 ±15 · ±30 · ±45°, T2는 꽉 채워 ±4
 
 새 버전이 위에 있습니다.
 
+**풀이** — **왜**: 버전마다 적은 분해능 배수 · 구간 · 𝑝 값이 어떤 식에서 나왔는지를 버전마다 되풀이하지 않습니다. **원리**: 분해능 배수와 그 구간은 11.14의 BER 식과 짝 부트스트랩(10,000번), 눈가림 시험의 구간은 윌슨 구간, 짝 판정의 𝑝는 맥니마 정확 검정 · 부호 검정입니다(11.1). **참고**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
 ### 0.47 (2026-10-11) 따라 긋는 러프(눈 인식 없음 · 실제 윤곽 · 배경 구도 · 이어 긋기)
 
 - 분해능: 0.1의 5.91배(95% 구간 4.33~8.63배 · 배경 결과가 앞 판과 같음, 11)
@@ -2475,6 +2528,8 @@ T1은 흰색 · 투명 모서리로 ±15 · ±30 · ±45°, T2는 꽉 채워 ±4
   두 판을 같은 컴퓨터에서 그림마다 한 번 미리 돌린 뒤 잰 값이라, 0.46 항목의 값(0.95 + 0.82초, 미리 돌리지 않고 잼)과 다릅니다.
 - **도움말**: 쓰는 법 · 틀린 곳 고치기 · 만들어지는 층 · 설정 · 원리 · 수식 · 검증 · 한계를 목차 · 찾기와 함께 정리한 도움말을 만들었습니다. 앱 파일 안에 함께 들어 있어 화면 오른쪽 위 **도움말** 버튼으로 새 창에 열리고(나눈 결과는 그대로), 도움말의 **Illustracy로 돌아가기**로 앱으로 돌아옵니다.
   앱(`illustracy.html`)과 도움말(`illustracy-help.html`)을 저장소에 다시 넣었습니다.
+- **수식 풀이**: README와 4절 문서의 모든 수식 · 통계식에 쓰는 까닭(왜) · 원리 · 참고를 단 **풀이**를 붙이고, 끝에 [13절 참고 문헌](#13-참고-문헌)을 더했습니다. 도움말의 수식에도 같은 풀이와 참고 문헌을 넣었습니다.
+  4절은 수식이 많아 GitHub이 한 문서에서 그리는 수식 수를 넘겨 일부가 그려지지 않았으므로, `docs/`의 네 문서로 나눴습니다(4절 첫머리의 링크).
 - 러프 밖은 그대로입니다. 바뀐 코드는 러프 생성뿐이고, 정답 그림 185장 · 눈가림 60장의 배경 지도가 0.46과 바이트 단위로 같습니다. 눈가림 시험(11.15)은 0.43 때 함께 매긴 판정을 그대로 썼습니다.
   브라우저에서 예시 그림을 나눠 PSD로 저장한 뒤 psd-tools로 열어, [러프] 폴더 안에 두 층이 숨김 · 불투명도 45%로 들어 있음을 확인했습니다.
 - 남은 약점: 러프 2의 형태가 0.45보다 약함(위), 장면이 복잡하거나 인물이 작은 그림에서 짧은 조각선이 그물처럼 갈라짐, 얼굴을 못 찾은 인물의 흐트러진 눈 · 입, 러프 1의 어긋난 구도(의도)는 형태 판정에서 늘 짐.
@@ -2541,6 +2596,7 @@ T1은 흰색 · 투명 모서리로 ±15 · ±30 · ±45°, T2는 꽉 채워 ±4
   - **획 굵기 상한**: 반지름을 $`2.5s'`$px(긴 변 1000px 이하 그림에서 2.5px)까지로 둡니다. 0.44는 굵은 선을 그 굵기대로(반지름 $`2.5r_T`$까지) 그어 덩어리가 됐습니다.
   - **줄 길이에 맞춘 다듬기**: 이동 평균 반창을 줄 길이/25(2\~6점)로, 긴 줄은 넓게 다듬습니다(0.44는 늘 5점).
   - **옅은 획은 더 옅게**: 진하기를 $`0.55 + 0.45\min(1, \bar\ell)`$에서 $`0.2 + 0.8\min(1, \bar\ell)^2`$로 바꿔, 원래 선이 옅은 실루엣 · 배경 윤곽 · 질감이 진한 획처럼 덮지 않게 했습니다.
+    - **풀이** — **왜**: 원래 선이 옅은 곳의 러프 획이 진한 획처럼 덮지 않게 진하기를 바꿨습니다. **원리**: $`0.2 + 0.8\min(1, \bar\ell)^2`$는 선 알파 평균 ℓ̄을 제곱해, 옅은 선(ℓ̄ = 0.5 → 0.4)은 더 옅게, 진한 선(ℓ̄ = 1 → 1)은 그대로 둡니다. 예전 $`0.55 + 0.45\bar\ell`$은 ℓ̄ = 0.5에서 0.78이었습니다. **참고**: 이 프로그램에서 정한 규칙
 - 기준 러프 18칸(0.43 · 0.44 → 0.45. 괄호 안은 평균 차이, 같은 칸 짝의 나아짐 : 나빠짐(0.0005 미만 차이는 같음), <mark>부호 검정</mark>):
   - F 0.708 · 0.714 → 0.740(0.44 대비 +0.026, 17 : 1, $`p = 1.4 \times 10^{-4}`$ / 0.43 대비 +0.031, 14 : 4, $`p = 0.031`$).
   - 정밀도 0.613 · 0.646 → 0.671(0.44 대비 +0.025, 17 : 1, $`p = 1.4 \times 10^{-4}`$ / 0.43 대비 +0.059, 17 : 1, $`p = 1.4 \times 10^{-4}`$), 핵심 획 재현율 0.892 · 0.808 → 0.884(0.44 대비 +0.076, 17 : 1, $`p = 1.4 \times 10^{-4}`$).
@@ -3198,3 +3254,95 @@ T1은 흰색 · 투명 모서리로 ±15 · ±30 · ±45°, T2는 꽉 채워 ±4
 - 분해능: 비교 기준(정답 그림 185장의 평균 BER 0.1533, 11)
 - 브라우저에서 동작합니다. 완성 그림을 선화 · 밑색 · 그림자 · 명암 · 하이라이트 · 반짝임 · 효과 · 배경 · 러프로 나누고,
   다시 겹치면 원본이 되는 PSD(폴더, 클리핑, 혼합 모드, 한글 층 이름)로 저장합니다.
+
+---
+
+## 13. 참고 문헌
+
+수식 풀이의 **참고**에 번호로 적은 문헌입니다. "이 프로그램의 실험(절)"은 문헌 없이 이 프로그램이 시험 그림으로 정한 값 · 규칙이고, 근거는 적힌 절에 있습니다. "이 프로그램에서 정한 규칙"은 표기 · 반올림처럼 근거가 필요 없는 약속입니다.
+
+- <a id="r1"></a>**[R1]** T. Porter, T. Duff, "Compositing Digital Images," <i>Computer Graphics (Proc. SIGGRAPH)</i> 18(3), 253–259, 1984.
+- <a id="r2"></a>**[R2]** A. R. Smith, "Alpha and the History of Digital Compositing," Microsoft Technical Memo 7, 1995.
+- <a id="r3"></a>**[R3]** ISO 32000-1:2008, <i>Document management — Portable document format — Part 1: PDF 1.7</i>, §11.3.5 "Blend Mode".
+- <a id="r4"></a>**[R4]** Adobe, <i>Adobe Photoshop File Formats Specification</i>.
+- <a id="r5"></a>**[R5]** Apple Computer, "Understanding PackBits," Technical Note TN1023, 1996.
+- <a id="r6"></a>**[R6]** IEC 61966-2-1:1999, <i>Multimedia systems and equipment — Colour measurement and management — Part 2-1: Default RGB colour space — sRGB</i>.
+- <a id="r7"></a>**[R7]** CIE 15:2004, <i>Colorimetry</i>, 3rd ed. (CIELAB, ΔE*ab).
+- <a id="r8"></a>**[R8]** M. Mahy, L. Van Eycken, A. Oosterlinck, "Evaluation of Uniform Color Spaces Developed after the Adoption of CIELAB and CIELUV," <i>Color Research &amp; Application</i> 19(2), 105–121, 1994.
+- <a id="r9"></a>**[R9]** ITU-R Recommendation BT.601, <i>Studio encoding parameters of digital television for standard 4:3 and wide-screen 16:9 aspect ratios</i>.
+- <a id="r10"></a>**[R10]** M. D. Fairchild, <i>Color Appearance Models</i>, 3rd ed., Wiley, 2013.
+- <a id="r11"></a>**[R11]** D. Hasler, S. Süsstrunk, "Measuring Colourfulness in Natural Images," <i>Proc. SPIE</i> 5007, 87–95, 2003.
+- <a id="r12"></a>**[R12]** A. Beer, "Bestimmung der Absorption des rothen Lichts in farbigen Flüssigkeiten," <i>Annalen der Physik</i> 162(5), 78–88, 1852.
+- <a id="r13"></a>**[R13]** E. Hecht, <i>Optics</i>, 5th ed., Pearson, 2017.
+- <a id="r14"></a>**[R14]** R. C. Gonzalez, R. E. Woods, <i>Digital Image Processing</i>, 4th ed., Pearson, 2018.
+- <a id="r15"></a>**[R15]** P. Soille, <i>Morphological Image Analysis: Principles and Applications</i>, 2nd ed., Springer, 2003.
+- <a id="r16"></a>**[R16]** D. Lemire, "Streaming Maximum-Minimum Filter Using No More than Three Comparisons per Element," <i>Nordic Journal of Computing</i> 13(4), 328–339, 2006.
+- <a id="r17"></a>**[R17]** W. M. Wells, "Efficient Synthesis of Gaussian Filters by Cascaded Uniform Filters," <i>IEEE Trans. PAMI</i> 8(2), 234–239, 1986.
+- <a id="r18"></a>**[R18]** J. Canny, "A Computational Approach to Edge Detection," <i>IEEE Trans. PAMI</i> 8(6), 679–698, 1986.
+- <a id="r19"></a>**[R19]** I. Sobel, G. Feldman, "A 3×3 Isotropic Gradient Operator for Image Processing," presented at the Stanford Artificial Intelligence Project, 1968.
+- <a id="r20"></a>**[R20]** A. Telea, "An Image Inpainting Technique Based on the Fast Marching Method," <i>Journal of Graphics Tools</i> 9(1), 23–34, 2004.
+- <a id="r21"></a>**[R21]** G. Borgefors, "Distance Transformations in Digital Images," <i>Computer Vision, Graphics, and Image Processing</i> 34(3), 344–371, 1986.
+- <a id="r22"></a>**[R22]** S. P. Lloyd, "Least Squares Quantization in PCM," <i>IEEE Trans. Information Theory</i> 28(2), 129–137, 1982.
+- <a id="r23"></a>**[R23]** D. Arthur, S. Vassilvitskii, "k-means++: The Advantages of Careful Seeding," <i>Proc. ACM-SIAM SODA</i>, 1027–1035, 2007.
+- <a id="r24"></a>**[R24]** Y. Boykov, M.-P. Jolly, "Interactive Graph Cuts for Optimal Boundary &amp; Region Segmentation of Objects in N-D Images," <i>Proc. ICCV</i>, 105–112, 2001.
+- <a id="r25"></a>**[R25]** C. Rother, V. Kolmogorov, A. Blake, "GrabCut: Interactive Foreground Extraction Using Iterated Graph Cuts," <i>ACM Trans. Graphics</i> 23(3), 309–314, 2004.
+- <a id="r26"></a>**[R26]** L. R. Ford, D. R. Fulkerson, "Maximal Flow through a Network," <i>Canadian Journal of Mathematics</i> 8, 399–404, 1956.
+- <a id="r27"></a>**[R27]** E. A. Dinic, "Algorithm for Solution of a Problem of Maximum Flow in a Network with Power Estimation," <i>Soviet Math. Doklady</i> 11, 1277–1280, 1970.
+- <a id="r28"></a>**[R28]** E. W. Dijkstra, "A Note on Two Problems in Connexion with Graphs," <i>Numerische Mathematik</i> 1, 269–271, 1959.
+- <a id="r29"></a>**[R29]** R. B. Dial, "Algorithm 360: Shortest-Path Forest with Topological Ordering," <i>Communications of the ACM</i> 12(11), 632–633, 1969.
+- <a id="r30"></a>**[R30]** R. E. Tarjan, "Efficiency of a Good But Not Linear Set Union Algorithm," <i>Journal of the ACM</i> 22(2), 215–225, 1975.
+- <a id="r31"></a>**[R31]** A. R. Smith, "Color Gamut Transform Pairs," <i>Computer Graphics (Proc. SIGGRAPH)</i> 12(3), 12–19, 1978.
+- <a id="r32"></a>**[R32]** H. Knutsson, C.-F. Westin, "Normalized and Differential Convolution," <i>Proc. IEEE CVPR</i>, 515–523, 1993.
+- <a id="r33"></a>**[R33]** T. Lindeberg, "Feature Detection with Automatic Scale Selection," <i>International Journal of Computer Vision</i> 30(2), 79–116, 1998.
+- <a id="r34"></a>**[R34]** J. P. Lewis, "Fast Normalized Cross-Correlation," <i>Vision Interface</i>, 120–123, 1995.
+- <a id="r35"></a>**[R35]** G. Strang, <i>Introduction to Linear Algebra</i>, 5th ed., Wellesley-Cambridge Press, 2016.
+- <a id="r36"></a>**[R36]** T. Y. Zhang, C. Y. Suen, "A Fast Parallel Algorithm for Thinning Digital Patterns," <i>Communications of the ACM</i> 27(3), 236–239, 1984.
+- <a id="r37"></a>**[R37]** H. Blum, "A Transformation for Extracting New Descriptors of Shape," in W. Wathen-Dunn (ed.), <i>Models for the Perception of Speech and Visual Form</i>, MIT Press, 362–380, 1967.
+- <a id="r38"></a>**[R38]** P. J. Schneider, "An Algorithm for Automatically Fitting Digitized Curves," in A. S. Glassner (ed.), <i>Graphics Gems</i>, Academic Press, 612–626, 1990.
+- <a id="r39"></a>**[R39]** A. Loomis, <i>Drawing the Head and Hands</i>, Viking Press, 1956.
+- <a id="r40"></a>**[R40]** G. Fowler, L. C. Noll, K.-P. Vo, D. Eastlake, T. Hansen, "The FNV Non-Cryptographic Hash Algorithm," IETF Internet-Draft draft-eastlake-fnv.
+- <a id="r41"></a>**[R41]** U. Ramer, "An Iterative Procedure for the Polygonal Approximation of Plane Curves," <i>Computer Graphics and Image Processing</i> 1(3), 244–256, 1972.
+- <a id="r42"></a>**[R42]** D. H. Douglas, T. K. Peucker, "Algorithms for the Reduction of the Number of Points Required to Represent a Digitized Line or its Caricature," <i>Cartographica</i> 10(2), 112–122, 1973.
+- <a id="r43"></a>**[R43]** Å. Björck, <i>Numerical Methods for Least Squares Problems</i>, SIAM, 1996.
+- <a id="r44"></a>**[R44]** M. A. Fischler, R. C. Bolles, "Random Sample Consensus: A Paradigm for Model Fitting with Applications to Image Analysis and Automated Cartography," <i>Communications of the ACM</i> 24(6), 381–395, 1981.
+- <a id="r45"></a>**[R45]** H. Theil, "A Rank-Invariant Method of Linear and Polynomial Regression Analysis," <i>Proc. Koninklijke Nederlandse Akademie van Wetenschappen</i> 53, 1950.
+- <a id="r46"></a>**[R46]** P. K. Sen, "Estimates of the Regression Coefficient Based on Kendall's Tau," <i>JASA</i> 63(324), 1379–1389, 1968.
+- <a id="r47"></a>**[R47]** D. S. Ebert, F. K. Musgrave, D. Peachey, K. Perlin, S. Worley, <i>Texturing and Modeling: A Procedural Approach</i>, 3rd ed., Morgan Kaufmann, 2003.
+- <a id="r48"></a>**[R48]** T. Ettinger, mulberry32 (public-domain 32-bit pseudorandom number generator), 2017.
+- <a id="r49"></a>**[R49]** D. Zhou, X. Shen, W. Dong, "Image Zooming Using Directional Cubic Convolution Interpolation," <i>IET Image Processing</i> 6(6), 627–634, 2012.
+- <a id="r50"></a>**[R50]** R. J. Hyndman, Y. Fan, "Sample Quantiles in Statistical Packages," <i>The American Statistician</i> 50(4), 361–365, 1996.
+- <a id="r51"></a>**[R51]** C. D. Manning, P. Raghavan, H. Schütze, <i>Introduction to Information Retrieval</i>, Cambridge University Press, 2008.
+- <a id="r52"></a>**[R52]** P. Jaccard, "The Distribution of the Flora in the Alpine Zone," <i>New Phytologist</i> 11(2), 37–50, 1912.
+- <a id="r53"></a>**[R53]** C. J. van Rijsbergen, <i>Information Retrieval</i>, 2nd ed., Butterworths, 1979.
+- <a id="r54"></a>**[R54]** I. Guyon, S. Gunn, A. Ben-Hur, G. Dror, "Result Analysis of the NIPS 2003 Feature Selection Challenge," <i>Advances in Neural Information Processing Systems</i> 17, 2004.
+- <a id="r55"></a>**[R55]** Q. Huynh-Thu, M. Ghanbari, "Scope of Validity of PSNR in Image/Video Quality Assessment," <i>Electronics Letters</i> 44(13), 800–801, 2008.
+- <a id="r56"></a>**[R56]** E. B. Wilson, "Probable Inference, the Law of Succession, and Statistical Inference," <i>JASA</i> 22(158), 209–212, 1927.
+- <a id="r57"></a>**[R57]** C. J. Clopper, E. S. Pearson, "The Use of Confidence or Fiducial Limits Illustrated in the Case of the Binomial," <i>Biometrika</i> 26(4), 404–413, 1934.
+- <a id="r58"></a>**[R58]** O. J. Dunn, "Multiple Comparisons among Means," <i>JASA</i> 56(293), 52–64, 1961.
+- <a id="r59"></a>**[R59]** Student (W. S. Gosset), "The Probable Error of a Mean," <i>Biometrika</i> 6(1), 1–25, 1908.
+- <a id="r60"></a>**[R60]** K. Pearson, "On the Criterion that a Given System of Deviations from the Probable in the Case of a Correlated System of Variables is such that it can be Reasonably Supposed to have Arisen from Random Sampling," <i>Philosophical Magazine</i> 50(302), 157–175, 1900.
+- <a id="r61"></a>**[R61]** F. Yates, "Contingency Tables Involving Small Numbers and the χ² Test," <i>Supplement to the Journal of the Royal Statistical Society</i> 1(2), 217–235, 1934.
+- <a id="r62"></a>**[R62]** G. U. Yule, "On the Methods of Measuring Association between Two Attributes," <i>Journal of the Royal Statistical Society</i> 75(6), 579–652, 1912.
+- <a id="r63"></a>**[R63]** R. A. Fisher, "On the Interpretation of χ² from Contingency Tables, and the Calculation of P," <i>Journal of the Royal Statistical Society</i> 85(1), 87–94, 1922.
+- <a id="r64"></a>**[R64]** R. G. Newcombe, "Interval Estimation for the Difference between Independent Proportions: Comparison of Eleven Methods," <i>Statistics in Medicine</i> 17(8), 873–890, 1998.
+- <a id="r65"></a>**[R65]** D. Katz, J. Baptista, S. P. Azen, M. C. Pike, "Obtaining Confidence Intervals for the Risk Ratio in Cohort Studies," <i>Biometrics</i> 34(3), 469–474, 1978.
+- <a id="r66"></a>**[R66]** B. Woolf, "On Estimating the Relation between Blood Group and Disease," <i>Annals of Human Genetics</i> 19(4), 251–253, 1955.
+- <a id="r67"></a>**[R67]** N. Mantel, W. Haenszel, "Statistical Aspects of the Analysis of Data from Retrospective Studies of Disease," <i>Journal of the National Cancer Institute</i> 22(4), 719–748, 1959.
+- <a id="r68"></a>**[R68]** J. Robins, N. Breslow, S. Greenland, "Estimators of the Mantel–Haenszel Variance Consistent in Both Sparse Data and Large-Strata Limiting Models," <i>Biometrics</i> 42(2), 311–323, 1986.
+- <a id="r69"></a>**[R69]** D. R. Cox, "The Regression Analysis of Binary Sequences," <i>Journal of the Royal Statistical Society B</i> 20(2), 215–242, 1958.
+- <a id="r70"></a>**[R70]** P. McCullagh, J. A. Nelder, <i>Generalized Linear Models</i>, 2nd ed., Chapman &amp; Hall, 1989.
+- <a id="r71"></a>**[R71]** A. Wald, "Tests of Statistical Hypotheses Concerning Several Parameters When the Number of Observations is Large," <i>Trans. American Mathematical Society</i> 54(3), 426–482, 1943.
+- <a id="r72"></a>**[R72]** Q. McNemar, "Note on the Sampling Error of the Difference between Correlated Proportions or Percentages," <i>Psychometrika</i> 12(2), 153–157, 1947.
+- <a id="r73"></a>**[R73]** J. A. Hanley, B. J. McNeil, "The Meaning and Use of the Area under a Receiver Operating Characteristic (ROC) Curve," <i>Radiology</i> 143(1), 29–36, 1982.
+- <a id="r74"></a>**[R74]** M. Stone, "Cross-Validatory Choice and Assessment of Statistical Predictions," <i>Journal of the Royal Statistical Society B</i> 36(2), 111–147, 1974.
+- <a id="r75"></a>**[R75]** Y. Benjamini, Y. Hochberg, "Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing," <i>Journal of the Royal Statistical Society B</i> 57(1), 289–300, 1995.
+- <a id="r76"></a>**[R76]** A. E. Hoerl, R. W. Kennard, "Ridge Regression: Biased Estimation for Nonorthogonal Problems," <i>Technometrics</i> 12(1), 55–67, 1970.
+- <a id="r77"></a>**[R77]** S. le Cessie, J. C. van Houwelingen, "Ridge Estimators in Logistic Regression," <i>Applied Statistics</i> 41(1), 191–201, 1992.
+- <a id="r78"></a>**[R78]** A. Agresti, <i>Categorical Data Analysis</i>, 3rd ed., Wiley, 2013.
+- <a id="r79"></a>**[R79]** J. Cohen, "A Coefficient of Agreement for Nominal Scales," <i>Educational and Psychological Measurement</i> 20(1), 37–46, 1960.
+- <a id="r80"></a>**[R80]** B. Efron, "Bootstrap Methods: Another Look at the Jackknife," <i>Annals of Statistics</i> 7(1), 1–26, 1979.
+- <a id="r81"></a>**[R81]** B. Efron, R. J. Tibshirani, <i>An Introduction to the Bootstrap</i>, Chapman &amp; Hall, 1993.
+- <a id="r82"></a>**[R82]** C. Spearman, "The Proof and Measurement of Association between Two Things," <i>American Journal of Psychology</i> 15(1), 72–101, 1904.
+- <a id="r83"></a>**[R83]** N. I. Fisher, <i>Statistical Analysis of Circular Data</i>, Cambridge University Press, 1993.
+- <a id="r84"></a>**[R84]** M. J. Swain, D. H. Ballard, "Color Indexing," <i>International Journal of Computer Vision</i> 7(1), 11–32, 1991.
+- <a id="r85"></a>**[R85]** W. J. Dixon, A. M. Mood, "The Statistical Sign Test," <i>JASA</i> 41(236), 557–566, 1946.
