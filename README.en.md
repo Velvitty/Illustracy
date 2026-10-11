@@ -14,7 +14,7 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **2.25× version 0.1** (0.42, 95% CI 1.89–2.75×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth, 11).
+- Resolving power: **5.91× version 0.1** (0.43, 95% CI 4.33–8.63×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller, 11).
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -320,6 +320,7 @@ so faces are searched for at that tilt (4.5) and the bottom-border · upper-corn
    If the reduced threshold finds too little background, it is redone with the original threshold.
    A **floor** whose color differs from the wall (a line-drawn room) is looked for separately (4.5, 0.40). A band of one color other than the main background color that touches the left, right and bottom borders and whose top edge is a straight line (where wall and floor meet) is added to the background.
    Clothes · hair crossing the bottom edge of the picture have a curved top edge like a shoulder line and are not taken.
+   When the character hides much of the floor so that the line where wall and floor meet shows only in places, the line passing through the most visible columns with almost no column sticking out above it is tried instead (4.5, 0.43).
    If the background found is bright and almost one color (white backgrounds · pale flat backgrounds), narrow gaps are closed and it is filled once more. Within 2px (for a 1200px long side) of lines and edges where the color changes sharply,
    the fill is not allowed through, so it does not get inside white clothes · pale hair through breaks in a pale outline, and after filling it is restored toward the edges by that much (4.5, 0.34).
 2. **Scene background stage 1**: places with low line density (line pixels widely blurred) that are connected to the top · left · right borders.
@@ -329,6 +330,8 @@ so faces are searched for at that tilt (4.5) and the bottom-border · upper-corn
    The scene background does not cross places at the edge of the flat background (1 above) where the color changes sharply (4.5, 0.37). When black stockings · black clothes · dark hair,
    whose outline has the same color as the clothes and so is not picked up as a line, touch a white background, the scene background following places with few lines used to get right inside them.
    Even without a flat background, it does not take a step where the color changes sharply into a dark place (lightness $`L^*`$ 35 or less) (4.5, 0.42). This stops blurred scene backgrounds from spreading into black legs · clothes.
+   This blocking is widened to two steps back (3px) and the scene background is searched once more; places that only the first scene background took (except the flat background · gaps) are kept on the character side when the background stages end (4.5, 0.43).
+   This stops the scene background from getting past black clothes · legs whose soft edge is painted more than 2px wide.
 3. **Picking out cropped character parts**: walking along the border, a piece wedged between background pieces with a crisp outline in between, and clearly different in color from its neighbors on both sides, is taken as a character part cropped by the frame (hat, sleeve) and returned.
 4. **Scene background stage 2**: it widens into places with no crisp lines but dense faint marks (blurred shelves, writing, patterns).
 5. **Margin**: the margin around the character is widened, without crossing lines, as far as the color continues smoothly. It does not widen into places enclosed by lines.
@@ -344,6 +347,9 @@ so faces are searched for at that tilt (4.5) and the bottom-border · upper-corn
    Pieces that do not touch the top · left · right borders, have 80% or more of their perimeter touching the character, and whose color is closer to the character than to the rest of the background are
    returned to the character (arms · hands · sleeves · wings painted without lines). The color model is computed with the background before returning, and the returned parts are also removed from the background added by the color model.
    A piece touching the border is also returned if more than half of it lies in the head · body zone of a sure face (4.5), its area is at most 6% of the whole, 75% or more of its perimeter touches the character, and its color is closer to the character (hair tips · sleeves · arms cut off by the frame, 0.41).
+   **Dark character parts** (4.5, 0.43): black hair · skirts · legs on a dark background have outlines as dark as the background, so they are not picked up as lines and the flat · scene background fills take them whole.
+   So the same background is also cut at faint color edges ($`\Delta E`$ 5), and pieces that do not touch the border, are dark (mean $`L^*`$ 35 or less) and have colors rare in the border-side background are returned repeatedly when they attach to the character
+   (or to pieces already returned; legs → skirt → body). Dark background objects such as furniture · floors sometimes come back too, but with character loss weighed 3 times it is still a gain on real pictures (0.43 in 12).
 8. **Returning swallowed characters**: if more than a quarter of the face zone or the crown cell of a high-scoring face (4.5) is background, the background has swallowed whole a character whose outline cannot be seen
    (black hair · clothes whose outline has the same color as the hair, dark outlines on a dark background). The background is cut at crisp color edges and lines, and pieces that
    lie at least half inside that face's head · body zone, do not touch the top · left · right borders, and whose color is rare in the border-side background are returned to the character.
@@ -362,6 +368,8 @@ so faces are searched for at that tilt (4.5) and the bottom-border · upper-corn
    so they are sent to the background. Such places have outlines on every side, so 1–9 cannot reach them, and they were deliberately protected because they are enclosed by lines (0.31).
    White clothes · white hair touch shadows · shading and remain. It is skipped for pictures where qualifying pieces exceed 5% of the character's paint (white-paint monochrome line art, white clothes on a white background)
    and for pictures where 30% or more of the character-side pixels are lines (particles · halftone dots picked up as lines) (4.5).
+11. **Rectangular background objects drawn with lines** (4.5, 0.43): finally, axis-aligned rectangular pieces enclosed by lines that remain on the character side (window panes · shelves · books · frames) are sent to the background
+   when at least half of their surroundings is background, they lie outside the faces' head · body zones, and they do not touch the border. In a window made of same-colored panes, panes hidden by the character so that they are no longer rectangles are also sent if they have the same color.
 
 Faces are also searched for in pictures where the background was not searched (background separation off, transparent-background PNG) or not found, and are used for part names and character splitting.
 For transparent-background pictures, transparent places are treated as background and the "face-like position" condition of 4.5 is checked.
@@ -700,6 +708,9 @@ and if $`\bar g = \sum w f / \sum w`$ has $`\lvert \bar g\rvert \ge 0.8`$ (the f
      For each column x the topmost pixel t(x) of F is taken, and a line y = a·x + b is fitted on 64 evenly chosen columns with a = the median of the slopes between every two columns and b = the median of t(x) − a·x (<mark>Theil–Sen</mark>; columns hidden by the character, where t(x) sags lower, do not move the medians).
      F is added to the background if it covers at least 3% and at most 60% of the picture, at least 60% of the columns are within τ = max(3, 0.01H)px of the line, and at most 2% of F's pixels are more than τ above the line. It is not done for rotated pictures (whose downward direction is set).
      The floor of a line-drawn room, differing in color from the wall, is caught here, while clothes · hair crossing the bottom of the picture have a curved top edge and too few columns on the line. On the 666 pixiv pictures, all 7 pictures that reached this check were stopped by the straight-top-edge condition.
+     **Fallback line** (0.43): if these conditions fail while F is 3–60% of the picture (the character hides much of the floor and the Theil-Sen line wavers), among the lines through two of the 64 columns,
+     the one with at most one column more than τ above it and the most columns within τ is chosen. If 25% or more of the width lies within τ of it, at least half of the leftmost and of the rightmost 10% of columns each lie within τ
+     (the wall-floor line crosses the picture), and no more than 2% of F is more than τ above it, F is added to the background. On the 777 real pictures no picture changed through this line.
 4. It is used only if the area is 3–97% of the whole.
 5. **Closing narrow gaps** (0.34): if the background found by 1–4 is bright and almost one color (median $`L^*`$ of at most about 20,000 background $`\mathrm{known}`$ pixels $`\ge 70`$,
    share within $`\Delta E < 10`$ of that median color $`\ge 0.6`$, the same formula as "almost one color" in face-based widening), 1–4 are redone with the same thresholds,
@@ -734,6 +745,9 @@ The median is $`i/1000`$ for the first bin 𝑖 where the cumulative count reach
 - **Blocking before dark places** (0.42): in the same stage 1 · 2 fills (also when searching again without 𝜀), a step $`p \to q`$ is also blocked when, in the Lab of 𝑈 (the same values as crisp edges), $`L^*_q \le 35`$ and either $`\Delta E(p, q) \ge 20`$
   or, for the pixel one step back $`p' = 2p - q`$ (when it is inside the picture without wrapping to another row), $`\Delta E(p', q) \ge 20`$. Done even without $`B_1`$; with $`B_1`$ it is used together with the blocking above.
   Only whether the arriving pixel is dark is checked. Also blocking when the starting pixel is dark made $`\mathrm{BER}`$ worse by 0.226 on one ground-truth picture (0.42 in 12).
+- **Widened blocking before dark places** (0.43): after the scene background is found, stages 1 · 2 are filled once more with the blocking above also checking the pixel two steps back $`p'' = 3p - 2q`$ (when inside the picture without wrapping to another row) with $`\Delta E(p'', q) \ge 20`$.
+  From the two results before the area criterion and returning swallowed characters, $`S`$ and $`S_3`$, the pixels of $`S \land \lnot S_3`$ that are not flat background are remembered and, after all background stages, put back on the character side unless they are gaps (below).
+  The other stages still run on $`S`$, so only these pixels change (changing the scene background itself shifted the color statistics of later stages and disturbed other places, 0.43 in 12). Searching the scene background once more costs time: 2.7% on 8 real pictures.
 - **Returning islands in the scene background** (0.38): if $`B_1`$ exists, the finished scene background 𝑆 (after returning swallowed characters and passing the area criterion) is split into 4-neighbor connected components (islands) of $`S \land \lnot \tilde B`$,
   and the islands containing no top · left · right border pixel form $`\mathcal I`$ (if the picture's down direction is set, the border pixels that are not the bottom border for that direction, 4.5).
   Splitting the character lump $`C = \lnot(B_1 \lor S) \lor \bigcup \mathcal I`$ into 4-neighbor connected components with largest area $`\lvert C_\max \rvert`$, an island $`I \in \mathcal I`$ is removed from 𝑆 when the component $`C(I)`$ containing it
@@ -807,6 +821,14 @@ The random numbers use a fixed seed (777) for this stage alone, so pictures wher
    The color model is computed with the background before returning; returned pixels are also removed from the background added by the color model, and from the background-effect candidates below.
 6. In pictures where a swallowed character was returned in the scene background stage (below), splitting into pieces and color comparison use the background before returning.
    If the returned character colors enter the character-side distribution, the likelihood ratio of other pieces (hair of the same color family) changes and the decision wavers.
+7. **Dark character parts** (0.43): the same background, minus the pieces returned under 4, is cut this time at faint edges ($`\Delta E \ge 5`$ between pixels 2px apart) and lines into pieces 𝑘 (label filling · contact lengths as in 2).
+   The pixels of pieces touching the top · left · right border are counted in $`25 \times 64 \times 64 = 102400`$ Lab bins ($`\lfloor L/4\rfloor,\ \lfloor(a + 128)/4\rfloor,\ \lfloor(b + 128)/4\rfloor`$, out-of-range values go to the end bins) as $`h_T`$ (total $`n_T`$), and for every piece not touching the border
+
+   $`\displaystyle \nu_k=\frac1{|k|}\sum_{p\in k}\mathrm{clip}_{[-4,4]}\Big(\ln\frac{n_T+102400}{102400}-\ln\big(h_T(c_p)+1\big)\Big),\qquad \bar L_k=\frac1{|k|}\sum_{p\in k}L^*_p`$
+
+   is measured. Pieces with $`2\times10^{-5}N \le |k| \le 0.15N`$, $`\bar L_k \le 35`$ and $`\nu_k > 0`$ (colors rarer than average in the border background) are candidates; a candidate whose contact with the character plus contact with already accepted candidates
+   is at least 0.1 of its total contact length or at least $`0.25\sqrt{|k|}`$ is accepted, repeated until nothing more is accepted (connected pieces like legs → skirt → body). The band (3px) between accepted pieces and the character is returned too.
+   The dark background itself has the colors of the border background and does not come back; parts painted on it with slightly different colors, such as black hair · skirts · legs, do.
 
 #### Face finding
 
@@ -981,6 +1003,20 @@ and line pixels ($`\mathrm{lineMask}`$) are fewer than $`0.3 n_o`$ of the $`n_o`
 
    Pictures where the character itself has the background color, like white clothes on a white background or black-and-white line art filled with white, have a large sum and are filtered out. The two thresholds (0.05 · 0.02) and flatness 0.6 were set by looking one by one at the 161 pictures changed by a version that gathered pieces loosely (no sum limit, pieces 5%)
    (11). The pixels sent are remembered separately as a gap map and used for region · tone filling (4.6).
+
+#### Rectangular background objects drawn with lines (0.43)
+
+Done after the gaps. For every 4-connected component 𝑟 of painted pixels left on the character side (not background, lines or returned character parts), its area $`A_r`$ and bounding box $`w_r \times h_r`$ are measured.
+
+1. **Rectangle**: it does not touch the border, $`w_r, h_r \ge \max(4, \mathrm{round}(0.015\max(W, H)))`$, $`0.97\,w_r h_r \le A_r \le 0.1N`$, all four corner pixels of the box belong to 𝑟,
+   and the box center lies outside the head ellipse $`(u/2.2)^2 + ((v + 0.3)/2)^2 \le 1`$ and the body column ($`-1.2 \le v \le 8`$, $`\lvert u\rvert \le 1.2 + 0.35 \max(v - 1.5, 0)`$) of every face used for background decisions.
+2. **Surroundings**: if at least half of the painted pixels in the ring around the box widened by $`d = 2\,\mathrm{lw} + 6`$px (lw is the line width), not counting other rectangle candidates, are background, it is accepted (several panes split by window frames leave each other out of their rings).
+   Once something is accepted, the check is repeated until nothing more is accepted.
+3. **Hidden panes**: accepted rectangles of one color (90% or more of their pixels within $`\Delta E \le 4`$ of the mean color) are grouped into a window when their mean colors differ by $`\Delta E < 4`$ and their boxes are within 𝑑 of each other.
+   Inside the group's bounding box widened by the panes' mean width · height plus 𝑑, painted pixels within $`\Delta E \le 4`$ of the group's mean color (outside face zones and returned character parts) are also sent to the background (panes hidden by the character, no longer rectangles).
+
+Window panes · shelves · books of line-drawn rooms (synthetic pictures) are caught here. Being enclosed by lines, the scene background · color model · face-based widening do not take them, and with an almost one-color background face-based widening is not done either.
+Only 1 of the 777 real pictures changed (0.43 in 12).
 
 #### Outer glow
 
@@ -1958,7 +1994,7 @@ In this section:
 - [11.12 Returning islands in the scene background (0.38)](#1112-returning-islands-in-the-scene-background-038)
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
-- [11.15 Blind test (0.1 · 0.40 · 0.41 · 0.42)](#1115-blind-test-01--040--041--042)
+- [11.15 Blind test (0.1 · 0.41 · 0.42 · 0.43)](#1115-blind-test-01--041--042--043)
 
 ### 11.1 Formulas used for evaluation
 
@@ -3256,7 +3292,7 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 
 ### 11.14 Resolving power by version
 
-Every version from 0.1 to 0.42 was measured again with the same pictures and the same scoring.
+Every version from 0.1 to 0.43 was measured again with the same pictures and the same scoring.
 Each version's code was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the <mark>balanced error rate</mark>
@@ -3313,6 +3349,7 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.40 | The floor of line-drawn rooms | 94.6 | 91.1 | 0.0716 | 13.96 | **2.14** | 1.79–2.61 | 3.43 · 1.70 · 1.90 |
 | 0.41 | Returning hair tips · sleeves cut off by the frame | 94.6 | 91.0 | 0.0718 | 13.93 | **2.14** | 1.79–2.60 | 3.43 · 1.69 · 1.90 |
 | 0.42 | Sending fewer black legs · clothes to the background | 95.4 | 91.0 | 0.0680 | 14.71 | **2.25** | 1.89–2.75 | 3.43 · 1.68 · 2.07 |
+| 0.43 | Dark character parts · rectangular background objects | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
 0.19 recovered the synthetic pictures' characters (82.0 → 97.7%), and in 0.37 · 0.38 the posed pictures' character kept rose 81.6 → 86.7 → 91.9%, taking the posed group's multiplier 0.97 → 1.18 → 1.44×.
@@ -3320,8 +3357,12 @@ From 0.4, finding scene backgrounds let the real pictures' backgrounds be found 
 0.41 returns hair tips · sleeves cut off by the frame, which raised character kept in the real picture t29, but that picture, another real picture and one posed picture keep a little more background, so it is slightly below 0.40 (mean BER 0.0716 → 0.0718, 2.140 → 2.136×).
 0.42 makes face-based widening and the scene background take fewer black legs · clothes, which changed 18 posed pictures and raised character kept 92.0 → 93.2%, taking the posed group's multiplier 1.90 → 2.07×.
 6 of the 8 real pictures keep a little more background (mean background found 41.5 → 41.1%), so the real group is 1.69 → 1.68×, but overall it is above 0.41 (mean BER 0.0718 → 0.0680, 2.136 → 2.254×).
+0.43 returns black hair · skirts · legs on dark backgrounds (character kept on the posed pictures 93.2 → 99.6%) and finds more window panes · shelves · floors of line-drawn rooms
+(background found: synthetic 92.2 → 97.5%, posed 93.8 → 97.9%), taking the synthetic group 3.43 → 9.43× and the posed group 2.07 → 10.56× (mean BER 0.0680 → 0.0259).
+5 of the 8 real pictures keep a little more background (mean background found 41.1 → 40.9%), so the real group is 1.68 → 1.67×. 177 of the 185 pictures are synthetic, which is why the overall multiplier jumped;
+the gain on real pictures should be read from the 0.43 entry in section 12 (blind component grading on the 777 real pictures) and the blind test in 11.15.
 
-### 11.15 Blind test (0.1 · 0.40 · 0.41 · 0.42)
+### 11.15 Blind test (0.1 · 0.41 · 0.42 · 0.43)
 
 To compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the three latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the four versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), and then the key was opened.
@@ -3329,24 +3370,69 @@ For each picture, only the distinct results were collected (versions with identi
 
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
-| 0.1 | **31.7%** (19/60, 21.3–44.2) | 20.0% | 13.3% | 55.0% | 10/30 · 9/30 |
-| 0.40 | **45.0%** (27/60, 33.1–57.5) | 30.0% | 55.0% | 0.0% | 18/30 · 9/30 |
-| 0.41 | **48.3%** (29/60, 36.2–60.7) | 30.0% | 51.7% | 0.0% | 19/30 · 10/30 |
-| 0.42 | **48.3%** (29/60, 36.2–60.7) | 31.7% | 51.7% | 0.0% | 19/30 · 10/30 |
+| 0.1 | **21.7%** (13/60, 13.1–33.6) | 20.0% | 21.7% | 56.7% | 7/30 · 6/30 |
+| 0.41 | **33.3%** (20/60, 22.7–45.9) | 30.0% | 65.0% | 1.7% | 11/30 · 9/30 |
+| 0.42 | **35.0%** (21/60, 24.2–47.6) | 30.0% | 63.3% | 1.7% | 11/30 · 10/30 |
+| 0.43 | **36.7%** (22/60, 25.6–49.3) | 31.7% | 61.7% | 1.7% | 12/30 · 10/30 |
 
-This time no two versions have byte-identical background maps on all 60 pictures, so each picture had 2 (21 pictures) · 3 (32) · 4 (7) distinct panels. 0.42 differs from 0.41 on 35 pictures.
-As same-picture pairs, 0.41 → 0.42 gained 0 · lost 0 in "no major loss" ($`p = 1.0`$) and 1 · 0 in "character without loss", with 1 picture graded higher (small pieces lost → character intact) and 0 lower.
-0.40 → 0.41 gained 2 · lost 0 in "no major loss" ($`p = 0.50`$), with 2 pictures graded higher and 0 lower.
-Version 0.1 found no background in 33 pictures and leaves them as they are, so it has few major losses (8); 0.1 → 0.42 gained 14 · lost 4 in "no major loss" ($`p = 0.031`$).
-The four versions were graded again from scratch together, so every version's rate is lower than in the 0.41 entry's grading (0.1 · 0.39 · 0.40 · 0.41 graded together): 0.41 went from 60.0 to 48.3%, 0.40 from 58.3 to 45.0%, and 0.1 from 35.0 to 31.7%.
-This time the line between "small pieces lost" and "major loss" was drawn more strictly (for example, losing the crown of the hair, a little over 0.5% of the picture, counts as a major loss). Read this as the difference between four versions graded together by the same standard rather than as the size of the rates.
-The table at the end of the 0.42 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+This time four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). Pictures had 2 (23 pictures) · 3 (15) · 4 (22) distinct panels, and 0.43 differs from 0.42 on 24 pictures.
+As same-picture pairs, 0.42 → 0.43 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$) and 1 · 0 in "character without loss", with 1 picture graded higher and 0 lower ($`p = 1.0`$).
+0.41 → 0.42 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$), with 1 picture graded higher and 0 lower.
+Version 0.1 found no background in 34 pictures and leaves them as they are, so it has few major losses (13); 0.1 → 0.43 gained 11 · lost 2 in "no major loss" ($`p = 0.022`$).
+The four versions were graded again from scratch together, so the rates differ from the 0.42 entry's grading (0.1 · 0.40 · 0.41 · 0.42 graded together): 0.42 went from 48.3 to 35.0%, 0.41 from 48.3 to 33.3%, and 0.1 from 31.7 to 21.7%.
+These graders also counted crowds and faintly drawn large figures in the background as characters and graded their losses as major, so every version's rate is lower. Read this as the difference between four versions graded together by the same standard rather than as the size of the rates.
+The table at the end of the 0.43 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
 ## 12. Release history
 
 Newest versions are at the top.
+
+### 0.43 (2026-10-11) Returning dark character parts · rectangular background objects drawn with lines
+
+- Resolving power: 5.91× version 0.1 (95% CI 4.33–8.63×, 11)
+- The failures left in 0.42 were split three ways and their causes looked for separately: 23 ground-truth pictures that lose character (character kept under 90%), 24 that leave background (background found under 80%), and the 31 of the 60 blind-test pictures where 0.42 had a major loss.
+  - In the 23 pictures losing character, 72% of the lost pixels were taken by the flat · gradient background and 20% by scene background stage 1. On a dark background (e.g. RGB 27 · 27 · 42), black hair · legs have outlines
+    only about $`\Delta E`$ 6 from the background and 7–9 from the paint, so they were not picked up as lines.
+  - The pictures leaving background had window panes · shelves · books of line-drawn rooms (enclosed by lines, so the color model · face stage do not take them) and floors largely hidden by the character (the straight-top-edge test of the floor band failed).
+  - The major losses in the 31 real pictures came from the scene background stage in 23 (heads · arms touching the border 9, dark clothes · hair on dark backgrounds 6, soft pictures without outlines 6, text · inset panels 2), the flat background stage in 5 and the color model in 3.
+- **Returning dark character parts** (7 of 3.5, 4.5): after returning attached parts, the background is cut at faint edges ($`\Delta E \ge 5`$) and lines, and pieces that do not touch the border, are dark (mean $`L^*`$ 35 or less) and have colors rare in the border background are returned repeatedly when connected to the character.
+- **Fallback line for the floor band** (1 of 3.5, 4.5): when the character hides much of the floor and the Theil-Sen line wavers, the line through the most columns with at most one column above it is tried (25% or more of columns on it, at least half of each 10% edge strip).
+- **Rectangular background objects drawn with lines** (11 of 3.5, 4.5): after the gaps, rectangular pieces left on the character side (window panes · shelves · frames) go to the background when at least half of their surroundings is background and they lie outside face zones; in windows of same-colored panes, hidden panes go too.
+- **Widened blocking before dark places** (2 of 3.5, 4.5): the dark-place blocking of 0.42 is widened to two steps back and the scene background is searched once more; pixels that only the first scene background took are kept on the character side at the end of the background stages.
+  Searching the scene background once more costs time: 2.7% on 8 real pictures.
+- Losing character was weighed 3 times as heavily as leaving background.
+- Of the 185 ground-truth pictures, 83 changed (better 66 · worse 17). Mean character kept went 95.4 → 99.5% and background found 91.0 → 95.3%; the synthetic group 3.43 → 9.43× and the posed group 2.07 → 10.56×.
+  The largest gains were posed pictures losing about half the character on dark backgrounds (character kept 49 → 100%, 49 → 99%) and room pictures leaving windows · floors (background found 53 → 99%, 55 → 100%).
+  All 17 worse pictures keep a little more background; the only character lost is 0.008%p in t24. 5 of the 8 real ground-truth pictures keep a little more background (mean background found 41.1 → 40.9%, at most t24 −1.2%p), so the real group is 1.68 → 1.67×.
+- Why the ground-truth multiplier jumped: 177 of the 185 pictures are synthetic, and these rules aim straight at failures common in the synthetic pictures (black legs on dark backgrounds, line-drawn rooms). The gain on real pictures should be read from the component grading and blind test below.
+- Of the 777 real pictures, 347 have changed background maps. The changes were split into connected components (0.03% of the picture or more); the 60 largest places and 30 random places from the rest were graded the same way as in the 0.42 entry by graders who did not know which side was new
+  (a returned place +3 if character, −1 if background; a further removed place +1 if background, −3 if character; times its area. Parentheses give place-level <mark>bootstrap</mark> 95% intervals).
+  - Dark character parts (vs 0.42, 90 of 926 places): +3.33 (+1.49 to +5.48), with equal weights +0.42 (−0.45 to +1.35). Of the returned places, 44 were character (1.46 pictures' worth of area) and 38 background (1.27),
+    so dark furniture · signs · floors come back too. By picture, better 37 · worse 29 ($`p = 0.39`$).
+  - Widened blocking before dark places (vs the version with the other three rules, 90 of 625 places): +0.75 (+0.12 to +1.40), with equal weights +0.23 (−0.03 to +0.49), by picture 34 · 28 ($`p = 0.53`$).
+  - The fallback floor line · rectangular objects changed only 1 of the 777 (the floor under a desk went to the background, together with a few skirt-edge pixels).
+- The blind test (11.15) graded 0.1 · 0.41 · 0.42 · 0.43 again together. 0.43 differed from 0.42 on 24 of the 60 pictures, with 22 "no major loss" (0.42: 21), gained 1 · lost 0 ($`p = 1.0`$), 1 picture graded higher and 0 lower.
+- The five-target results on pixiv pictures (10.6, 11.13) were graded at 0.39 and were not graded again.
+- Remaining weaknesses: busy real backgrounds stay as they were (the ground-truth picture t17 has 5% background found). Returning dark character parts also returns dark furniture · floors,
+  and 17 cues (lightness · chroma · position · texture · face zones and more) could not separate the two (best <mark>AUC</mark> 0.68). Characters taken by the flat background stage, such as skin on a cream background, were not addressed this time.
+- Tried but not added:
+  - Dark character parts: returning only pieces touching large character components (posed pictures lost legs · body again in 4), treating 2 · 3px from the border as the border (no effect · a loss), filtering by the 17 cues above (all losses when checked leaving one picture out at a time).
+  - Background: letting the face stage ignore enclosure outside face zones (mean $`\mathrm{BER}`$ −9.1×10⁻⁴ on the ground truth, but it took hair · ribbons · sleeves · a scythe blade on real pictures), measuring the gap stage's flatness for wall · floor separately (no effect), adding floor-colored gaps (lost character on posed pictures).
+  - Major losses on real pictures: cutting border seeds (+2.3×10⁻⁴), blocking every $`\Delta E \ge 25`$ step (+16.9×10⁻⁴, character loss), a dark-place threshold of 15 (+8.2×10⁻⁴), protecting regions continuous with the face's crown color (returned large dark backgrounds around false faces),
+    changing the scene background itself and passing it on to later stages (later stages' color statistics shifted and one picture lost a white shirt of 117,000 pixels).
+
+| | Version 0.1 | Version 0.41 | Version 0.42 | Version 0.43 |
+|---|---|---|---|---|
+| Resolving power | 100% | 214% | 225% | 591% |
+| Resolving power 95% CI | — | 179–260% | 189–275% | 433–863% |
+| Resolving power 80% CI | — | 190–242% | 200–256% | 482–754% |
+| Blind test | 22% | 33% | 35% | 37% |
+| Blind test 95% CI | 13–34% | 23–46% | 24–48% | 26–49% |
+| Blind test 80% CI | 16–29% | 26–41% | 28–43% | 29–45% |
+
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with <mark>Wilson intervals</mark>. The four versions were graded again from scratch together, so the rates differ from the table of the 0.42 entry (11).
 
 ### 0.42 (2026-10-10) Sending fewer black legs · clothes to the background
 
