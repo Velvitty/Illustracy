@@ -31,6 +31,7 @@ A program that takes a single finished illustration and **splits it back into ma
 10. [Limitations](#10-limitations)
 11. [Verification](#11-verification)
 12. [Release history](#12-release-history)
+13. [References](#13-references)
 
 ---
 
@@ -299,6 +300,8 @@ Applying a **closing** (a maximum filter followed by a minimum filter) to the br
 $`\text{closing} - \text{original}`$ (the **black top-hat**) is the depth of the line. Starting from pixels with a large depth, slightly weaker pixels are joined (**hysteresis**), and pieces that are too small are discarded.
 Dark blobs wider than the closing window, such as crossings where lines meet, are filled by continuing from the lines, but dark surfaces that continue beyond the line width (black clothes) are not filled.
 
+**Note** — **Why**: A line is "darker than its surroundings and thinner than the pen", so only dark structures below that width are picked (formulas in 4.3). **How it works**: Closing fills dark valleys narrower than the window with the surrounding light values, so closing − original (the black top-hat) keeps only thin dark structures. Hysteresis, starting from a high threshold and linking down to a low one, is the method of Canny edge detection. **References**: [R15 Soille 2003](#r15) · [R18 Canny 1986](#r18)
+
 Lines that are dark and whose depth drops a lot when slightly blurred are marked separately as **crisp lines**. They are used to tell character lines from blurred background marks when separating the background.
 
 ### 3.3 Restoring the color under lines
@@ -311,6 +314,8 @@ The median color of pixels almost fully covered by lines is the **base line colo
 For each pixel, $`\text{original} = \text{line alpha} \times \text{line color} + (1 - \text{line alpha}) \times \text{color below}`$ is solved for the alpha,
 and where the base line color does not reproduce the original (lines catching light, colored lines), the actual line color at that place is found separately and put into the **color trace** layer.
 The color trace is clipped to the line art, so it only changes the line color within the line art's alpha.
+
+**Note** — **Why**: Separating the line-art layer requires knowing how much the line covers each pixel (alpha) (formulas in 4.4). **How it works**: The standard compositing formula $`O = aK + (1 - a)U`$, opaque ink covering a share 𝑎 of the pixel, is solved for 𝑎. Knowing the line color 𝐾 and the color beneath 𝑈 fixes 𝑎, and the actual line color is found separately only where the base line color fails to reproduce the original. **References**: [R1 Porter · Duff 1984](#r1) · [R2 Smith 1995](#r2)
 
 ### 3.5 Finding the background
 
@@ -439,6 +444,8 @@ Tones clearly brighter than the base color are highlights (normal layer), and sm
 
 For each pixel, the color painted up to $`\text{base color} \times \text{1st} \times \text{2nd} \to \text{highlight}`$ is compared with the restored color under the lines.
 
+**Note** — **Why**: The remaining difference between the color made by base and shadow layers and the original goes into multiply and screen layers, so combining all layers restores the original (formulas in 4.9–4.11). **How it works**: Shadows are multiplies, so the base is multiplied by the first and second shadow colors in turn, and highlight tones cover it with their color. The remaining darkening is found by inverting multiply, brightening by inverting screen. **References**: [R1 Porter · Duff 1984](#r1) · [R3 ISO 32000-1 2008](#r3)
+
 - If darker, the remaining **darkening** is split into a widely laid part (**gradient**) and the rest (**shading**). Both are multiply, so multiplying them gives the original darkening.
 - If brighter, the remaining **brightening** is peeled off in the order sparkle → rim light → thin sparkle → reflected light → light. It is split so that the screens stacked together equal the original brightening.
 
@@ -529,6 +536,8 @@ The layer structure of a picture imitates the properties of light and paint, and
 | **Depth of field**: out-of-focus objects spread by the circle of confusion and look blurred | Background painted blurred | presence of "crisp lines" (lines that weaken a lot when slightly blurred) |
 | **Human color perception**: the eye is most sensitive to green, and feels color differences as brightness and hue | All color comparisons | brightness weights 0.299 · 0.587 · 0.114, Lab and $`\Delta E`$ (about 2.3 is a just-noticeable difference → part merge threshold 2.5) |
 
+**Note** — **Why**: Mapping layer blend modes to physical phenomena explains why each blend formula fits its layer and predicts how editing the layer will look. **How it works**: Multiply $`x \cdot g`$ is light passing a filter of transmittance 𝑔, and two filters multiply their transmittances (under the Beer–Lambert law absorbances add, so transmittances multiply). Screen $`1 - (1 - a)(1 - b)`$ has the form of "the probability that at least one of two lights arrives", so it never exceeds 1. Normal blending $`aK + (1 - a)U`$ is opaque ink covering area 𝑎. 2.5 is a threshold matched to a just-noticeable CIELAB difference (about 2.3). **References**: [R12 Beer 1852](#r12) · [R1 Porter · Duff 1984](#r1) · [R3 ISO 32000-1 2008](#r3) · [R8 Mahy et al. 1994](#r8)
+
 Multiply · screen are computed on **gamma-encoded sRGB values**, like Photoshop.
 It is not physically exact linear-space compositing, but Photoshop composites a PSD with the same formulas when it is opened, so the original is reproduced as it is.
 Only color comparisons (<mark>k-means</mark>, $`\Delta E`$) are done in Lab space, after linearization.
@@ -591,6 +600,8 @@ The same picture with the same settings always gives the same result, and fixing
 ## 7. Issues and fixes
 
 Problems that came up while verifying with real pictures during development, and how they were solved.
+
+**Note** — **Why**: The numbers in this section (𝑝, intervals, counts better · worse) are computed with the formulas of 11.1 rather than restated for each problem. **How it works**: Intervals for shares are Wilson intervals, comparisons of the same pictures under two versions use McNemar or sign tests (binomial tests on the discordant pictures only), and small tables use Fisher's exact test. The grading criteria themselves (no major loss and so on) are in 11.1 and 11.15. **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R63 Fisher 1922](#r63) · [R85 Dixon · Mood 1946](#r85)
 
 ### 7.1 Split quality
 
@@ -789,6 +800,8 @@ Problems that came up while verifying with real pictures during development, and
 | (0.47) Tracing every line of the line art in rough 2 (down to short closed loops · contours of thick painted shapes outside faces) | In a blind test on 40 unseen pictures it lost heavily to 0.46's rough 2 on plausible origin 3 : 22 and by hand 2 : 28, with no difference on form 9 : 10. Notes gathered on "patterns traced as small closed loops look mechanical", so repeated small loops are left out and contours of painted shapes are taken only inside face areas |
 | (0.47) Finding irises by color and drawing them as ellipses (blobs that are neither white of the eye nor skin around found eye points) | Some eyes in development pictures were right, but cheek blush · parts of eyes were often taken as irises; above all, recognizing eyes and turning them into symbols was dropped in favor of tracing the line art |
 
+**Note** — **Why**: Methods not adopted must be measured by the same standard to show why the current method stayed. The 𝑝 values in the table are sign-test or exact-test values from paired gradings (formulas in 11.1). **How it works**: The line-detection window $`\max(1, \mathrm{round}(4s))`$ was an attempt to make the 4px window at a 1000px long side proportional to the size ratio 𝑠 without the floor of 3. On small pictures the window shrank to 2px, fewer lines were found and results got worse. **References**: [R85 Dixon · Mood 1946](#r85) · a rule set by this program
+
 ---
 
 ## 8. Optimization
@@ -809,6 +822,8 @@ Problems that came up while verifying with real pictures during development, and
 | Correction undo | stores only the rows of the changed rectangle | undo memory stays small even for large pictures |
 | Stage isolation | fixed random seeds per stage, immediate return outside the operating condition | new stages do not change results of existing pictures (regression checks can compare bytes) |
 | Re-splitting after corrections | the automatic background result (background · returned-part marks, faces) is kept in the worker and reused when the picture content hash and line settings are the same | core computation per correction median 8.0 → 5.1 s, on screen 10.0 → 8.3 s (17–35% faster on three test pictures). Only two picture-sized byte maps are stored |
+
+**Note** — **Why**: Processing large pictures in seconds in a browser needs methods whose cost does not grow with radius or picture size. **How it works**: $`O(1)`$ means constant work per pixel regardless of radius, and $`O(N)`$ means work proportional to the pixel count 𝑁. Sliding max/min with a monotonic deque needs only a few comparisons per element, and a box blur with running sums needs one addition and subtraction regardless of window size. **References**: [R16 Lemire 2006](#r16) · [R17 Wells 1986](#r17) · [R27 Dinic 1970](#r27)
 
 ---
 
@@ -843,6 +858,7 @@ Problems that came up while verifying with real pictures during development, and
   Only bright, very saturated fluorescence ($`L^* > 60,\ C^* > 45`$) counts as glow, so light teal, faint pink spreading over a dark background, and thin orange glows are not split and stay in the background layer (only 1 of 5 synthetic glow pictures is split, 11).
   Finding faint glow outside the outline by "tint stronger than the background's own color, fading with distance from the line" was right on synthetic pictures, but all 24 pictures newly found among real ones were bands · scene pieces on flat backgrounds (7.5).
   White sticker borders, and borders of pictures where little background is found (the rainbow border of the two-person yukata picture), cannot be split and stay on the character or background side.
+  - **Note** — **Why**: This explains the limitation that the strict glow condition leaves faint glows in the background layer (formulas in 4.5, outer glow). **How it works**: $`L^*`$ is lightness and $`C^* = \sqrt{a^{*2} + b^{*2}}`$ chroma, so only bright, vivid colors passing both thresholds count as fluorescent. **References**: [R7 CIE 2004](#r7)
 
 ### 10.2 Separating background and character
 
@@ -949,6 +965,7 @@ Problems that came up while verifying with real pictures during development, and
   - **Line detection window**: the window is $`\max(3, \mathrm{round}(4 \times \text{long side}/1000))`$px, so small pictures hit the minimum of 3px, and automatic line width measurement does not count widths under 1.8px, so it misses the 1–2px lines of small pictures,
     measures thicker dark shapes (median 6.7px), and raises the window to 5px. Enlarging the same picture 2× measures the actual pen (3.4px at original size) and the window becomes 2px at original size, so the found lines fall from 17.1% → 8.5% of the picture area,
     the line density inside the character falls, and the scene background enters clothes · hair.
+    - **Note** — **Why**: This explains the limitation that the line-detection window hits its minimum on small pictures. **How it works**: The window $`\max(3, \mathrm{round}(4 \times \text{long side}/1000))`$ scales a 4px length at a 1000px long side with size but never goes below 3px. On small pictures the 3px floor exceeds the actual pen, so dark shapes that are not lines get measured too. **References**: [R15 Soille 2003](#r15) · a rule set by this program
   - **Color step threshold**: the flat background fill and the margin widening of the scene background stop at the color difference of one neighboring pixel (0.035, 0.03); enlarging a picture spreads the same boundary's color change over several steps, so the one-step difference shrinks and the boundary is crossed.
     From 0.29, pictures with a long side over 1200px reduce this threshold in proportion to size (4.5).
   - **Crisp line decision**: only lines losing more than 25% of their depth when blurred by 1.5px are crisp, so the thickened lines of an enlarged picture are judged less crisp.
@@ -958,6 +975,7 @@ Problems that came up while verifying with real pictures during development, and
     the larger the canvas, the thicker the lines in pixels (<mark>Spearman</mark> $`\rho = 0.62,\ p < 0.0001`$), but the ratio to the long side was unrelated to canvas size ($`\rho = -0.09,\ p = 0.44`$).
     Artists choose their pen for the canvas size, so the typical width lives as a ratio to picture size, not in pixels. At this ratio, lines are 0.8px in a picture with a 540px long side and 1.8px at 1200px,
     so the smaller the picture, the less fully pixel-based rules see its lines.
+    - **Note** — **Why**: This checks whether line width grows with canvas size; the values are skewed and the relation need not be a straight line, so ranks are used. **How it works**: Spearman's 𝜌 is the Pearson correlation of the two values after each is replaced by its rank, so it only asks whether one rises as the other rises (a monotone relation) and is not swayed by a few large values. 𝑝 is the probability of a 𝜌 this large if the correlation were 0. Line widths are measured on lightness enlarged 2× with <mark>DCCI</mark> (directional cubic interpolation), which does not blur outlines. **References**: [R82 Spearman 1904](#r82) · [R49 Zhou et al. 2012](#r49)
   - So in 0.29 the three values were changed to ratios relative to a long side of 1200px (the size the rules are tuned to) and verified on 666 pictures. For large pictures, making the color step threshold proportional helped, so only that was added;
     for small pictures, making them proportional shrinks the line detection window to 2px and loses more character (no major loss under 900px 50% → 33%), so they stay in pixels (7.5).
     Pen widths cluster as a ratio to picture size, but in small pictures the generous pixel window also catches dark patterns · hair grain outside the outlines as lines (found lines a median of 12.3% of the picture area in 24 random pictures under 900px, 8.4% with a proportional window),
@@ -1036,6 +1054,8 @@ For every picture, the PSD was recomposited with **psd-tools** (Python) and comp
 Checks of the layer structure (names, blend modes, clipping bases, empty layers, canvas bounds) found 0 problems, and splitting the same picture twice gave byte-identical pixels in every layer.
 It was also run with all external network requests from the browser blocked (0 external requests).
 
+**Note** — **Why**: This gathers in one place which formulas produce the statistics in this section (shares, intervals, 𝑝, odds ratios, 𝜅, resolving power). **How it works**: All values come from the formulas of 11.1: reconstruction accuracy is PSNR (4.13), separation accuracy is the BER and its reciprocal, the resolving power (11.14), intervals for shares are Wilson intervals, and intervals between versions use a paired picture-level bootstrap. **References**: [R55 Huynh-Thu · Ghanbari 2008](#r55) · [R56 Wilson 1927](#r56) · [R80 Efron 1979](#r80)
+
 In this section:
 
 - [11.1 Formulas used for evaluation](#111-formulas-used-for-evaluation)
@@ -1064,37 +1084,48 @@ In this section:
   $`\displaystyle \mathrm{IoU}=\frac{|C\cap G|}{|C\cup G|},\qquad \text{character kept}=\frac{|C\cap G\cap I|}{|G\cap I|},\qquad \text{background found}=\frac{|\bar C\cap\bar G\cap I|}{|\bar G\cap I|}`$
 
   "Pixel total" divides the sums of numerators and denominators over several pictures, and "mean" is the mean of per-picture values. "In 24-color regions, area-weighted" counts the color model's regions weighted by area instead of pixels.
+  - **Note** — **Why**: This is the basic measure for comparing a split with ground truth pixel by pixel. Measuring character kept and background found separately catches results that are good on only one side. **How it works**: IoU (the Jaccard index) is the intersection area over the union area. Character kept is the share of true character placed on the character side (recall of the character), background found the share of true background placed in the background. The 3px band 𝐼 around the true boundary is excluded because hand-drawn ground-truth outlines themselves wander by a few pixels. Pixel totals weight large pictures more; means weight each picture equally. **References**: [R52 Jaccard 1912](#r52) · a rule set by this program
 - **<mark>Precision</mark> · <mark>recall</mark>**: with found 𝑃 and ground truth 𝑇, <mark>precision</mark> $`\lvert P \cap T\rvert/ \lvert P\rvert`$ and <mark>recall</mark> $`\lvert P \cap T\rvert/ \lvert T\rvert`$. Lines count as correct within 1px of a ground-truth line, and names are counted in pixels excluding a 3px band at material boundaries.
   In synthetic pictures, a face counts as found if there is a found face within $`0.35d`$ of the midpoint of the ground-truth eyes with a size ratio of 0.6–1.6.
+  - **Note** — **Why**: The share of found items that are right and the share of true items that are found measure different failures (false finds, misses). **How it works**: Precision $`|P \cap T|/|P|`$ is the share of found items that are true, recall $`|P \cap T|/|T|`$ the share of true items that are found. A face counts as the same if within $`0.35d`$ (35% of the eye distance) of the true eye midpoint and similar in size. **References**: [R53 van Rijsbergen 1979](#r53) · [R51 Manning et al. 2008](#r51)
 - **Coverage · purity** (base colors of brush paintings): the mean over materials 𝑚 of the share taken by the dominant part $`\max_k \lvert m \cap k\rvert/ \lvert m\rvert`$ (coverage), and over parts 𝑘 of the share of the dominant material $`\max_m \lvert m \cap k\rvert/ \lvert k\rvert`$ (purity).
+  - **Note** — **Why**: This measures how well base colors split materials in brush-painted pictures, in two directions: fragmentation (coverage) and mixing (purity). **How it works**: Coverage is, per material, the share held by its largest part, so it drops when a material splits into several parts; purity is, per part, the share of its largest material, so it drops when materials mix in one part. **References**: a rule set by this program
 - **Colorfulness** (of test pictures, <mark>Hasler–Süsstrunk</mark>): on 0–255 values of the picture shrunk to a 300px long side, with $`\mathrm{rg} = R - G,\ \mathrm{yb} = (R + G)/2 - B`$,
 
   $`\displaystyle M=\sqrt{\sigma_{rg}^2+\sigma_{yb}^2}+0.3\sqrt{\mu_{rg}^2+\mu_{yb}^2}`$
 
   Dull · medium · colorful were divided at the tertiles of 𝑀 over the added 342 pixiv pictures (33.4, 52.2).
+  - **Note** — **Why**: Splitting test pictures into dull and colorful ones to see results by condition needs one number that matches the human sense of "colorful". **How it works**: $`rg = R - G`$ and $`yb = (R + G)/2 - B`$ approximate the red–green and yellow–blue opponent axes of human vision in RGB. Colorfulness 𝑀 adds the standard deviations of both axes (how varied the colors are) and their mean (how far the whole leans to one color) with weight 0.3, a formula fitted to correlate well with human ratings of colorfulness. **References**: [R11 Hasler · Süsstrunk 2003](#r11)
 - **Spread of a proportion**: if 𝑘 of 𝑛 pictures pass, $`p = k/n`$, per-picture standard deviation $`\sqrt{p(1 - p)}`$, standard error $`\mathrm{SE} = \sqrt{p(1 - p)/n}`$, margin of error $`z \cdot \mathrm{SE}`$ (𝑧 is 1.645 · 1.960 · 2.576 for 90 · 95 · 99%).
+  - **Note** — **Why**: A pass share alone hides the uncertainty from the number of pictures, so spread and margin of error are given too. **How it works**: Each picture is a Bernoulli variable, pass (1) or fail (0), with standard deviation $`\sqrt{p(1 - p)}`$; the standard error of a mean over 𝑛 pictures divides by $`\sqrt{n}`$. By the central limit theorem the share is approximately normal, so the margin of error multiplies the standard error by the normal quantile 𝑧 (1.96 at 95%). **References**: [R78 Agresti 2013](#r78)
 - **<mark>Wilson score interval</mark>**:
 
   $`\displaystyle \frac{p+\frac{z^2}{2n}}{1+\frac{z^2}n}\ \pm\ \frac z{1+\frac{z^2}n}\sqrt{\frac{p(1-p)}n+\frac{z^2}{4n^2}}`$
+  - **Note** — **Why**: When 𝑝 is near 0 or 1 or 𝑛 is small, the interval $`p \pm z\cdot\mathrm{SE}`$ can go below 0 or above 1 and under-covers. The Wilson interval works well in these cases too. **How it works**: It solves $`|p - \pi| \le z\sqrt{\pi(1 - \pi)/n}`$ as a quadratic inequality in the true share 𝜋. Because the unknown 𝜋, not the observed 𝑝, is in the standard error, the center is pulled toward $`1/2`$ and the interval always stays within 0–1. **References**: [R56 Wilson 1927](#r56) · [R78 Agresti 2013](#r78)
 
 - **<mark>Clopper–Pearson exact interval</mark>** (confidence level $`1 - \alpha`$): an interval inverting the <mark>binomial distribution</mark>, wider than the <mark>normal approximation</mark>, whose actual coverage never falls below $`1 - \alpha`$. $`B(q; a, b)`$ is the 𝑞 quantile of the beta distribution.
 
   $`\displaystyle p_L=B\!\left(\tfrac{\alpha}2;\,k,\,n-k+1\right)\ (0\text{ if }k=0),\qquad p_U=B\!\left(1-\tfrac{\alpha}2;\,k+1,\,n-k\right)\ (1\text{ if }k=n)`$
 
   The **one-sided 95% lower bound** is $`B(0.05; k, n - k + 1)`$, and **<mark>Bonferroni</mark>** uses a $`1 - 0.05/3 \approx 98.3\%`$ interval per criterion so that the three criteria together hold at 95% overall.
+  - **Note** — **Why**: Used when it must be guaranteed without approximation that the true share lies outside the interval with probability at most 𝛼 (small samples, lower-bound claims). **How it works**: It finds the 𝜋 at which the binomial cumulative probability is exactly 𝛼/2, which, by the identity between binomial and beta cumulative distributions, comes directly from beta quantiles. Because the distribution is discrete, coverage is conservatively at least 1 − 𝛼. Bonferroni cuts each criterion's error to 0.05/3 when three are claimed together so the total error stays below 0.05 (the union bound). **References**: [R57 Clopper · Pearson 1934](#r57) · [R58 Dunn 1961](#r58)
 - **<mark>𝑡 interval of a mean</mark>**: from the mean $`\bar x`$ of per-picture values $`x_1 \dots x_n`$ and the sample standard deviation $`s = \sqrt{\sum(x_i - \bar x)^2/(n - 1)}`$, $`\bar x \pm t_{n-1}(1 - \alpha/2) \cdot s/\sqrt n`$ ($`t_{n-1}(q)`$ is the 𝑞 quantile of the 𝑡 distribution with $`n - 1`$ degrees of freedom; capped at 100%).
+  - **Note** — **Why**: This is an interval for the mean of per-picture values (e.g. % character kept). Because the standard deviation is estimated from the sample, a 𝑡 quantile is used in place of the normal one. **How it works**: The sample standard deviation divides by $`n - 1`$ because estimating the mean uses up one degree of freedom (unbiased variance). Estimating the standard deviation adds uncertainty, so the quantile of Student's 𝑡 distribution, with heavier tails, is used. For large 𝑛 the 𝑡 quantile approaches the normal 1.96. **References**: [R59 Student 1908](#r59)
 - **<mark>Chi-square test of independence</mark>**: in a 2×2 table of two groups × (pass / other) (e.g. two pixiv groups × no major loss, face found · not found × no major loss),
   the 𝑝 value of $`\chi^2 = \sum(\lvert O - E\rvert - 0.5)^2 / E`$ (1 degree of freedom) with expected counts $`E = \text{row sum} \times \text{column sum}/\text{total}`$ and <mark>Yates</mark>' continuity correction.
   𝑝 is the probability that the two groups differ this much or more by sampling error alone when their true proportions are equal; below 0.05 it was written as "hard to see as chance", above it as "no evidence of a change".
   The effect size is the phi coefficient $`\varphi = \sqrt{\chi^2/n}`$ ($`\chi^2`$ without continuity correction).
+  - **Note** — **Why**: When two groups pass at different rates, this checks whether sampling error can explain the gap. **How it works**: If two variables are independent, each cell's expected count is row total × column total / grand total. The sum of squared observed-minus-expected over expected is approximately chi-squared with 1 degree of freedom. Yates's correction (−0.5) keeps 𝑝 from being too small when discrete counts are approximated by a continuous distribution. The phi coefficient is the size of the association (0–1) independent of sample size. **References**: [R60 Pearson 1900](#r60) · [R61 Yates 1934](#r61) · [R62 Yule 1912](#r62)
 - **<mark>Fisher's exact test</mark>**: in the same 2×2 table with row and column sums fixed, the probability that the top-left cell is 𝑎, $`P(a) = C(a + b, a) C(c + d, c) / C(n, a + c)`$, is used,
   and 𝑝 is the sum of 𝑃 over all tables no more probable than the observed one (two-sided). It is exact without approximation even with small expected counts.
+  - **Note** — **Why**: This is the exact test used when expected counts are small (under 5) and the chi-squared approximation fails. **How it works**: With row and column totals fixed, the top-left cell 𝑎 follows a hypergeometric distribution with probability given by the ratio of binomial coefficients $`\binom{a + b}{a}\binom{c + d}{c}/\binom{n}{a + c}`$. Summing the probabilities of all tables no more likely than the observed one gives the two-sided 𝑝. **References**: [R63 Fisher 1922](#r63)
 - **Difference · ratio · <mark>odds ratio</mark> of two proportions**: if group 1 passes $`k_1`$ of $`n_1`$ and group 2 passes $`k_2`$ of $`n_2`$, the 95% interval of the difference $`p_1 - p_2`$ is the Newcombe interval combining the two <mark>Wilson intervals</mark> $`[l_1, u_1],\ [l_2, u_2]`$,
   and the intervals of the ratio $`\mathrm{RR} = p_1/p_2`$ and <mark>odds ratio</mark> $`\mathrm{OR} = k_1(n_2 - k_2) / ((n_1 - k_1)k_2)`$ are <mark>normal approximations</mark> on the log scale.
 
   $`\displaystyle \bigl[(p_1-p_2)-\sqrt{(p_1-l_1)^2+(u_2-p_2)^2},\ (p_1-p_2)+\sqrt{(u_1-p_1)^2+(p_2-l_2)^2}\bigr]`$
 
   $`\displaystyle \mathrm{RR}\cdot e^{\pm1.96\sqrt{\frac1{k_1}-\frac1{n_1}+\frac1{k_2}-\frac1{n_2}}},\qquad \mathrm{OR}\cdot e^{\pm1.96\sqrt{\frac1{k_1}+\frac1{n_1-k_1}+\frac1{k_2}+\frac1{n_2-k_2}}}`$
+  - **Note** — **Why**: This shows "how much" two shares differ, as a difference, ratio and odds ratio with intervals, since a test's 𝑝 alone says nothing about the size of the difference. **How it works**: Newcombe's interval builds the difference interval from the square root of summed squared distances to each share's Wilson limits, behaving well near 0 and 1. Ratios and odds ratios live on a multiplicative scale, so their logs are nearly normal; intervals use the log-ratio variance $`1/k_1 - 1/n_1 + 1/k_2 - 1/n_2`$ (Katz) and the log-odds-ratio variance $`\sum 1/\text{cell}`$ (Woolf) and are then exponentiated. **References**: [R64 Newcombe 1998](#r64) · [R65 Katz et al. 1978](#r65) · [R66 Woolf 1955](#r66)
 
 - **Comparison with matched conditions (<mark>Mantel–Haenszel</mark>)**: dividing pictures into strata 𝑖 by the value of one condition (e.g. no occlusion · face occluded · body occluded) and the source, with a 2×2 table $`a_i, b_i, c_i, d_i`$ (sum $`n_i`$) per stratum,
 
@@ -1102,21 +1133,30 @@ In this section:
 
   with $`E[a_i] = (a_i + b_i)(a_i + c_i)/n_i`$, $`\mathrm{Var}(a_i) = (a_i + b_i)(c_i + d_i)(a_i + c_i)(b_i + d_i) / (n_i^2(n_i - 1))`$ (1 degree of freedom). The interval of the <mark>odds ratio</mark> uses the <mark>Robins–Breslow–Greenland</mark> variance.
   Strata where an empty cell makes the table undefined are excluded. Within a stratum the condition is the same, so apparent differences caused by differences in the condition are filtered out.
+  - **Note** — **Why**: A difference between groups may really come from a different mix of conditions (occlusion, source), so results compared only within matching conditions are pooled. **How it works**: Summing $`a_id_i/n_i`$ and $`b_ic_i/n_i`$ separately over the strata and dividing gives a common odds ratio, a weighted average of the per-stratum odds ratios. The test statistic sums observed minus expected for cell 𝑎 in every stratum (with the hypergeometric mean and variance) and standardizes it, so only within-stratum comparisons are pooled. **References**: [R67 Mantel · Haenszel 1959](#r67) · [R68 Robins et al. 1986](#r68)
 - **Logistic regression**: pass/fail $`y \in \lbrace0, 1\rbrace`$ is modeled as $`P(y = 1) = 1 / (1 + e^{-x\beta})`$, with 𝑥 containing the factor of interest (face found · group) together with all conditions (0/1 for each value of number of people · occlusion · focus · tilt · pose · colorfulness · image quality, source, log of the long side).
   𝛽 is fitted by <mark>iteratively reweighted least squares</mark> $`\beta \gets \beta + (X^{\mathsf T}WX)^{-1}X^{\mathsf T}(y - p)`$, $`W = \mathrm{diag}(p(1 - p))`$; the factor's <mark>odds ratio</mark> is $`e^\beta`$, its interval $`e^{\beta \pm 1.96 \mathrm{SE}}`$ ($`\mathrm{SE}`$ from the diagonal of $`(X^{\mathsf T}WX)^{-1}`$), and 𝑝 is the two-sided Wald $`z = \beta/\mathrm{SE}`$.
+  - **Note** — **Why**: Measuring the effect of one factor (e.g. face found) with all other conditions held fixed, across pictures where conditions are mixed, requires regression. **How it works**: Modeling the pass probability with the logistic function makes the log odds $`\ln(p/(1 - p)) = x\beta`$ linear in the factors, so the exponential $`e^\beta`$ of a coefficient is the odds ratio with the other factors held fixed. Maximum likelihood is solved by Newton's method, which is iteratively reweighted least squares with weights $`W = \mathrm{diag}(p(1 - p))`$. $`(X^{\mathsf T}WX)^{-1}`$ is the inverse Fisher information, so its diagonal gives coefficient variances, and the intervals are Wald approximations. **References**: [R69 Cox 1958](#r69) · [R70 McCullagh · Nelder 1989](#r70) · [R71 Wald 1943](#r71)
 - **Paired comparison (<mark>McNemar</mark>)**: when the same pictures are judged by two methods, with 𝑏 pictures passing only on one side and 𝑐 only on the other, $`\chi^2 = (\lvert b - c\rvert - 1)^2 / (b + c)`$ (1 degree of freedom);
   when $`b + c`$ is small, the two-sided exact 𝑝 of $`b \sim \mathrm{Binomial}(b + c, 1/2)`$ is used.
+  - **Note** — **Why**: Paired data, the same pictures graded under two methods, are not independent, so the comparison uses only pictures where the two methods disagree. **How it works**: Pictures graded the same by both methods carry no information about the difference. With no real difference, the 𝑏 + 𝑐 discordant pictures split evenly, so 𝑏 follows a binomial $`\mathrm{B}(b + c, 1/2)`$; for large counts the chi-squared approximation (continuity correction −1) is used. **References**: [R72 McNemar 1947](#r72)
 - **Discriminating power (<mark>AUC</mark>)**: the probability that, drawing one from each of two groups (e.g. background pieces 𝑏, character pieces 𝑐), the cue value is larger on the 𝑏 side, $`\mathrm{AUC} = P(x_b > x_c) + P(x_b = x_c)/2`$. 0.5 is the same as a coin toss; the closer to 1 or 0, the better it separates.
   Models combining several cues are measured by **<mark>cross-validation</mark>**, splitting pictures into 10 groups, fitting on 9 and measuring on the remaining 1, repeated 10 times (so pieces of the same picture are never in both fitting and measuring).
+  - **Note** — **Why**: This measures in one number how well a cue separates two groups (background pieces, character pieces), before any threshold is chosen. **How it works**: AUC is the area under the ROC curve (true-positive rate against false-positive rate over all thresholds) and equals the probability that one draw from each group is ordered correctly (the normalized Mann–Whitney statistic); ties count half. Measuring a multi-cue model on the pictures it was fitted to overstates it, so 10-fold cross-validation measures it on pictures not used for fitting. **References**: [R73 Hanley · McNeil 1982](#r73) · [R74 Stone 1974](#r74)
 - **Correction for multiple tests (<mark>Benjamini–Hochberg</mark>)**: ordering the 𝑝 values of 𝑚 conditions, each tested against the remaining pictures by <mark>Fisher's exact test</mark> on one metric, as $`p_1 \le \dots \le p_m`$,
   $`q_k = \min_{j \ge k} m\,p_j/j`$. Choosing only conditions with $`q < 0.05`$ keeps the share of chosen conditions that truly have no difference at 5% or less on average.
   Conditions with fewer than 5 pictures measurable on that metric are excluded from testing.
+  - **Note** — **Why**: Testing many conditions at once produces some with 𝑝 < 0.05 by chance, so the share of false discoveries among those chosen must be controlled. **How it works**: Sorting the 𝑝 values and multiplying the 𝑘-th by $`m/k`$ gives thresholds that control the false discovery rate (FDR), based on 𝑝 values being uniform when all null hypotheses are true. Taking the minimum over later ones makes 𝑞 monotone. It is less conservative than Bonferroni, so fewer real differences are missed. **References**: [R75 Benjamini · Hochberg 1995](#r75)
 - **Ridge <mark>logistic regression</mark>**: putting many overlapping conditions in together makes coefficients unstable, so $`-(\lambda/2)\lVert \beta \rVert^2`$ (the sum of squared coefficients except the intercept, $`\lambda = 1`$) is added to the log likelihood.
   With Λ as $`\lambda I`$ with only the intercept cell 0, $`\beta \gets \beta + (X^{\mathsf T}WX + \Lambda)^{-1}(X^{\mathsf T}(y - p) - \Lambda\beta)`$ is repeated, and the intervals and 𝑝 use the diagonal of $`(X^{\mathsf T}WX + \Lambda)^{-1}`$ as $`\mathrm{SE}^2`$.
+  - **Note** — **Why**: When conditions overlap (e.g. head count and occlusion), fitting them together makes coefficients swing widely or run to infinity, so coefficients are pulled slightly toward 0 for stability. **How it works**: Subtracting $`(\lambda/2)\lVert\beta\rVert^2`$ from the log-likelihood adds $`\lambda I`$ to the Newton matrix, so the inverse always exists and conditioning improves. It equals maximum a posteriori estimation with a normal prior of mean 0 and variance $`1/\lambda`$ on the coefficients. The intercept is not shrunk. **References**: [R76 Hoerl · Kennard 1970](#r76) · [R77 le Cessie · van Houwelingen 1992](#r77)
 - **Comparing mean counts** (number of fake faces): from the totals $`x_1,\ x_2`$ of two groups and picture counts $`n_1,\ n_2`$, if the rates are equal then $`x_1 \sim \mathrm{Binomial}(x_1 + x_2, n_1/(n_1 + n_2))`$, and its two-sided exact 𝑝 is used.
+  - **Note** — **Why**: This compares mean counts per picture (0, 1, 2… fake faces) between two groups. **How it works**: If counts are Poisson and the per-picture rates of the two groups are equal, then given the total $`x_1 + x_2`$, group 1's share is binomial with probability $`n_1/(n_1 + n_2)`$, the share of pictures (the conditional Poisson test). Hence the exact binomial test. **References**: [R78 Agresti 2013](#r78)
 - **Agreement between gradings (<mark>Cohen's kappa</mark>)**: over 𝑚 pictures graded twice, with agreement share $`p_o`$ and pass shares $`p_1,\ p_2`$ of the two gradings, chance agreement $`p_e = p_1p_2 + (1 - p_1)(1 - p_2)`$ and $`\kappa = (p_o - p_e)/(1 - p_e)`$.
+  - **Note** — **Why**: This measures how well two gradings of the same pictures agree, after removing agreement expected by chance. **How it works**: Two unrelated gradings with these pass shares would still agree $`p_1p_2 + (1 - p_1)(1 - p_2)`$ of the time by chance. Kappa subtracts that from the observed agreement and divides by the maximum possible, so 0 is chance level and 1 perfect agreement. **References**: [R79 Cohen 1960](#r79)
 - **Share counting only passes in both gradings**: the first-grading share 𝑝 multiplied by $`r = \text{both}/\text{first passes}`$, the share of first-grading passes that also passed the second grading in the re-graded sample, $`p \cdot r`$.
   The 95% interval is by <mark>bootstrap</mark>: the 2.5 · 97.5 percentiles of $`p^* r^*`$ over 20,000 draws of $`p^* = \mathrm{Binomial}(n, p)/n`$, $`r^* = \mathrm{Binomial}(\text{number of first passes}, r)/\text{number of first passes}`$ (random seed 0).
+  - **Note** — **Why**: For statistics such as a product of two shares, whose distribution has no simple formula, the interval is found by resampling. **How it works**: The <mark>bootstrap</mark> redraws binomial samples at the observed shares, recomputes the statistic 20,000 times, and takes the 2.5 · 97.5 percentiles of that distribution as the interval (percentile method). Redrawing the two shares independently combines the uncertainty of the product automatically. **References**: [R80 Efron 1979](#r80) · [R81 Efron · Tibshirani 1993](#r81)
 
 ### 11.2 The 25 test pictures
 
@@ -1305,6 +1345,8 @@ The rest did not meet the fluorescence condition ($`L^* > 60,\ C^* > 45`$) (teal
 In 52 synthetic pictures without glow, wrongly split glow was 0. In real pictures without glow, the fluorescence share of the character-side band also rises to 35% (kitchen 35%, yukata · elf in a flower field 30%),
 so the fluorescence condition was not widened (10).
 
+**Note** — **Why**: This shows which condition excluded the synthetic glows that were not separated. **How it works**: Fluorescence must exceed both $`L^* > 60`$ (lightness) and $`C^* > 45`$ (chroma), so teal at chroma 40 and pink below lightness 60 drop out (4.5, outer glow). **References**: [R7 CIE 2004](#r7)
+
 ### 11.3 57 synthetic ground-truth pictures (0.19)
 
 The figure of the sample picture was redrawn in code, drawing ground truth for the character region · character number · glow · eye positions together.
@@ -1441,6 +1483,8 @@ because face finding uses two crisp eyes and faces with the two eyes almost leve
 *Background separation rate (0.25)*: every background result of the 666 was placed next to the original and graded by a person (the 300 pixiv pictures reuse the 0.21 grading; the background maps of 0.21 and 0.25 are the same for all 300).
 On the 650 excluding the 16 without characters, for a proportion 𝑝 the per-picture standard deviation is $`\sqrt{p(1-p)}`$, the standard error $`\sqrt{p(1-p)/n}`$, the margin of error $`z \times \text{standard error}`$,
 and the confidence interval the <mark>Wilson score interval</mark> (𝑧 is 1.645 · 1.960 · 2.576 for 90 · 95 · 99%).
+
+**Note** — **Why**: These formulas attach the uncertainty from the number of pictures to the background separation rate (same as 11.1). **How it works**: The margin of error is 𝑧 times the standard error, the per-picture standard deviation $`\sqrt{p(1 - p)}`$ divided by $`\sqrt n`$, and the interval is the Wilson interval, valid near 0 and 1 too. **References**: [R56 Wilson 1927](#r56) · [R78 Agresti 2013](#r78)
 
 | Grade | Pictures | Share | Standard deviation | Standard error | 95% margin · interval | 90% | 99% |
 |---|---|---|---|---|---|---|---|
@@ -2025,6 +2069,8 @@ The mean over materials (with at least 100 remaining pixels) of each material's 
 \mathrm{BER}_{\text{base}}=\frac1{|M|}\sum_{m\in M}\frac{|\lbrace p\in m:\ \Delta E(F_p,\ F^{\text{true}}_m)\ge10\rbrace|}{|m|},\qquad \text{base-color resolving power}=\frac1{\overline{\mathrm{BER}}_{\text{base}}}
 ```
 
+**Note** — **Why**: This measures how well base colors match the true material colors in one number of the same form as the resolving power. **How it works**: For each material 𝑚, the share of pixels whose base color differs from the true color by $`\Delta E \ge 10`$ (a clearly different color) is the error rate, averaged over materials. Each material weighs the same, so failures on small materials (eyes, ribbons) count fully. The reciprocal is the base-color resolving power. **References**: [R7 CIE 2004](#r7) · a rule set by this program
+
 and the reciprocal of its mean over the 117 pictures is the base-color resolving power. The 95% CI of the ratio is a picture-level <mark>paired bootstrap</mark> (10,000 draws, seed 20261002).
 
 | Version | 57 background · face synthetic | 48 naming synthetic | 12 brush paintings | All 117 | Base-color resolving power | Coverage | Purity | Mean base color $`\Delta E`$ | Parts |
@@ -2109,6 +2155,8 @@ so that small · large are mixed evenly. The processing long side is $`L = \min(
 T1 rotated by ±15 · ±30 · ±45° with white · transparent corners, T2 by ±45 · ±60 · ±90° filling the canvas. The two results (pictures with places gone to the background painted, character folder counts, names) were placed left/right at random (separately drawn random numbers, unblinded after grading)
 and graded by the same criteria, looking first at how well the character was kept and the background removed, then at faces · names.
 
+**Note** — **Why**: Picture sizes must be spread evenly between shrinking and enlarging so size effects do not lean one way. **How it works**: With $`r = 2^u`$ and 𝑢 uniform on −1 to 1, the distribution is uniform on a log scale, so ½× and 2× are equally likely. By change of variables the density is $`f(r) = 1/(2r\ln 2)`$ and the cumulative $`(1 + \log_2 r)/2`$. $`u_i = -1 + (2i - 1)/20`$ are the midpoints of 20 equal cells (stratified sampling), spreading more evenly than random draws. The processing long side is capped at 4096 for memory. <mark>DCCI</mark>, used for enlarging, is a directional cubic interpolation that follows edge directions so boundaries do not blur. **References**: a rule set by this program · [R49 Zhou et al. 2012](#r49)
+
 | Test | 0.37 better | 0.36 better | Same | Sign test 𝑝 | By angle (better : worse : same) |
 |---|---|---|---|---|---|
 | T1 rotated canvas (no setting) | 37 | 12 | 11 | 0.0005 | 15° 11 : 3 : 4 · 30° 16 : 2 : 3 · 45° 10 : 7 : 4 |
@@ -2156,6 +2204,7 @@ Using condition tags people assigned to the 666 real pictures (number of people 
 
 - Size: $`r = 2^u`$, with 𝑢 divided evenly over −1 to 1 within a category and shuffled (the size category only $`\lvert u\rvert \ge 0.5`$). Long side $`L = \min(r \cdot \text{stored long side}, 2048)`$ (272–2048px, 231 capped at 2048).
   Enlarging repeats <mark>DCCI</mark> 2× and then area-averages; shrinking area-averages.
+  - **Note** — **Why**: The 12-category reverse verification also spreads size ratios evenly on a log scale. **How it works**: $`r = 2^u`$ (𝑢 evenly over −1 to 1) makes shrinking and enlarging symmetric, and the long side is capped at 2048px. **References**: a rule set by this program
 - Rotation: 0 · ±15 · ±45° (clockwise +) in equal numbers, rotated about the center with <mark>Catmull–Rom</mark>; half of the rotated ones cropped to the largest rectangle inside the rotated picture, half with corners filled white.
   Left-right mirroring on · off also in equal numbers. The "opposite situation" category is not rotated but flipped left-right · top-bottom · both.
 - Version A splits the picture as is; version B enlarges 2× horizontally · vertically with <mark>DCCI</mark>, splits, and returns to the original size by 2×2 majority vote.
@@ -2359,6 +2408,8 @@ For each picture the <mark>balanced error rate</mark>
 \mathrm{BER}=\frac{(1-\text{character kept})+(1-\text{background found})}2,\qquad \text{resolving power}=\frac1{\overline{\mathrm{BER}}},\qquad \text{× version 0.1}=\frac{\overline{\mathrm{BER}}_{0.1}}{\overline{\mathrm{BER}}_v}
 ```
 
+**Note** — **Why**: A single error number for background–character separation is needed to compare versions. Pictures with wide and narrow backgrounds are mixed, so both kinds of error weigh the same. **How it works**: The balanced error rate BER is the mean of the share of character lost and the share of background missed, so answering "all one side" on a picture dominated by one side does not score well (it gives BER = 0.5). Resolving power is the reciprocal of the mean BER, and the multiple of 0.1 the ratio of the two mean BERs. Intervals come from a paired picture-level bootstrap (the same resample of pictures for both versions). **References**: [R54 Guyon et al. 2004](#r54) · [R80 Efron 1979](#r80)
+
 is measured ($`\mathrm{BER}`$ is 0.5 when nothing is split and 0 when perfect), and the reciprocal of the mean $`\mathrm{BER}`$ over the 185 pictures is the resolving power. The 95% interval is the 2.5 · 97.5 percentiles of a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002).
 Rough generation does not change the background layer (confirmed pixel-identical background maps on 8 versions · 2–3 pictures each; for the new rough of 0.44, all other layers were identical with the rough on and off on 6 pictures), so some versions were run with the rough turned off to save time.
 The posed synthetic pictures are the most numerous and weigh the most, so the multiplier per group (synthetic · real · posed) is also given. There are only 8 real pictures, so their values vary a lot.
@@ -2452,6 +2503,8 @@ The table at the end of the 0.47 entry in section 12 gives the resolving power a
 
 Newest versions are at the top.
 
+**Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
 ### 0.47 (2026-10-11) Roughs that trace (no eye recognition · real outlines · background composition · continuous strokes)
 
 - Resolving power: 5.91× version 0.1 (95% CI 4.33–8.63× · background results identical to the previous version, 11)
@@ -2476,6 +2529,8 @@ Newest versions are at the top.
   Both versions were measured on the same computer after one warm-up run per picture, so the numbers differ from those of the 0.46 entry (0.95 + 0.82 s, without a warm-up run).
 - **Help**: a help page was made that covers usage · fixing wrong parts · the layers made · settings · principles · formulas · validation · limitations with a table of contents and search. It is contained in the app file, opens in a new window from the **도움말** (help) button at the top right (your result stays as it is), and its **Illustracy로 돌아가기** (back to Illustracy) button returns to the app.
   The app (`illustracy.html`) and the help (`illustracy-help.html`) were put back into the repository.
+- **Formula notes**: every formula and statistic in the README and the section-4 documents now carries a **Note** giving why it is used, how it works and references, and [section 13](#13-references) lists the references. The formulas in the help carry the same notes and references.
+  Section 4 had more formulas than GitHub draws in one document, so some were not rendered; it is now split into four documents under `docs/` (links at the start of section 4).
 - Everything outside the rough is unchanged. Only rough generation changed in the code, and the background maps of the 185 ground-truth pictures · 60 blind-test pictures are byte-identical to 0.46. The blind test (11.15) reuses the grading done together at 0.43.
   The sample picture was split in a browser and saved as PSD, and opening it with psd-tools showed the two layers inside the [Rough] folder, hidden at 45% opacity.
 - Remaining weaknesses: rough 2's form is weaker than 0.45's (above), short broken lines split like a net in complex scenes or with small figures, scattered eyes · mouths on figures whose face was not found, and rough 1's offset composition (intended) always loses on form.
@@ -2542,6 +2597,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
   - **Stroke width cap**: the radius is capped at $`2.5s'`$px (2.5px for pictures with a long side of 1000px or less). 0.44 drew thick lines at their own width (radius up to $`2.5r_T`$), so they turned into lumps.
   - **Smoothing by line length**: the moving-average half-window is the line length / 25 (2–6 points), smoothing long lines more widely (0.44: always 5 points).
   - **Faint strokes fainter**: the darkness went from $`0.55 + 0.45\min(1, \bar\ell)`$ to $`0.2 + 0.8\min(1, \bar\ell)^2`$, so silhouettes · background contours · texture with faint original lines no longer cover like dark strokes.
+    - **Note** — **Why**: Opacity was changed so rough strokes where the original lines are faint do not cover like dark strokes. **How it works**: $`0.2 + 0.8\min(1, \bar\ell)^2`$ squares the mean line alpha ℓ̄, making faint lines fainter (ℓ̄ = 0.5 → 0.4) while leaving dark lines unchanged (ℓ̄ = 1 → 1). The old $`0.55 + 0.45\bar\ell`$ gave 0.78 at ℓ̄ = 0.5. **References**: a rule set by this program
 - Reference roughs, 18 crops (0.43 · 0.44 → 0.45; parentheses give the mean difference, crops better : worse in same-crop pairs (differences under 0.0005 count as ties), and the <mark>sign test</mark>):
   - F 0.708 · 0.714 → 0.740 (vs 0.44 +0.026, 17 : 1, $`p = 1.4 \times 10^{-4}`$ / vs 0.43 +0.031, 14 : 4, $`p = 0.031`$).
   - Precision 0.613 · 0.646 → 0.671 (vs 0.44 +0.025, 17 : 1, $`p = 1.4 \times 10^{-4}`$ / vs 0.43 +0.059, 17 : 1, $`p = 1.4 \times 10^{-4}`$); key-stroke recall 0.892 · 0.808 → 0.884 (vs 0.44 +0.076, 17 : 1, $`p = 1.4 \times 10^{-4}`$).
@@ -3199,3 +3255,95 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 - Resolving power: the reference (mean BER 0.1533 on 185 ground-truth pictures, 11)
 - Works in the browser. Splits a finished picture into line art · base color · shadow · shading · highlight · sparkle · effects · background · rough,
   and saves a PSD (folders, clipping, blend modes, Korean layer names) that becomes the original again when stacked.
+
+---
+
+## 13. References
+
+These are the works cited by number under **References** in the formula notes. "This program's experiments (section)" marks values and rules set by this program on its test pictures without a published source; the evidence is in the section given. "A rule set by this program" marks conventions such as notation or rounding that need no evidence.
+
+- <a id="r1"></a>**[R1]** T. Porter, T. Duff, "Compositing Digital Images," <i>Computer Graphics (Proc. SIGGRAPH)</i> 18(3), 253–259, 1984.
+- <a id="r2"></a>**[R2]** A. R. Smith, "Alpha and the History of Digital Compositing," Microsoft Technical Memo 7, 1995.
+- <a id="r3"></a>**[R3]** ISO 32000-1:2008, <i>Document management — Portable document format — Part 1: PDF 1.7</i>, §11.3.5 "Blend Mode".
+- <a id="r4"></a>**[R4]** Adobe, <i>Adobe Photoshop File Formats Specification</i>.
+- <a id="r5"></a>**[R5]** Apple Computer, "Understanding PackBits," Technical Note TN1023, 1996.
+- <a id="r6"></a>**[R6]** IEC 61966-2-1:1999, <i>Multimedia systems and equipment — Colour measurement and management — Part 2-1: Default RGB colour space — sRGB</i>.
+- <a id="r7"></a>**[R7]** CIE 15:2004, <i>Colorimetry</i>, 3rd ed. (CIELAB, ΔE*ab).
+- <a id="r8"></a>**[R8]** M. Mahy, L. Van Eycken, A. Oosterlinck, "Evaluation of Uniform Color Spaces Developed after the Adoption of CIELAB and CIELUV," <i>Color Research &amp; Application</i> 19(2), 105–121, 1994.
+- <a id="r9"></a>**[R9]** ITU-R Recommendation BT.601, <i>Studio encoding parameters of digital television for standard 4:3 and wide-screen 16:9 aspect ratios</i>.
+- <a id="r10"></a>**[R10]** M. D. Fairchild, <i>Color Appearance Models</i>, 3rd ed., Wiley, 2013.
+- <a id="r11"></a>**[R11]** D. Hasler, S. Süsstrunk, "Measuring Colourfulness in Natural Images," <i>Proc. SPIE</i> 5007, 87–95, 2003.
+- <a id="r12"></a>**[R12]** A. Beer, "Bestimmung der Absorption des rothen Lichts in farbigen Flüssigkeiten," <i>Annalen der Physik</i> 162(5), 78–88, 1852.
+- <a id="r13"></a>**[R13]** E. Hecht, <i>Optics</i>, 5th ed., Pearson, 2017.
+- <a id="r14"></a>**[R14]** R. C. Gonzalez, R. E. Woods, <i>Digital Image Processing</i>, 4th ed., Pearson, 2018.
+- <a id="r15"></a>**[R15]** P. Soille, <i>Morphological Image Analysis: Principles and Applications</i>, 2nd ed., Springer, 2003.
+- <a id="r16"></a>**[R16]** D. Lemire, "Streaming Maximum-Minimum Filter Using No More than Three Comparisons per Element," <i>Nordic Journal of Computing</i> 13(4), 328–339, 2006.
+- <a id="r17"></a>**[R17]** W. M. Wells, "Efficient Synthesis of Gaussian Filters by Cascaded Uniform Filters," <i>IEEE Trans. PAMI</i> 8(2), 234–239, 1986.
+- <a id="r18"></a>**[R18]** J. Canny, "A Computational Approach to Edge Detection," <i>IEEE Trans. PAMI</i> 8(6), 679–698, 1986.
+- <a id="r19"></a>**[R19]** I. Sobel, G. Feldman, "A 3×3 Isotropic Gradient Operator for Image Processing," presented at the Stanford Artificial Intelligence Project, 1968.
+- <a id="r20"></a>**[R20]** A. Telea, "An Image Inpainting Technique Based on the Fast Marching Method," <i>Journal of Graphics Tools</i> 9(1), 23–34, 2004.
+- <a id="r21"></a>**[R21]** G. Borgefors, "Distance Transformations in Digital Images," <i>Computer Vision, Graphics, and Image Processing</i> 34(3), 344–371, 1986.
+- <a id="r22"></a>**[R22]** S. P. Lloyd, "Least Squares Quantization in PCM," <i>IEEE Trans. Information Theory</i> 28(2), 129–137, 1982.
+- <a id="r23"></a>**[R23]** D. Arthur, S. Vassilvitskii, "k-means++: The Advantages of Careful Seeding," <i>Proc. ACM-SIAM SODA</i>, 1027–1035, 2007.
+- <a id="r24"></a>**[R24]** Y. Boykov, M.-P. Jolly, "Interactive Graph Cuts for Optimal Boundary &amp; Region Segmentation of Objects in N-D Images," <i>Proc. ICCV</i>, 105–112, 2001.
+- <a id="r25"></a>**[R25]** C. Rother, V. Kolmogorov, A. Blake, "GrabCut: Interactive Foreground Extraction Using Iterated Graph Cuts," <i>ACM Trans. Graphics</i> 23(3), 309–314, 2004.
+- <a id="r26"></a>**[R26]** L. R. Ford, D. R. Fulkerson, "Maximal Flow through a Network," <i>Canadian Journal of Mathematics</i> 8, 399–404, 1956.
+- <a id="r27"></a>**[R27]** E. A. Dinic, "Algorithm for Solution of a Problem of Maximum Flow in a Network with Power Estimation," <i>Soviet Math. Doklady</i> 11, 1277–1280, 1970.
+- <a id="r28"></a>**[R28]** E. W. Dijkstra, "A Note on Two Problems in Connexion with Graphs," <i>Numerische Mathematik</i> 1, 269–271, 1959.
+- <a id="r29"></a>**[R29]** R. B. Dial, "Algorithm 360: Shortest-Path Forest with Topological Ordering," <i>Communications of the ACM</i> 12(11), 632–633, 1969.
+- <a id="r30"></a>**[R30]** R. E. Tarjan, "Efficiency of a Good But Not Linear Set Union Algorithm," <i>Journal of the ACM</i> 22(2), 215–225, 1975.
+- <a id="r31"></a>**[R31]** A. R. Smith, "Color Gamut Transform Pairs," <i>Computer Graphics (Proc. SIGGRAPH)</i> 12(3), 12–19, 1978.
+- <a id="r32"></a>**[R32]** H. Knutsson, C.-F. Westin, "Normalized and Differential Convolution," <i>Proc. IEEE CVPR</i>, 515–523, 1993.
+- <a id="r33"></a>**[R33]** T. Lindeberg, "Feature Detection with Automatic Scale Selection," <i>International Journal of Computer Vision</i> 30(2), 79–116, 1998.
+- <a id="r34"></a>**[R34]** J. P. Lewis, "Fast Normalized Cross-Correlation," <i>Vision Interface</i>, 120–123, 1995.
+- <a id="r35"></a>**[R35]** G. Strang, <i>Introduction to Linear Algebra</i>, 5th ed., Wellesley-Cambridge Press, 2016.
+- <a id="r36"></a>**[R36]** T. Y. Zhang, C. Y. Suen, "A Fast Parallel Algorithm for Thinning Digital Patterns," <i>Communications of the ACM</i> 27(3), 236–239, 1984.
+- <a id="r37"></a>**[R37]** H. Blum, "A Transformation for Extracting New Descriptors of Shape," in W. Wathen-Dunn (ed.), <i>Models for the Perception of Speech and Visual Form</i>, MIT Press, 362–380, 1967.
+- <a id="r38"></a>**[R38]** P. J. Schneider, "An Algorithm for Automatically Fitting Digitized Curves," in A. S. Glassner (ed.), <i>Graphics Gems</i>, Academic Press, 612–626, 1990.
+- <a id="r39"></a>**[R39]** A. Loomis, <i>Drawing the Head and Hands</i>, Viking Press, 1956.
+- <a id="r40"></a>**[R40]** G. Fowler, L. C. Noll, K.-P. Vo, D. Eastlake, T. Hansen, "The FNV Non-Cryptographic Hash Algorithm," IETF Internet-Draft draft-eastlake-fnv.
+- <a id="r41"></a>**[R41]** U. Ramer, "An Iterative Procedure for the Polygonal Approximation of Plane Curves," <i>Computer Graphics and Image Processing</i> 1(3), 244–256, 1972.
+- <a id="r42"></a>**[R42]** D. H. Douglas, T. K. Peucker, "Algorithms for the Reduction of the Number of Points Required to Represent a Digitized Line or its Caricature," <i>Cartographica</i> 10(2), 112–122, 1973.
+- <a id="r43"></a>**[R43]** Å. Björck, <i>Numerical Methods for Least Squares Problems</i>, SIAM, 1996.
+- <a id="r44"></a>**[R44]** M. A. Fischler, R. C. Bolles, "Random Sample Consensus: A Paradigm for Model Fitting with Applications to Image Analysis and Automated Cartography," <i>Communications of the ACM</i> 24(6), 381–395, 1981.
+- <a id="r45"></a>**[R45]** H. Theil, "A Rank-Invariant Method of Linear and Polynomial Regression Analysis," <i>Proc. Koninklijke Nederlandse Akademie van Wetenschappen</i> 53, 1950.
+- <a id="r46"></a>**[R46]** P. K. Sen, "Estimates of the Regression Coefficient Based on Kendall's Tau," <i>JASA</i> 63(324), 1379–1389, 1968.
+- <a id="r47"></a>**[R47]** D. S. Ebert, F. K. Musgrave, D. Peachey, K. Perlin, S. Worley, <i>Texturing and Modeling: A Procedural Approach</i>, 3rd ed., Morgan Kaufmann, 2003.
+- <a id="r48"></a>**[R48]** T. Ettinger, mulberry32 (public-domain 32-bit pseudorandom number generator), 2017.
+- <a id="r49"></a>**[R49]** D. Zhou, X. Shen, W. Dong, "Image Zooming Using Directional Cubic Convolution Interpolation," <i>IET Image Processing</i> 6(6), 627–634, 2012.
+- <a id="r50"></a>**[R50]** R. J. Hyndman, Y. Fan, "Sample Quantiles in Statistical Packages," <i>The American Statistician</i> 50(4), 361–365, 1996.
+- <a id="r51"></a>**[R51]** C. D. Manning, P. Raghavan, H. Schütze, <i>Introduction to Information Retrieval</i>, Cambridge University Press, 2008.
+- <a id="r52"></a>**[R52]** P. Jaccard, "The Distribution of the Flora in the Alpine Zone," <i>New Phytologist</i> 11(2), 37–50, 1912.
+- <a id="r53"></a>**[R53]** C. J. van Rijsbergen, <i>Information Retrieval</i>, 2nd ed., Butterworths, 1979.
+- <a id="r54"></a>**[R54]** I. Guyon, S. Gunn, A. Ben-Hur, G. Dror, "Result Analysis of the NIPS 2003 Feature Selection Challenge," <i>Advances in Neural Information Processing Systems</i> 17, 2004.
+- <a id="r55"></a>**[R55]** Q. Huynh-Thu, M. Ghanbari, "Scope of Validity of PSNR in Image/Video Quality Assessment," <i>Electronics Letters</i> 44(13), 800–801, 2008.
+- <a id="r56"></a>**[R56]** E. B. Wilson, "Probable Inference, the Law of Succession, and Statistical Inference," <i>JASA</i> 22(158), 209–212, 1927.
+- <a id="r57"></a>**[R57]** C. J. Clopper, E. S. Pearson, "The Use of Confidence or Fiducial Limits Illustrated in the Case of the Binomial," <i>Biometrika</i> 26(4), 404–413, 1934.
+- <a id="r58"></a>**[R58]** O. J. Dunn, "Multiple Comparisons among Means," <i>JASA</i> 56(293), 52–64, 1961.
+- <a id="r59"></a>**[R59]** Student (W. S. Gosset), "The Probable Error of a Mean," <i>Biometrika</i> 6(1), 1–25, 1908.
+- <a id="r60"></a>**[R60]** K. Pearson, "On the Criterion that a Given System of Deviations from the Probable in the Case of a Correlated System of Variables is such that it can be Reasonably Supposed to have Arisen from Random Sampling," <i>Philosophical Magazine</i> 50(302), 157–175, 1900.
+- <a id="r61"></a>**[R61]** F. Yates, "Contingency Tables Involving Small Numbers and the χ² Test," <i>Supplement to the Journal of the Royal Statistical Society</i> 1(2), 217–235, 1934.
+- <a id="r62"></a>**[R62]** G. U. Yule, "On the Methods of Measuring Association between Two Attributes," <i>Journal of the Royal Statistical Society</i> 75(6), 579–652, 1912.
+- <a id="r63"></a>**[R63]** R. A. Fisher, "On the Interpretation of χ² from Contingency Tables, and the Calculation of P," <i>Journal of the Royal Statistical Society</i> 85(1), 87–94, 1922.
+- <a id="r64"></a>**[R64]** R. G. Newcombe, "Interval Estimation for the Difference between Independent Proportions: Comparison of Eleven Methods," <i>Statistics in Medicine</i> 17(8), 873–890, 1998.
+- <a id="r65"></a>**[R65]** D. Katz, J. Baptista, S. P. Azen, M. C. Pike, "Obtaining Confidence Intervals for the Risk Ratio in Cohort Studies," <i>Biometrics</i> 34(3), 469–474, 1978.
+- <a id="r66"></a>**[R66]** B. Woolf, "On Estimating the Relation between Blood Group and Disease," <i>Annals of Human Genetics</i> 19(4), 251–253, 1955.
+- <a id="r67"></a>**[R67]** N. Mantel, W. Haenszel, "Statistical Aspects of the Analysis of Data from Retrospective Studies of Disease," <i>Journal of the National Cancer Institute</i> 22(4), 719–748, 1959.
+- <a id="r68"></a>**[R68]** J. Robins, N. Breslow, S. Greenland, "Estimators of the Mantel–Haenszel Variance Consistent in Both Sparse Data and Large-Strata Limiting Models," <i>Biometrics</i> 42(2), 311–323, 1986.
+- <a id="r69"></a>**[R69]** D. R. Cox, "The Regression Analysis of Binary Sequences," <i>Journal of the Royal Statistical Society B</i> 20(2), 215–242, 1958.
+- <a id="r70"></a>**[R70]** P. McCullagh, J. A. Nelder, <i>Generalized Linear Models</i>, 2nd ed., Chapman &amp; Hall, 1989.
+- <a id="r71"></a>**[R71]** A. Wald, "Tests of Statistical Hypotheses Concerning Several Parameters When the Number of Observations is Large," <i>Trans. American Mathematical Society</i> 54(3), 426–482, 1943.
+- <a id="r72"></a>**[R72]** Q. McNemar, "Note on the Sampling Error of the Difference between Correlated Proportions or Percentages," <i>Psychometrika</i> 12(2), 153–157, 1947.
+- <a id="r73"></a>**[R73]** J. A. Hanley, B. J. McNeil, "The Meaning and Use of the Area under a Receiver Operating Characteristic (ROC) Curve," <i>Radiology</i> 143(1), 29–36, 1982.
+- <a id="r74"></a>**[R74]** M. Stone, "Cross-Validatory Choice and Assessment of Statistical Predictions," <i>Journal of the Royal Statistical Society B</i> 36(2), 111–147, 1974.
+- <a id="r75"></a>**[R75]** Y. Benjamini, Y. Hochberg, "Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing," <i>Journal of the Royal Statistical Society B</i> 57(1), 289–300, 1995.
+- <a id="r76"></a>**[R76]** A. E. Hoerl, R. W. Kennard, "Ridge Regression: Biased Estimation for Nonorthogonal Problems," <i>Technometrics</i> 12(1), 55–67, 1970.
+- <a id="r77"></a>**[R77]** S. le Cessie, J. C. van Houwelingen, "Ridge Estimators in Logistic Regression," <i>Applied Statistics</i> 41(1), 191–201, 1992.
+- <a id="r78"></a>**[R78]** A. Agresti, <i>Categorical Data Analysis</i>, 3rd ed., Wiley, 2013.
+- <a id="r79"></a>**[R79]** J. Cohen, "A Coefficient of Agreement for Nominal Scales," <i>Educational and Psychological Measurement</i> 20(1), 37–46, 1960.
+- <a id="r80"></a>**[R80]** B. Efron, "Bootstrap Methods: Another Look at the Jackknife," <i>Annals of Statistics</i> 7(1), 1–26, 1979.
+- <a id="r81"></a>**[R81]** B. Efron, R. J. Tibshirani, <i>An Introduction to the Bootstrap</i>, Chapman &amp; Hall, 1993.
+- <a id="r82"></a>**[R82]** C. Spearman, "The Proof and Measurement of Association between Two Things," <i>American Journal of Psychology</i> 15(1), 72–101, 1904.
+- <a id="r83"></a>**[R83]** N. I. Fisher, <i>Statistical Analysis of Circular Data</i>, Cambridge University Press, 1993.
+- <a id="r84"></a>**[R84]** M. J. Swain, D. H. Ballard, "Color Indexing," <i>International Journal of Computer Vision</i> 7(1), 11–32, 1991.
+- <a id="r85"></a>**[R85]** W. J. Dixon, A. M. Mood, "The Statistical Sign Test," <i>JASA</i> 41(236), 557–566, 1946.
