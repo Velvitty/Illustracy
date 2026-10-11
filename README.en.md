@@ -87,6 +87,7 @@ If the program finds a face in the picture (also in PNGs with a transparent back
 
 Zoom the picture in the middle with the mouse wheel and drag to move it.
 The **도움말** (help) button at the top right opens, in a new window, a help page (in Korean) on how to use the program, how to fix wrongly split parts and how it works; your result stays as it is. To read only the help, download [`illustracy-help.html`](illustracy-help.html) and open it.
+The theme switch next to it sets the screen colors to follow the system, light or dark. The choice is shared by the app and the help, and changing it in one updates the other if it is open.
 With the buttons at the top you can switch between **Composite** (`합성`, the split layers stacked) · **Original** (`원본`) · **Selected layer** (`선택 레이어`, only the chosen layer) · **Difference ×8** (`차이 ×8`, places that differ from the original, emphasized 8×).
 
 ### Fixing wrongly split areas
@@ -2528,6 +2529,8 @@ Newest versions are at the top.
 - Processing time: the rough step went from 0.63 + 0.64 s (0.46) to 0.74 + 0.90 s (rough 1 + rough 2), median of 12 pictures.
   Both versions were measured on the same computer after one warm-up run per picture, so the numbers differ from those of the 0.46 entry (0.95 + 0.82 s, without a warm-up run).
 - **Help**: a help page was made that covers usage · fixing wrong parts · the layers made · settings · principles · formulas · validation · limitations with a table of contents and search. It is contained in the app file, opens in a new window from the **도움말** (help) button at the top right (your result stays as it is), and its **Illustracy로 돌아가기** (back to Illustracy) button returns to the app.
+  The app header now has the same theme switch as the help (follow system · light · dark). The app, which had only a dark screen, gained a light screen (dark keeps the same colors as before),
+  and the choice is shared by the app and the help, so changing it in one updates the other if it is open. Layer splitting results and PSDs do not depend on the theme.
   The app (`illustracy.html`) and the help (`illustracy-help.html`) were put back into the repository.
 - **Formula notes**: every formula and statistic in the README and the section-4 documents now carries a **Note** giving why it is used, how it works and references, and [section 13](#13-references) lists the references. The formulas in the help carry the same notes and references.
   Section 4 had more formulas than GitHub draws in one document, so some were not rendered; it is now split into four documents under `docs/` (links at the start of section 4).
