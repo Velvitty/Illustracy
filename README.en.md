@@ -14,7 +14,7 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **5.91× version 0.1** (0.44, 95% CI 4.33–8.63×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller, 11).
+- Resolving power: **5.91× version 0.1** (0.45, 95% CI 4.33–8.63×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller, 11).
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -246,7 +246,9 @@ The rough no longer exists in the original picture, so it cannot be restored.
 Instead it is made to look like an underdrawing a person loosely sketched in pencil.
 
 - Lines are traced from the character's lines and silhouette and the brightness contours of the background. Lines use their center line; only very wide dark areas (black hair · wide black clothes) use a rounded outer contour.
-- Stroke width follows the original line's width there (thick for thick lines like eyebrows · eyelashes), and darkness and the number of passes follow the original line's darkness. Eyes · outlines are dark, faint contours · texture faint.
+- Stroke width follows the original line's width there but only up to 2.5px (for pictures with a long side of 1000px or less; larger pictures in proportion), and darkness and the number of passes follow the original line's darkness. Eyes · outlines are dark, faint contours · texture fainter still.
+- Inside the found face areas, small strokes such as the nose · mouth corners · eyelash tips · small irises are not removed, and they are drawn with less wobble, to their ends, and dark.
+- The original lines are laid faintly (45%) under the strokes, so small shapes of eyes · ribbons · fingers that easily break when redrawn as strokes stay as they are.
 - The lines are split into strokes of the length a person draws in one go, and each stroke is drawn 2–3 times, slightly off each time: the first pass goes to the ends, and later passes start · end a little past or short of the line, shifted 1–3px sideways, tilted or bent.
 - Imitating pen pressure, a stroke is thin and light at its start · end and dark in the middle, and a little thicker where the original line is thick.
 - Coverage is computed from the distance between each pixel center and the stroke, so edges have no staircase. Pencil grain is only a soft grain 2–3px in size.
@@ -1343,6 +1345,8 @@ Background pixels are $`v = \text{background} \to 1 - (1 - v)(1 - aK)`$ (backgro
 
 The rough uses its own random numbers (<mark>mulberry32</mark>, seed 20261011), so the same picture always gives the same rough regardless of the other layers. Below, $`s' = \max(1, s)`$, 𝑢 is a new random number in $`[0, 1)`$ each time it is used, and 𝑣 one in $`[-1, 1)`$.
 
+**Face area** 𝐹 (0.45): for each naming · folder face (step 9 of face finding in 4.5) with eye center $`(c_x, c_y)`$, eye distance 𝑑, unit eye direction 𝐞 and the downward direction 𝐟 perpendicular to it, the pixels with $`\lvert u\rvert \le 1.1`$ and $`-0.6 \le v \le 1.6`$ where $`u = (\mathbf p - \mathbf c)\cdot\mathbf e / d`$, $`v = (\mathbf p - \mathbf c)\cdot\mathbf f / d`$ (from the eyebrows to the chin). Below, a "face line · face stroke" is a line · stroke with more than half of its points inside 𝐹.
+
 1. **Material** 𝐵: pixels with line alpha $`\ge 0.25`$, and the character silhouette (the boundary with background · transparency).
    - Pictures with almost no line art (line pixels under 3% of the character's painted area) also get the boundaries between parts with base colors $`\Delta E \ge 20`$.
    - For the silhouette · part boundaries, 𝑝 is added when the group (empty / undecided / background / material) of pixel 𝑝 and its right · lower neighbor differ, and either one side is not character (silhouette) or, in a picture without line art, the base colors of the two parts are $`\Delta E \ge 20`$.
@@ -1363,33 +1367,35 @@ The rough uses its own random numbers (<mark>mulberry32</mark>, seed 20261011), 
    (the 1px picture border is cleared), and **<mark>Zhang–Suen thinning</mark>** gives 1px center lines. With the 8-neighbors of pixel 𝑝 clockwise from north as $`P_2 \dots P_9`$,
    $`B(p) = \sum P_i`$ (2–6) and $`A(p)`$, the number of 0 → 1 transitions in the order $`P_2 \to P_3 \to \dots \to P_9 \to P_2`$, is 1;
    pixels with $`P_2P_4P_6 = 0 \land P_4P_6P_8 = 0`$ in the first step and $`P_2P_4P_8 = 0 \land P_2P_6P_8 = 0`$ in the second step are removed all at once, alternating until nothing more is removed.
-   End points (8-neighbors 1 or fewer) are removed $`k = \max(3, \mathrm{round}(5 \cdot \max(1, s)))`$ times, and from the surviving line ends (1 neighbor) the removed pixels are revived for at most 𝑘 steps, trimming short spurs.
-   8-connected pieces shorter than $`\max(12, \mathrm{round}(14 \cdot \max(1, s)))`$ pixels are discarded.
+   End points (8-neighbors 1 or fewer) outside 𝐹 are removed $`k = \max(3, \mathrm{round}(5 \cdot \max(1, s)))`$ times, and from the surviving line ends (1 neighbor) the removed pixels are revived for at most 𝑘 steps, trimming short spurs (eyelash tips are not spurs).
+   8-connected pieces shorter than $`\max(12, \mathrm{round}(14 \cdot \max(1, s)))`$ pixels are discarded; pieces touching 𝐹 are kept from 4 pixels (nose · mouth corners).
 4. **Tracing lines**: among the center-line pixels, end points (1 or fewer 8-neighbors) and junctions (3 or more 0 → 1 transitions going once around the 8-neighbors) are nodes. A pixel with 3 neighbors on a staircase diagonal has 2 transitions and is not a node.
    From each node, a pixel chain is traced out through each non-node neighbor (4-neighbors first, then diagonals), following unused pixels with 4-neighbors first and stopping at a node. Loops without nodes are traced from any pixel until returning to it.
    Chains under 3 pixels are discarded.
    Pairs of chain ends within $`3s' + 1.5`$px whose outward directions (from the point 6 pixels inside to the end) have a dot product under $`-0.766`$ (the two lines continue straight within 40°) are joined into one line, in order of smallest dot product, one pair per end,
-   because a person does not lift the pencil at every junction. Closed loops under $`22s'`$ pixels (highlights in pupils) are not drawn.
-5. **Smoothing**: each line gets a 5-point moving average twice (the two points at each end of an open line stay) and is resampled at 1.5px spacing.
+   because a person does not lift the pencil at every junction. Closed loops under $`22s'`$ pixels (highlights in pupils) are not drawn; loops that are face lines are drawn unless under $`8s'`$ pixels (small irises).
+5. **Smoothing**: with 𝑛 the number of points of a line, a moving average with half-window $`h_s = \mathrm{clamp}(\mathrm{round}(n/25),\ 2,\ 6)`$ (2 for face lines; $`2h_s + 1`$ points) is applied twice, and the line is resampled at 1.5px spacing.
+   On an open line the half-window of the 𝑖-th point from an end is reduced to $`\min(h_s, i)`$ (end points stay). Long lines are smoothed widely, and small shapes in faces narrowly so they keep their form.
 6. **Splitting into strokes**: a line is split every $`(50 + 90u)s'`$px, the length a person draws in one go (the next stroke starts 2 points back), and also at corners.
    A corner is a point where the angle between the directions $`i - 4 \to i`$ and $`i \to i + 4`$ exceeds 0.96 rad (about 55°), not smaller than at the two points around it, at least 7 points from the stroke start and 6 points from the line end.
-7. **Drawing**: let $`\bar\ell`$ be the mean line strength $`\ell_m`$ along the stroke and $`\tilde h`$ the median half-width $`h`$. Each stroke is drawn 2 times (3 with probability 45%), and a stroke under $`12s'`$px or with $`\bar\ell < 0.45`$ 1 time (2 with probability 50%).
+7. **Drawing**: let $`\bar\ell`$ be the mean line strength $`\ell_m`$ along the stroke and $`\tilde h`$ the median half-width $`h`$. Each stroke is drawn 2 times (3 with probability 45%), and a stroke under $`12s'`$px or with $`\bar\ell < 0.45`$ 1 time (2 with probability 50%). Face strokes are always drawn 2 times (3 with probability 45%).
    The 𝑘-th pass ($`k = 0, 1, 2`$) is as follows.
    - Start · end: with $`\ell_e = \min(9s', 0.2 \cdot \text{stroke length})`$, the first pass has $`e_0, e_1 = -0.6u\,\ell_e`$ and later passes $`e_0, e_1 = (1.6u - 0.6)\,\ell_e`$. If positive, the pass starts later or stops earlier by that much (falls short); if negative, it is extended by that much along the tangent (overshoots).
-     The first pass always reaches the ends, and at an end of a line that ends at a junction later passes do not fall short either (to avoid breaks).
+     The first pass always reaches the ends, and at an end of a line that ends at a junction, and on face strokes, later passes do not fall short either (to avoid breaks).
    - Sideways shift: with $`t \in [0, 1]`$ along the stroke, the pass is moved along the normal by $`o(t) = g_0 + g_l(t - 0.5) + g_1\sin(\pi t + \varphi)`$,
-     $`g_0 = 0.9\,\sigma_k v`$, $`g_l = 1.6\,\sigma_k v`$, $`g_1 = 1.4\,\sigma_k v`$ (each with a new 𝑣), $`\sigma_0 = 0.4s'`$, $`\sigma_k = 1.2s'`$ for later passes, $`\varphi = \pi u`$. The first pass stays close to the original line; later passes are shifted a little, tilted or bent.
+     $`g_0 = 0.9\,\sigma_k v`$, $`g_l = 1.6\,\sigma_k v`$, $`g_1 = 1.4\,\sigma_k v`$ (each with a new 𝑣), $`\sigma_0 = 0.4s'`$, $`\sigma_k = 1.2s'`$ for later passes (both × 0.35 for face strokes), $`\varphi = \pi u`$. The first pass stays close to the original line; later passes are shifted a little, tilted or bent.
    - Pen pressure: with $`\tau(t) = \mathrm{smoothstep}(0, t_a, t)\,\big(1 - \mathrm{smoothstep}(1 - t_b, 1, t)\big)`$, $`t_a = 0.12 + 0.18u`$, $`t_b = 0.15 + 0.2u`$,
 
      $`\displaystyle \mathrm{pr}(t) = P_k\,\big(0.18 + 0.82\,\tau(t)\big)\,\big(0.88 + 0.12\sin(2\pi f t + \psi)\big),\qquad P_0 = 0.75 + 0.3u,\quad P_{k \ge 1} = 0.5 + 0.3u,\quad f = 1 + 2u,\quad \psi = 2\pi u`$
 
-   - Width: the stroke radius is $`R = \mathrm{clamp}(0.9\tilde h,\ 1.05s',\ 2.5r_T)`$ (about 1px for thin lines, the line's own width for thick lines like eyebrows · eyelashes), and with the end width ratio $`\lambda = 0.45 + 0.4\,\mathrm{clamp}\big((R/s' - 1.5)/2,\ 0,\ 1\big)`$,
+   - Width: the stroke radius is $`R = \mathrm{clamp}\big(0.9\tilde h,\ 1.05s',\ \min(2.5r_T,\ 2.5s')\big)`$ (about 1px for thin lines, at most 2.5px for thick lines too: drawn thick, small shapes become lumps · bead-like knots), and with the end width ratio $`\lambda = 0.45 + 0.4\,\mathrm{clamp}\big((R/s' - 1.5)/2,\ 0,\ 1\big)`$,
      $`r = R\,\big(\lambda + (1.3 - \lambda)\min(1, \mathrm{pr})\big)`$. Thick strokes thin less at their ends, so joints of short strokes do not form knots.
-   - Darkness: $`a = o_k\,(0.35 + 0.65\,\mathrm{pr})`$, $`o_k = (1 \text{ or } 0.75 \text{ for later passes}) \cdot \big(0.55 + 0.45\min(1, \bar\ell)\big)`$. Where the original line is dark (eyes · outlines) the rough is dark; faint contours · texture are faint.
+   - Darkness: $`a = o_k\,(0.35 + 0.65\,\mathrm{pr})`$, $`o_k = (1 \text{ or } 0.75 \text{ for later passes}) \cdot \big(0.2 + 0.8\min(1, \bar\ell)^2\big)`$ (1 instead of $`0.2 + 0.8\min(1, \bar\ell)^2`$ for face strokes). Where the original line is dark (eyes · outlines) the rough is dark; strokes whose original line is faint (silhouette · background contours · texture) are fainter still.
    - Rendering: two neighboring points are joined by a round-capped segment along which 𝑟 · 𝑎 change linearly. With 𝑑 the distance from the pixel center to the nearest point of the segment (parameter $`t^*`$),
      the coverage is $`c = \min\big(1,\ r(t^*) + 0.5 - d\big)`$ (not covered if 0 or less), and the value is $`c \cdot a(t^*)`$ (<mark>anti-aliasing</mark>).
      Within one pass each pixel takes its largest value 𝑥, and passes are stacked by screen: $`\mathrm{acc} \gets 1 - (1 - \mathrm{acc})(1 - x)`$.
-8. **Alpha**: $`a = \min\big(1,\ \mathrm{acc}\,(0.92 + 0.08\,n)\big)`$, where 𝑛 is value noise (4.2) with cell size $`2.5s'`$, a soft pencil grain 2–3px in size (shaking each pixel separately makes edges jittery).
+8. **Underlay** (0.45): for pixels with line alpha $`\alpha_{line} \ge 0.25`$, $`\mathrm{acc} \gets \max\big(\mathrm{acc},\ 0.45\min(1, \alpha_{line})\big)`$. Laying the original lines faintly keeps small shapes (eyes · ribbons · fingers) that break when redrawn as strokes.
+9. **Alpha**: $`a = \min\big(1,\ \mathrm{acc}\,(0.92 + 0.08\,n)\big)`$, where 𝑛 is value noise (4.2) with cell size $`2.5s'`$, a soft pencil grain 2–3px in size (shaking each pixel separately makes edges jittery).
    Pixels with $`\mathrm{acc} < 0.01`$ are left empty, and the 8-bit alpha is $`\mathrm{round}(255a)`$. Rough color (default `#2F6FE0`), opacity $`115/255 \approx 45\%`$, hidden.
 
 ### 4.15 PSD format
@@ -1576,6 +1582,7 @@ Problems that came up while verifying with real pictures during development, and
 | Rough lines broke into dashes (unusable as a guide for line art) | faint or thin lines become small after blurring and break wherever they fall below the final threshold. Small marks from color boundaries and sparkle crumbs also remained as dots | lay the center line of each line under the strokes at a minimum darkness, and remove crumbs and color-boundary marks not connected to center lines. The over-drawn pencil feel stays. Pieces per 1000px of line 16–35 → 3.6–5.4 |
 | Changing the rough to an even single center line looked artificial, like a machine tracing outlines | a person's rough varies in width · darkness from line to line and is smudged by drawing over several times | the even single-line approach was dropped and reverted to soft strokes following the original line width + drawing three times (only the break prevention added). 0.44 uses center lines again but draws each stroke differently (next row) |
 | (0.44) The rough did not look drawn by a person: a stroke was not drawn two or three times, staircases showed, and there was no pen pressure | it was a blurred line warped by noise and stacked three times, so it had no strokes, and per-pixel random grain made the edges jittery. Width followed only the line width, so stroke ends did not taper | center lines are split into strokes of a person's drawing length, each drawn 2 or 3 times slightly off, with pen pressure thinning · lightening the ends and coverage-based <mark>anti-aliasing</mark> (4.14). Length · width · darkness differ per stroke, so it does not become an even single line. Blind paired grading, overall: 51 : 9 on the 60 pictures, 34 : 6 on 40 unseen pictures (0.44 in 12) |
+| (0.45) Rough details broke down: eyes · mouths · fingers · ribbons turned into lumps · bead-like knots | Short face strokes (eyelash tips · nose · mouth corners) were trimmed as spurs, thick lines were drawn at their full width so small shapes became lumps, and shifted later passes covered small shapes | In face areas small strokes are kept and drawn darker with less wobble, the original lines are laid underneath at 45%, and the stroke radius is capped at 2.5px (4.14). Artist-style reference roughs on 18 crops: F 0.714 → 0.740; blind test on 40 unseen pictures, detail 36 : 0 (0.45 in 12) |
 | "Hair" names from faces were also put on black dresses · white clothes | parts are split by color, so clothes of the same color as the hair are one part | colors covering 25% or more of the torso center are not called hair. Colors that received both the skin vote and the hair vote are not named either |
 | Choosing hair around the bangs (including side hair) picked collars · hats · background | the side-hair area is occupied by clothes · hats · background depending on the picture | look only at the bangs just above the forehead, counting without the exposed forehead (skin) |
 | A pale skin part merged with white clothes into one color became "skin" | the part occupying the cheeks · nose bridge has the same color as the clothes | "skin" only for warm colors that are not too white |
@@ -1798,7 +1805,8 @@ Problems that came up while verifying with real pictures during development, and
   Brush grain is ignored only when most lines in the picture are grain, so hair drawn with grain in only part of a line-art picture can be split into several parts along the grain.
 - The rough is not in the original, so it is an **estimated sketch**. It follows the original lines, so pictures with dense lines (hair grain, lace) get an equally dense rough.
   In pictures with many brush strokes or dark areas with dense texture, short strokes remain like a mesh, and small knots can show where short strokes join.
-  Some pictures get double lines along both edges of a thick black line, or eyes of small faces blurred into short strokes (4.14, 0.44 in 12).
+  Some pictures get double lines along both edges of a thick black line, and because the original lines are laid faintly underneath, dark areas · halftone dots caught as lines can show through as a faint wash or dotted smudges.
+  Faint contours are covered less than by 0.43's thick bands, so the share of an artist-style reference rough that the rough covers (recall) is a little lower than 0.43's (4.14, 0.44 · 0.45 in 12).
 - The color under lines is a guess from the surroundings. Errors can remain in places like 1–2px gaps between two lines (reproduction is matched exactly by the color trace).
 - Light · sparkle layers are placed below the line art. In pictures with light painted over lines, that part goes into the color trace.
   Color trace (lines tinted with the paint color) and "light over black lines" cannot be told apart from one pixel's color, and a method separating light over lines treated color trace as light in 574 of 666 real pictures (7.5).
@@ -2015,7 +2023,7 @@ In this section:
 - [11.12 Returning islands in the scene background (0.38)](#1112-returning-islands-in-the-scene-background-038)
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
-- [11.15 Blind test (0.1 · 0.42 · 0.43 · 0.44)](#1115-blind-test-01--042--043--044)
+- [11.15 Blind test (0.1 · 0.43 · 0.44 · 0.45)](#1115-blind-test-01--043--044--045)
 
 ### 11.1 Formulas used for evaluation
 
@@ -3313,7 +3321,7 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 
 ### 11.14 Resolving power by version
 
-Every version from 0.1 to 0.44 was measured again with the same pictures and the same scoring.
+Every version from 0.1 to 0.45 was measured again with the same pictures and the same scoring.
 Each version's code was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the <mark>balanced error rate</mark>
@@ -3372,6 +3380,7 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.42 | Sending fewer black legs · clothes to the background | 95.4 | 91.0 | 0.0680 | 14.71 | **2.25** | 1.89–2.75 | 3.43 · 1.68 · 2.07 |
 | 0.43 | Dark character parts · rectangular background objects | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 | 0.44 | A rough that looks drawn by a person | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
+| 0.45 | Keeping rough details | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
 0.19 recovered the synthetic pictures' characters (82.0 → 97.7%), and in 0.37 · 0.38 the posed pictures' character kept rose 81.6 → 86.7 → 91.9%, taking the posed group's multiplier 0.97 → 1.18 → 1.44×.
@@ -3383,9 +3392,9 @@ From 0.4, finding scene backgrounds let the real pictures' backgrounds be found 
 (background found: synthetic 92.2 → 97.5%, posed 93.8 → 97.9%), taking the synthetic group 3.43 → 9.43× and the posed group 2.07 → 10.56× (mean BER 0.0680 → 0.0259).
 5 of the 8 real pictures keep a little more background (mean background found 41.1 → 40.9%), so the real group is 1.68 → 1.67×. 177 of the 185 pictures are synthetic, which is why the overall multiplier jumped;
 the gain on real pictures should be read from the 0.43 entry in section 12 (blind component grading on the 777 real pictures) and the blind test in 11.15.
-0.44 changed only the rough, and all 185 background maps are byte-identical to 0.43.
+0.44 · 0.45 changed only the rough, and all 185 background maps are byte-identical to 0.43.
 
-### 11.15 Blind test (0.1 · 0.42 · 0.43 · 0.44)
+### 11.15 Blind test (0.1 · 0.43 · 0.44 · 0.45)
 
 To compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the three latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the four versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), and then the key was opened.
@@ -3394,23 +3403,62 @@ For each picture, only the distinct results were collected (versions with identi
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
 | 0.1 | **20.0%** (12/60, 11.8–31.8) | 18.3% | 23.3% | 56.7% | 6/30 · 6/30 |
-| 0.42 | **35.0%** (21/60, 24.2–47.6) | 26.7% | 63.3% | 1.7% | 11/30 · 10/30 |
 | 0.43 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
 | 0.44 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
+| 0.45 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
 
-0.44 has background maps byte-identical to 0.43 on all 60 pictures. Identical results share one panel, so 0.44's grades equal 0.43's, and the grading of 0.1 · 0.41 · 0.42 · 0.43 done together at 0.43 is used as it is.
+0.44 · 0.45 have background maps byte-identical to 0.43 on all 60 pictures. Identical results share one panel, so their grades equal 0.43's, and the grading of 0.1 · 0.41 · 0.42 · 0.43 done together at 0.43 is used as it is.
 In that grading four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). Pictures had 2 (23 pictures) · 3 (15) · 4 (22) distinct panels, and 0.43 differs from 0.42 on 24 pictures.
-As same-picture pairs, 0.42 → 0.44 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$) and 1 · 0 in "character without loss", with 1 picture graded higher and 0 lower ($`p = 1.0`$).
-Version 0.1 found no background in 34 pictures and leaves them as they are, so it has few major losses (14); 0.1 → 0.44 gained 12 · lost 2 in "no major loss" ($`p = 0.013`$).
+As same-picture pairs, 0.43 · 0.44 · 0.45 share the same panel on all 60 pictures, so nothing is gained or lost among them; against the previous version 0.42 (dropped from this table, 35.0%), 0.42 → 0.45 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$) and 1 · 0 in "character without loss", with 1 picture graded higher and 0 lower ($`p = 1.0`$).
+Version 0.1 found no background in 34 pictures and leaves them as they are, so it has few major losses (14); 0.1 → 0.45 gained 12 · lost 2 in "no major loss" ($`p = 0.013`$).
 At 0.43 the four versions were graded again from scratch together, so the rates differ from the 0.42 entry's grading (0.1 · 0.40 · 0.41 · 0.42 graded together): 0.42 went from 48.3 to 35.0%, 0.41 from 48.3 to 33.3%, and 0.1 from 31.7 to 20.0%.
 These graders also counted crowds and faintly drawn large figures in the background as characters and graded their losses as major, so every version's rate is lower. Read this as the difference between four versions graded together by the same standard rather than as the size of the rates.
-The table at the end of the 0.44 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+The table at the end of the 0.45 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
 ## 12. Release history
 
 Newest versions are at the top.
+
+### 0.45 (2026-10-11) Keeping rough details
+
+- Resolving power: 5.91× version 0.1 (95% CI 4.33–8.63×; background results identical to the previous version, 11)
+- The 0.44 rough looked drawn by a person, but small shapes such as eyes · mouths · fingers · ribbons broke down. Short face strokes (eyelash tips · nose · mouth corners) were trimmed as spurs, thick lines drawn at their full width turned small shapes into lumps · bead-like knots, and shifted later passes covered small shapes.
+- **Measuring against artist-style reference roughs**: from 18 real pictures, one crop each (220–540px on a side) with faces · hands · accessories was cut, and a grader in the role of an illustrator drew, as stroke coordinates, "the rough the artist of that picture would have drawn before the line art".
+  Strokes were drawn with weight 3 (face outline · eyes · eyebrows · nose · mouth · fingers), 2 (hair silhouette · large hair locks · body · clothing edges · ribbons) or 1 (folds · small accessories); shading borders · highlights · texture · single hairs were not drawn (21–173 strokes per crop, 1,466 in all). The graders did not see the program's roughs.
+  - Measure: reference strokes are expanded into points 1px apart, and a point counts as "caught" if it is within 3px of the program's rough ink (alpha over 0.25). Recall is the weighted mean of caught points, precision the alpha-weighted share of ink within 3px of a reference stroke, F their harmonic mean, and key-stroke recall the recall of weight-3 strokes only.
+  - Changes were made while looking at 12 of the 18 crops only; the other 6 were measured once at the end.
+  - For 6 crops (d07 · d08 · d09 · t01 · t02 · t03) the drawers used a helper that moves hand-placed points a few px toward the nearest dark line (which strokes to draw and how far was decided by hand). This favors roughs that follow the original lines, so they are also reported separately.
+- Changes (2.9, 4.14):
+  - **Face area** (for each naming face, in units of the eye distance 𝑑: ±1.1𝑑 sideways, from 0.6𝑑 above to 1.6𝑑 below the eyes): spurs are not trimmed, 4-pixel pieces · 8-pixel loops (small irises) are kept, strokes are always drawn 2–3 times with less wobble (× 0.35), never falling short, dark, and smoothed narrowly (half-window 2).
+  - **Underlay**: the original lines (line alpha 0.25 or more) are laid under the strokes at 45% darkness.
+  - **Stroke width cap**: the radius is capped at $`2.5s'`$px (2.5px for pictures with a long side of 1000px or less). 0.44 drew thick lines at their own width (radius up to $`2.5r_T`$), so they turned into lumps.
+  - **Smoothing by line length**: the moving-average half-window is the line length / 25 (2–6 points), smoothing long lines more widely (0.44: always 5 points).
+  - **Faint strokes fainter**: the darkness went from $`0.55 + 0.45\min(1, \bar\ell)`$ to $`0.2 + 0.8\min(1, \bar\ell)^2`$, so silhouettes · background contours · texture with faint original lines no longer cover like dark strokes.
+- Reference roughs, 18 crops (0.43 · 0.44 → 0.45; parentheses give the mean difference, crops better : worse in same-crop pairs (differences under 0.0005 count as ties), and the <mark>sign test</mark>):
+  - F 0.708 · 0.714 → 0.740 (vs 0.44 +0.026, 17 : 1, $`p = 1.4 \times 10^{-4}`$ / vs 0.43 +0.031, 14 : 4, $`p = 0.031`$).
+  - Precision 0.613 · 0.646 → 0.671 (vs 0.44 +0.025, 17 : 1, $`p = 1.4 \times 10^{-4}`$ / vs 0.43 +0.059, 17 : 1, $`p = 1.4 \times 10^{-4}`$); key-stroke recall 0.892 · 0.808 → 0.884 (vs 0.44 +0.076, 17 : 1, $`p = 1.4 \times 10^{-4}`$).
+  - Recall 0.886 · 0.835 → 0.862: higher than 0.44 (+0.027, 15 : 2, $`p = 0.002`$) but lower than 0.43 (−0.023, 1 : 16, $`p = 2.7 \times 10^{-4}`$), because 0.43's thick bands cover even faint contours widely. Key-stroke recall is also slightly lower than 0.43's (−0.008, 6 : 11, $`p = 0.33`$).
+  - The 6 crops measured only at the end: F 0.665 · 0.666 → 0.694. Leaving out the 6 crops drawn with the helper, the other 12 give F 0.666 · 0.673 → 0.697 (vs 0.44 +0.025, 11 : 1, $`p = 0.006`$ / vs 0.43 +0.031, 9 : 3, $`p = 0.15`$).
+- Blind paired grading: 40 unseen pixiv pictures (random, from the 777-picture validation set outside the 60 · 40 of the 0.44 entry) were compared with 0.44 by four graders, 10 each, without knowing which was new, from the two roughs next to the original (whole view and a 300px crop enlarged 2×).
+  0.45 won on details not breaking down 36 : 0 (4 ties, $`p = 2.9 \times 10^{-11}`$), looking like a rough drawn by a person 38 : 1 (1 tie, $`p = 1.5 \times 10^{-10}`$), and overall 38 : 1 (1 tie, $`p = 1.5 \times 10^{-10}`$).
+  Notes on 0.44 were mostly "thick lines clump into lumps · bead-like knots and smear eyes · mouths"; notes on 0.45 repeatedly mentioned "faint wash · dotted smudges" and "some staircase edges" (where the original lines are laid underneath).
+- Tried but not adopted (F on 18 crops; 0.45 is 0.740): underlay 35% · 55% (0.737 · 0.741, no difference from 45%), part-color boundaries as material also in pictures with line art (0.739), an extra 60% underlay of the original lines in face areas plus less tapering at stroke joints (0.741, no difference).
+  Removing each change one at a time from the version with these three no-difference additions (0.740–0.741) gives 0.734 without the width cap, 0.734 without fainter faint strokes, 0.737 without the face area and 0.737 without the length-based smoothing; the underlay alone gives 0.727.
+- Everything outside the rough is unchanged. Only rough generation changed in the code, and the background maps of the 185 ground-truth pictures · 60 blind-test pictures are byte-identical to 0.44. The blind test (11.15) reuses the grading done together at 0.43.
+- Remaining weaknesses: faint wash · dotted smudges where the original lines are laid underneath, lower recall than 0.43 (faint contours), mesh-like short strokes on brush strokes · dense texture, and double lines along thick black lines.
+
+| | Version 0.1 | Version 0.43 | Version 0.44 | Version 0.45 |
+|---|---|---|---|---|
+| Resolving power | 100% | 591% | 591% | 591% |
+| Resolving power 95% CI | — | 433–863% | 433–863% | 433–863% |
+| Resolving power 80% CI | — | 482–754% | 482–754% | 482–754% |
+| Blind test | 20% | 37% | 37% | 37% |
+| Blind test 95% CI | 12–32% | 26–49% | 26–49% | 26–49% |
+| Blind test 80% CI | 14–27% | 29–45% | 29–45% | 29–45% |
+
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference and has no interval). The blind test is the share of pictures with "no major loss" when the results of the four versions were mixed and graded without knowing which version made them, on 60 pixiv pictures, with <mark>Wilson intervals</mark>. 0.44 · 0.45 have the same 60 background maps as 0.43, so the grading done together at 0.43 is used as it is (11).
 
 ### 0.44 (2026-10-11) A rough that looks drawn by a person
 
