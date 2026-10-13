@@ -11,7 +11,7 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **5.91× version 0.1** (0.47, 95% CI 4.33–8.63×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller, 11).
+- Resolving power: **5.91× version 0.1** (0.48, 95% CI 4.33–8.63×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller, 11).
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -63,7 +63,7 @@ The program's screen and the layer names in the PSD are in Korean. The Korean na
 | Background · background FX (`배경` · `배경 효과`) | The background behind the character, flecks of light floating over the background |
 | Outer glow (`외곽 글로우`) | A neon band drawn around the character (only in pictures that have one) |
 
-Each part gets its own folder, and the folder holds that part's base color · shadows · highlights.
+Each part gets its own folder, and the folder holds that part's base color · shadows · highlights (choosing **per-stage folders** in the settings turns this around: the parts sit inside [Base color] · [1st shadow] · [2nd shadow] · [Highlight] folders).
 If the program finds a face in the picture (also in PNGs with a transparent background), it names folders **eyes · skin · hair** (`눈` · `피부` · `머리카락`) from the colors around the face; the other folders are named by color (blue `파랑`, black `검정` …).
 
 ### What do I need?
@@ -121,7 +121,8 @@ PSB files and files converted to 16 · 32 bits also work. If the file is already
 | Shadow threshold | Higher sends faintly darkened areas to the shadow layer too |
 | Maximum sparkle size | Bright dots smaller than this are treated as sparkles (0 sets it automatically for the resolution) |
 | Maximum number of parts | Maximum number of part folders (default 32). Small parts that overflow go into the "small parts" folder |
-| Split painting into per-part folders | When off, base color · shadows · highlights become one layer each, without separating parts |
+| Split painting by part (`채색을 파츠별로 나누기`) | When off, base color · shadows · highlights become one layer each, without separating parts |
+| Folder layout (`폴더 나누는 방식`) | **Per-part folders** (`파츠별 폴더`, default): in each of [Skin] [Hair] … folders, base color · 1st · 2nd shadow · highlight.<br>**Per-stage folders** (`단계별 폴더`): in each of [Base color] [1st shadow] [2nd shadow] [Highlight] folders, one layer per part (3.12). Available only when splitting by part; no clipping is used |
 | Clip shadows · highlights to the base color | Keeps shadows and highlights from going outside the base color |
 | Automatic flat background separation | Turns background detection on and off |
 | Tilted picture (`기울어진 그림`) | Off by default. Turn it on for pictures that are strongly tilted overall (more than 45°) or lying on their side: faces are searched at several angles (0 · ±30 · ±60 · ±90°) and names · character folders · background rules follow the most face-like angle. The chosen tilt appears in the result line as "tilt N°".<br>On upright pictures it finds slightly fewer faces and slightly more fake faces (82 ground-truth pictures: real faces 29/35 → 26/35, fake faces 15 → 17), so it is better left off for pictures that are not tilted.<br>Pictures saved rotated, whose four corners are white · one color · transparent, are recognized without turning it on |
@@ -487,6 +488,23 @@ The layers are grouped into the tree of a work file, and two roughs are made and
 
 For opaque pictures with no background, [Line art] · [Effects] · [Painting] come at the top without the [Character] · [Background] folders.
 
+Choosing **per-stage folders** under the setting **Folder layout** (0.48) turns the part-folder section inside [Painting] around as below. Each stage folder holds one layer per part, base color layers carry the color code after the name,
+and small parts with no neighbor of similar color are gathered into [Small parts (n)] inside each stage folder (a stage folder with no parts is not made).
+
+```
+  [Painting]
+    Rim light · Reflected light · Shading · Gradient   (as above)
+    [Highlight]                   one per part (normal)
+    [2nd shadow]                  one per part (multiply)
+    [1st shadow]                  one per part (multiply)
+    [Base color]                  Skin #F2D3C4, Hair #7B56B5 … (normal)
+    Silhouette (for selection)    normal, hidden
+```
+
+Since base colors and shadows sit in different folders, no clipping is used. Parts do not overlap and each layer is painted only where its part is, so for opaque pictures the result of stacking the layers again is the same as with per-part folders
+(the app's composite is pixel-identical on the example picture · a real picture · a transparent-background picture · two synthetic pictures with several characters, and psd-tools re-renders of the two layouts agree at PSNR 99 dB).
+Transparent-background pictures with semi-transparent edges come out the same as per-part folders with clipping off, so they differ from clipped per-part folders only in the semi-transparent edge pixels (0.83% of the whole on a test picture with blurred edges).
+
 **With several characters**, instead of [Character], folders [Character 1] · [Character 2] … are made from the left, each containing the same [Line art] · [Effects] · [Painting] as above.
 Characters are determined from the faces found. Faces of similar size and height that lie outside each other's body zone are taken as characters (fake faces found on knees · shoes are left out),
 and pixels are divided starting from each face's head · body zone, using outlines as walls (4.8). The composited result of the layers is the same as with one folder.
@@ -799,6 +817,17 @@ Problems that came up while verifying with real pictures during development, and
 | (0.46) Capping the total length of inner color boundaries at a multiple of the silhouette length | On 16 pictures, the values of good pictures (1.6–2.6×) and of pictures that became a cell mesh (1.3–7.0×) overlapped and could not be separated |
 | (0.47) Tracing every line of the line art in rough 2 (down to short closed loops · contours of thick painted shapes outside faces) | In a blind test on 40 unseen pictures it lost heavily to 0.46's rough 2 on plausible origin 3 : 22 and by hand 2 : 28, with no difference on form 9 : 10. Notes gathered on "patterns traced as small closed loops look mechanical", so repeated small loops are left out and contours of painted shapes are taken only inside face areas |
 | (0.47) Finding irises by color and drawing them as ellipses (blobs that are neither white of the eye nor skin around found eye points) | Some eyes in development pictures were right, but cheek blush · parts of eyes were often taken as irises; above all, recognizing eyes and turning them into symbols was dropped in favor of tracing the line art |
+| (0.48) Naming faces: finding closed · smiling eyes as short dark arcs (scored separately by trough depth · width · skin below the eye) | On the 88 development pictures for decisions, faces found +0, and +1 with fakes +1 after widening the arc candidates (acceptance: found +2 or more with fakes +1 or less). Arc candidates appear, but closed-eye faces miss the open-eye cues (sparkle · eye pattern), leaving too few cues to tell them from fakes |
+| (0.48) Naming faces: mean patterns per eye type (real faces split into 1 · 2 · 3 · 4 clusters, per-cluster mean face · eye patterns), a chroma face pattern | In two-fold cross-validation on the 117 development pictures for choosing, all 24 variants found as many or fewer faces than the current patterns (55) at the same number of fakes (49–53). The chroma pattern separated real from fake with an AUC of only 0.52 · 0.59 |
+| (0.48) Naming faces: accepting smaller faces (eye distance 16 → 12 px on the 800 px grid) · more tilted faces (eye line ±38.7° → ±50.2°) | The 14 · 4 new detections were all fakes (text · clothing ornaments · sparkles of large eyes). The missed small · tilted faces score low on other cues too and do not come back |
+| (0.48 cycle 1) Face score threshold 13 → 11 in restoring swallowed character parts | The 185-picture BER improved (×0.974), but in 8 blind rounds (new graders each round) on the 97 of 400 hold-out pictures that changed: candidate 34 · 0.47 40 · ties 23 ($`p = 0.56`$). With only 8 real pictures with ground truth, the 185 pictures do not catch such a regression |
+| (0.48 cycle 2) Line-ratio threshold 0.3 → 0.4 in the gap rule between characters (only on non-white backgrounds) | Development screening better 3 · worse 2 · similar 3 (lost white stockings · a white skirt); only 1 of 400 hold-out pictures changed (candidate 1 : 0, $`p = 1`$) |
+| (0.48 cycle 3) Treating the bottom border as a wall too in the line-enclosure check | 185-picture BER ×1.016 (worse); 272 of 400 hold-out pictures changed, and in the blind test of 128: candidate 50 · 0.47 68 · ties 10 ($`p = 0.12`$). What it returned was mostly floor · background at the bottom |
+| (0.48 cycle 4) Keeping scene-background filling out of the head zone of naming faces (score 12 or more) | 185-picture BER ×1.007; only 4.6% of development pictures changed. On 26 of 400 hold-out pictures: candidate 16 · base 9 · ties 1 ($`p = 0.23`$). Blocking with every found face let fake faces (blurred light circles) in posed synthetic pictures block wide background (185-picture BER ×1.13) |
+| (0.48 cycle 5) Piece-splitting boundary $`\Delta E`$ 20 → 12 in restoring attached parts | 185-picture BER ×1.000; development screening better 8 · worse 6. On 113 of 400 hold-out pictures: candidate 49 · base 52 · ties 12 ($`p = 0.84`$). Finer pieces increase both what is returned and what is removed |
+| (0.48 cycle 6) Stopping scene filling at a sharp color change ($`\Delta E \ge 20`$) in front of bright pixels ($`L^* \ge 70`$), the counterpart of the dark-area block | 185-picture BER ×1.017; 51% of development pictures changed, screening better 6 · worse 8. On 236 of 400 hold-out pictures (128 in the blind test): candidate 60 · base 47 · ties 21 ($`p = 0.25`$). Pictures where bright clothes are kept and pictures where bright background stays are mixed |
+| (0.48 cycle 7) Finding the scene inside a wide frame margin around the picture (filling the margin with inner values and using it as the picture border) | 0 of 185 changed; only 1.5% of development pictures (4: better 3 · similar 1). Only 1 of 400 hold-out pictures changed, so even 7 rounds for the candidate and 1 tie give $`p = 1`$ at the picture level |
+| (0.48 cycle 8) More look-back steps, 3 → 5 · 8, in the dark-area block (scene filling stops in front of dark pixels) | It returns black sleeves · legs · hats but also night skies · dark cities · walls. 8 steps: 185-picture BER ×0.994 but development screening better 5 · worse 9; 5 steps: ×1.000 · 3 : 3. The 5-step version went to 8 blind rounds over the 131 of 400 hold-out pictures that changed: candidate 42 · base 58 · ties 28 ($`p = 0.13`$). One block cannot tell dark clothes from dark backgrounds |
 
 **Note** — **Why**: Methods not adopted must be measured by the same standard to show why the current method stayed. The 𝑝 values in the table are sign-test or exact-test values from paired gradings (formulas in 11.1). **How it works**: The line-detection window $`\max(1, \mathrm{round}(4s))`$ was an attempt to make the 4px window at a 1000px long side proportional to the size ratio 𝑠 without the floor of 3. On small pictures the window shrank to 2px, fewer lines were found and results got worse. **References**: [R85 Dixon · Mood 1946](#r85) · a rule set by this program
 
@@ -934,6 +963,8 @@ Problems that came up while verifying with real pictures during development, and
   Names · folders use faces chosen separately with a score that filters fakes (9 of 4.5), reducing fake faces 310 → 232, but 8 of 235 one-person pictures are still split in two (11).
   From 0.34, only faces also found in the left-right flipped picture are used for names · folders (10 of 4.5), reducing naming faces on 666 pictures 1046 → 755 and resolving 6 one-person pictures (and 1 picture without people) that had been split into two character folders.
   In exchange, real faces that fall below the threshold when flipped (oblique faces, half-hidden faces) also drop out: of the 89 pictures whose names changed, 27 were better before, and 5 pictures of two or three people lost one folder (11).
+  From 0.48, head-structure cues (skin continuing in one blob down to the cheeks, a red · yellow cast of the skin) are added for the faces for names · folders (9 in 4.5); on 88 development pixiv pictures not used for choosing, faces found went 40 → 44 and fake faces 57 → 47 (neither significant).
+  In exchange, on 120 posed synthetic pictures, whose skin is even and wide, fakes on hands · legs · one eye with a cheek went 11 → 38 (0.48 in 12).
 - Pictures with several people rarely get the right number of character folders (11 of 65 pixiv pictures, 7 of 61 in the new 342). Not all faces are found, and characters at different face heights,
   such as front and back rows · several panels, are not grouped as characters of the same picture. Relaxing the height condition increases one-person pictures split by fake faces, so it was kept (7.5).
 - Faces with dark skin may not be found (face finding uses "dark eyes on bright skin" as a cue). In synthetic pictures, faces are found up to skin brightness 77;
@@ -1072,7 +1103,7 @@ In this section:
 - [11.12 Returning islands in the scene background (0.38)](#1112-returning-islands-in-the-scene-background-038)
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
-- [11.15 Blind test (0.1 · 0.45 · 0.46 · 0.47)](#1115-blind-test-01--045--046--047)
+- [11.15 Blind test (0.1 · 0.46 · 0.47 · 0.48)](#1115-blind-test-01--046--047--048)
 
 ### 11.1 Formulas used for evaluation
 
@@ -2399,7 +2430,7 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 
 ### 11.14 Resolving power by version
 
-Every version from 0.1 to 0.47 was measured again with the same pictures and the same scoring.
+Every version from 0.1 to 0.48 was measured again with the same pictures and the same scoring.
 Each version's code was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the <mark>balanced error rate</mark>
@@ -2463,6 +2494,7 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.45 | Keeping rough details | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 | 0.46 | Two roughs (concept · refined) | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 | 0.47 | Roughs that trace | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
+| 0.48 | Head-structure cues for naming faces · per-stage painting folders · 8 background improvement cycles | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
 0.19 recovered the synthetic pictures' characters (82.0 → 97.7%), and in 0.37 · 0.38 the posed pictures' character kept rose 81.6 → 86.7 → 91.9%, taking the posed group's multiplier 0.97 → 1.18 → 1.44×.
@@ -2474,9 +2506,9 @@ From 0.4, finding scene backgrounds let the real pictures' backgrounds be found 
 (background found: synthetic 92.2 → 97.5%, posed 93.8 → 97.9%), taking the synthetic group 3.43 → 9.43× and the posed group 2.07 → 10.56× (mean BER 0.0680 → 0.0259).
 5 of the 8 real pictures keep a little more background (mean background found 41.1 → 40.9%), so the real group is 1.68 → 1.67×. 177 of the 185 pictures are synthetic, which is why the overall multiplier jumped;
 the gain on real pictures should be read from the 0.43 entry in section 12 (blind component grading on the 777 real pictures) and the blind test in 11.15.
-0.44 to 0.47 changed only the rough, and all 185 background maps are byte-identical to 0.43.
+0.44 to 0.48 changed only the rough · naming faces · painting folders (no candidate of 0.48's 8 background improvement cycles was adopted), and all 185 background maps are byte-identical to 0.43.
 
-### 11.15 Blind test (0.1 · 0.45 · 0.46 · 0.47)
+### 11.15 Blind test (0.1 · 0.46 · 0.47 · 0.48)
 
 To compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the three latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the four versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), and then the key was opened.
@@ -2485,17 +2517,17 @@ For each picture, only the distinct results were collected (versions with identi
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
 | 0.1 | **20.0%** (12/60, 11.8–31.8) | 18.3% | 23.3% | 56.7% | 6/30 · 6/30 |
-| 0.45 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
 | 0.46 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
 | 0.47 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
+| 0.48 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
 
-0.44 to 0.47 have background maps byte-identical to 0.43 on all 60 pictures. Identical results share one panel, so their grades equal those of 0.43 (dropped from this table, 36.7%), and the grading of 0.1 · 0.41 · 0.42 · 0.43 done together at 0.43 is used as it is.
+0.44 to 0.48 have background maps byte-identical to 0.43 on all 60 pictures. Identical results share one panel, so their grades equal those of 0.43 (dropped from this table, 36.7%), and the grading of 0.1 · 0.41 · 0.42 · 0.43 done together at 0.43 is used as it is.
 In that grading four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). Pictures had 2 (23 pictures) · 3 (15) · 4 (22) distinct panels, and 0.43 differs from 0.42 on 24 pictures.
-As same-picture pairs, 0.43 to 0.47 share the same panel on all 60 pictures, so nothing is gained or lost among them; against the previous version 0.42 (dropped from this table, 35.0%), 0.42 → 0.47 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$) and 1 · 0 in "character without loss", with 1 picture graded higher and 0 lower ($`p = 1.0`$).
-Version 0.1 found no background in 34 pictures and leaves them as they are, so it has few major losses (14); 0.1 → 0.47 gained 12 · lost 2 in "no major loss" ($`p = 0.013`$).
+As same-picture pairs, 0.43 to 0.48 share the same panel on all 60 pictures, so nothing is gained or lost among them; against the previous version 0.42 (dropped from this table, 35.0%), 0.42 → 0.48 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$) and 1 · 0 in "character without loss", with 1 picture graded higher and 0 lower ($`p = 1.0`$).
+Version 0.1 found no background in 34 pictures and leaves them as they are, so it has few major losses (14); 0.1 → 0.48 gained 12 · lost 2 in "no major loss" ($`p = 0.013`$).
 At 0.43 the four versions were graded again from scratch together, so the rates differ from the 0.42 entry's grading (0.1 · 0.40 · 0.41 · 0.42 graded together): 0.42 went from 48.3 to 35.0%, 0.41 from 48.3 to 33.3%, and 0.1 from 31.7 to 20.0%.
 These graders also counted crowds and faintly drawn large figures in the background as characters and graded their losses as major, so every version's rate is lower. Read this as the difference between four versions graded together by the same standard rather than as the size of the rates.
-The table at the end of the 0.47 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+The table at the end of the 0.48 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
@@ -2504,6 +2536,49 @@ The table at the end of the 0.47 entry in section 12 gives the resolving power a
 Newest versions are at the top.
 
 **Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
+### 0.48 (2026-10-13) Head-structure cues for naming faces · per-stage painting folders · 8 background improvement cycles
+
+- Resolving power: 5.91× version 0.1 (95% CI 4.33–8.63× · background results identical to the previous version, 11)
+- **Head-structure cues for the faces used for names · character folders** (9 in 4.5): a real face is one blob of skin color from below the eyes to the cheeks, and skin has a red · yellow cast.
+  The width over which the cheek skin continues and the $`a^*`$ · $`b^*`$ of the reference skin color are added as a bonus (at most 7.5), and the naming threshold is raised from 10.75 to 16.5.
+  The faces for background decisions, and picking when the setting "Tilted picture" is on, are unchanged, so background results are the same as 0.47.
+  - How it was chosen: the 293 development pixiv pictures (the 777-picture validation set minus the 400 hold-out and the fixed 60 of 11.15) were split into A 117 · B 88 · C 88 (seed 20261012); in 25 loops, rules · variables were chosen on A and only the accept decision was made on B.
+    The acceptance rule on B was "faces found +2 or more with fakes +1 or less" or "fakes −2 or less with faces found not decreasing". Only this rule was accepted; finding closed · smiling eyes as arcs, mean patterns per eye type, accepting smaller · more tilted faces and others were dropped (7.5).
+  - Results (against a list in which every detection was judged real · fake; same-picture pairs; intervals of the difference from a paired bootstrap, 95%; 𝑝 from a picture-level sign test): on A, faces found 55 → 66 (of 115, $`p = 0.039`$) · fakes 73 → 49 ($`p = 0.088`$);
+    on B, 45 → 52 (of 95, $`p = 0.039`$) · fakes 47 → 29 ($`p = 0.029`$). **On C, never used for choosing or deciding, faces found 40 → 44 (of 85, +4, CI −2 to +10, $`p = 0.34`$) · fakes 57 → 47 (−10, CI −27 to +7, $`p = 0.11`$)**:
+    the same direction, but not significant. The share found on C went 47.1% (Wilson 95% 36.8–57.6%) → 51.8% (41.3–62.1%), and the effect is larger on the sets used for choosing (A > B > C).
+  - By condition over all 293, nearly achromatic pictures (90th percentile of chroma $`C^*`$ below 15) also went faces found 20 → 22 · fakes 24 → 16, while pictures with two faces had fakes rise 19 → 22.
+  - **It got worse on 120 posed synthetic pictures.** Pictures with a face found rose 46 → 63 (17 more · 0 fewer, $`p = 1.5 \times 10^{-5}`$), and fake faces also rose 11 → 38 (23 pictures more · 3 fewer, $`p = 8.8 \times 10^{-5}`$).
+    Synthetic characters have even, wide skin, so hands · legs · one eye with a cheek also earn the full bonus (of the 38 fakes, 25 inside a face and 13 on hands · legs · body; 23 crossed from below the old threshold 10.75 by the bonus). The gain on real pictures was preferred (10.3).
+  - Processing time is the same (C, 88 pictures, median per-picture ratio 0.48 / 0.47 = 0.97). The Python reproduction used for choosing and the app agree on 204 of the 205 A · B pictures; on the other one, the app, which looks for faces after filling the frame line with inner values, gave one fewer fake (all counts above are the app's).
+- **Per-stage painting folders**: choosing **per-stage folders** under the setting **Folder layout** puts [Highlight] · [2nd shadow] · [1st shadow] · [Base color] folders inside [Painting], each holding one layer per part (3.12). The default stays per-part folders as before.
+  The setting "Split painting into per-part folders" was renamed "Split painting by part"; when it is off, the folder layout cannot be chosen. Per-stage folders use no clipping (the clipping box is locked).
+  - Checks: on the example picture · 6 real pictures · a transparent-background picture · two synthetic pictures with several characters, the app's composites of the two layouts are pixel-identical, and psd-tools re-renders of the two PSDs agree at PSNR 99 dB.
+    On a transparent picture with blurred edges, only semi-transparent edge pixels (0.83% of the whole) differ from clipped per-part folders, and the result equals per-part folders with clipping off.
+- **8 background improvement cycles**: the background rules were tried 8 times in a "measure → improve → 8 differential blind tests" cycle. None of the 8 met the adoption rule, so the background rules stay as in 0.47 (each candidate's result is in 7.5).
+  - Each cycle (1) measured the BER on the 185 ground-truth pictures and five grades given by a new grader to 30 development pictures freshly drawn for the cycle,
+    (2) diagnosed the most common failure on up to 20 of those 30, made a candidate rule and screened it on the 185 and the development pictures,
+    (3) compared base and candidate on the 400 hold-out pictures not used in development, blind, 8 times over the pictures whose results differ (up to 16 per round, new seed · shuffled sides · new grader each round).
+    The adoption rule was a pooled picture-level <mark>sign test</mark> $`p < 0.05`$ with more candidate wins, no round against the candidate, and a 185-picture BER no more than 5% worse (1% up to cycle 3).
+  - The one leaning furthest toward its candidate was cycle 6 (stopping scene filling in front of bright pixels: candidate 60 · base 47 · ties 21, $`p = 0.25`$), while cycle 8 (the dark-area block extended to five steps back: candidate 42 · base 58 · ties 28, $`p = 0.13`$) leaned toward the base. Cycle 1's candidate lowered the 185-picture BER by 2.6% but lost or tied on real pictures (34 · 40 · ties 23).
+    The candidates of cycles 2 · 7 changed only 1 of the 400 hold-out pictures, so even without a loss they could not be adopted by a picture-level test.
+  - The "no major loss" counts of the 30 development pictures drawn fresh for each cycle (240 over 8 cycles, no overlap, background results all identical to 0.47) were 22 · 20 · 19 · 17 · 21 · 16 · 16 · 20 (of 30 each); pooled, 151/240 = 62.9% (Wilson 95% 56.7–68.8%).
+    Graders differ by cycle, so differences between cycles include grader differences. Most major losses were the scene stage swallowing hair · clothes · legs in softly painted pictures.
+- The blind test (11.15) reuses the grading done together at 0.43, since the background maps of the 60 pictures are byte-identical to 0.43.
+  The 185 ground-truth pictures also have background maps byte-identical to 0.47.
+- Remaining weaknesses: the scene stage swallowing white · pale clothes · hair · legs in softly painted pictures (few pictures have a naming face, so the face-zone rules rarely reach them), scenes inside frame margins, and fake naming faces in posed synthetic pictures.
+
+| | Version 0.1 | Version 0.46 | Version 0.47 | Version 0.48 |
+|---|---|---|---|---|
+| Resolving power | 100% | 591% | 591% | 591% |
+| Resolving power 95% CI | — | 433–863% | 433–863% | 433–863% |
+| Resolving power 80% CI | — | 482–754% | 482–754% | 482–754% |
+| Blind test | 20% | 37% | 37% | 37% |
+| Blind test 95% CI | 12–32% | 26–49% | 26–49% | 26–49% |
+| Blind test 80% CI | 14–27% | 29–45% | 29–45% | 29–45% |
+
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (0.1 is the reference, so it has no interval). The blind test is the share of "no major loss" pictures when the four versions' results on 60 pixiv pictures were mixed and graded without knowing the version, with <mark>Wilson intervals</mark>. 0.46 · 0.47 · 0.48 have background maps identical to 0.43 on the 60 pictures, so the grading done together at 0.43 is used as it is (11).
 
 ### 0.47 (2026-10-11) Roughs that trace (no eye recognition · real outlines · background composition · continuous strokes)
 
