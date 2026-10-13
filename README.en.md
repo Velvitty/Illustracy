@@ -1071,7 +1071,7 @@ The windows (the glass inside the window frames) remain, so background good on t
 
 #### Help wanted
 
-We are looking for people to help solve these weaknesses. If you are a grey hat, please help. Anyone who knows image processing or how illustrations are painted is welcome.
+We are looking for people to help solve these weaknesses. Anyone who knows image processing or how illustrations are painted is welcome.
 
 - Send pictures that split wrongly (counterexamples), analyses of causes, or fixes as issues or pull requests.
 - Changes are measured with the same tests as section 11 (ground-truth scoring and blind grading) and go in only when they improve results.
