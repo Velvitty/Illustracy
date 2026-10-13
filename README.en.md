@@ -7,8 +7,7 @@ A program that takes a single finished illustration and **splits it back into ma
 > [!IMPORTANT]
 > This program was made for cases where drawn layers were merged by mistake and can no longer be separated, or where an image was exported as a single file and the original file could not be saved.
 >
-> Never use this program on images you did not create.\
-> Doing so violates this program's license and is an illegal act under copyright law, subject to criminal penalties.
+> Never use this program on images you did not create.
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
