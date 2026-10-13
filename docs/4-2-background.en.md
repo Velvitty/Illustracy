@@ -333,6 +333,21 @@ but the character of a missed face is not protected.
    and fakes (clothing patterns, text, props, snacks) often had too large eye contrast and lower-eyelid brightness or a white backing in the skin area.
    Among pairs scoring 10 or more, the mean adjustment is −0.13 for real faces (median 0) and −0.41 for fakes (a quarter at −0.85 or less).
    Two kinds of faces are used because changing the faces for background decisions with this adjustment too made the background flip between better and worse (7.5).
+
+   **Head-structure cues** (0.48): on the default path (setting "Tilted picture" off), pairs whose score including the adjustments above is 9 or more get the bonus 𝐻 below (at most 7.5), and 7 · 8 are done with threshold 16.5.
+   So a pair cannot be picked as a naming face without the bonus. A picked face reports its score before the bonus, and the faces for background decisions (7) are unchanged.
+   On the face-frame grid ($`u`$ −2 to 2, $`v`$ −2 to 2.6, step $`0.1d`$, bilinear sampling), the per-channel medians of $`L^*`$ · $`a^*`$ · $`b^*`$ over the nose-bridge ($`\lvert u\rvert \le 0.12,\ 0.05 \le v \le 0.45`$) and cheek ($`0.3 \le \lvert u\rvert \le 0.7,\ 0.35 \le v \le 0.7`$) grid points are the reference skin color ($`L^*_s, a^*_s, b^*_s`$).
+   Grid points inside the picture with $`L^* \ge L^*_s - 25`$ (not a line) and $`\Delta E \le 12`$ to the reference are skin; a blob is grown by 4-neighbours from the skin points of the nose bridge · cheeks.
+   At each cheek height ($`v`$ = 0.3, 0.4, …, 0.8) we step outward from the centre by $`0.1`$ and take the last $`\lvert u\rvert`$ before the blob first breaks; the median of these is taken on the left and on the right, and the smaller one is the cheek extent 𝑒.
+
+   ```math
+   H = 3\,\mathrm{clamp}\!\left(\frac{a^*_s + 4}{8}\right) + 3\,\mathrm{clamp}\!\left(\frac{e}{0.3}\right) + 1.5\,\mathrm{clamp}\!\left(\frac{b^*_s}{5}\right)
+   ```
+
+   **Note** — **Why**: a real face is one blob of skin color from below the eyes to the cheeks, and skin has a red · yellow cast. Fake pairs from clothing folds · patterns · props often lose the skin blob right at cheek height, or their "skin" area is grey · bluish. **How it works**: everything is measured in face-frame coordinates (𝑢, 𝑣 in units of 𝑑), so the same places are looked at whatever the face size · tilt. $`a^*_s`$ · $`b^*_s`$ are the red · yellow cast of the reference skin, 𝑒 is how many eye distances wide the cheek skin continues, and the three are ramped to 0–1 and added with weights 3 · 3 · 1.5. The weights · threshold were chosen on 205 of 293 development pixiv pictures. **References**: this program's experiments (0.48 in 12)
+
+   On 88 development pictures never used for choosing, faces found went 40 → 44 and fake faces 57 → 47 (neither significant; same direction as on the pictures used for choosing).
+   On 120 posed synthetic pictures, whose skin is even and wide, pictures with a face found went 46 → 63 while fake faces also went 11 → 38 (hands · legs · one eye with a cheek take the full bonus, 0.48 in 12).
 10. **Mirror agreement** (0.34): the picture is flipped left-right and 1–9 are done once more; among the faces of 9, only those that also have a face at the same place in 9 of the flipped picture
    (the flipped center mapped back by $`x \mapsto W - 1 - x`$, with the two centers less than $`\max(d, d')`$ apart) are used for names · character folders (position · score from the original picture).
    A real face is still a face when flipped, but fakes arising by chance from clothing folds · patterns · text often cross the threshold on only one side because of the asymmetry of the average patterns · lash band · eye refinement order.
