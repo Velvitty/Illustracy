@@ -11,7 +11,7 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **5.91× version 0.1** (0.48, 95% CI 4.33–8.63×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller, 11).
+- Resolving power: **6.14× version 0.1** (0.49, 95% CI 4.50–8.91×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller; in the blind test on 60 real pictures it is slightly lower than 0.48, 11).
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -125,6 +125,7 @@ PSB files and files converted to 16 · 32 bits also work. If the file is already
 | Folder layout (`폴더 나누는 방식`) | **Per-part folders** (`파츠별 폴더`, default): in each of [Skin] [Hair] … folders, base color · 1st · 2nd shadow · highlight.<br>**Per-stage folders** (`단계별 폴더`): in each of [Base color] [1st shadow] [2nd shadow] [Highlight] folders, one layer per part (3.12). Available only when splitting by part; no clipping is used |
 | Clip shadows · highlights to the base color | Keeps shadows and highlights from going outside the base color |
 | Automatic flat background separation | Turns background detection on and off |
+| Neural-network assist | On by default. At the end of background detection, of the color regions left on the character side, only those that both a statistical formula and a small neural network call background are sent to the background (12 in 3.5). Turned off, results are the same as 0.48 |
 | Tilted picture (`기울어진 그림`) | Off by default. Turn it on for pictures that are strongly tilted overall (more than 45°) or lying on their side: faces are searched at several angles (0 · ±30 · ±60 · ±90°) and names · character folders · background rules follow the most face-like angle. The chosen tilt appears in the result line as "tilt N°".<br>On upright pictures it finds slightly fewer faces and slightly more fake faces (82 ground-truth pictures: real faces 29/35 → 26/35, fake faces 15 → 17), so it is better left off for pictures that are not tilted.<br>Pictures saved rotated, whose four corners are white · one color · transparent, are recognized without turning it on |
 | Generate rough sketch · rough color | Whether to make the two rough layers (rough 1 · rough 2), and in what color to draw them |
 
@@ -384,6 +385,10 @@ so faces are searched for at that tilt (4.5) and the bottom-border · upper-corn
    and for pictures where 30% or more of the character-side pixels are lines (particles · halftone dots picked up as lines) (4.5).
 11. **Rectangular background objects drawn with lines** (4.5, 0.43): finally, axis-aligned rectangular pieces enclosed by lines that remain on the character side (window panes · shelves · books · frames) are sent to the background
    when at least half of their surroundings is background, they lie outside the faces' head · body zones, and they do not touch the border. In a window made of same-colored panes, panes hidden by the character so that they are no longer rectangles are also sent if they have the same color.
+12. **Neural-network-assisted removal** (4.5, 0.49, setting "Neural-network assist"): finally, each color region left on the character side that covers at least 0.2% of the picture is put to two judges.
+   It is sent to the background only when a statistical score over 45 region features (color · position · face-relative coordinates · surroundings · hair texture) passes its threshold and the region mean of the character score
+   from a small convolutional neural network, written and trained from scratch for this program and looking at the whole downscaled picture, is also below its threshold. Line pixels are left as they are, and nothing is returned to the character.
+   If only one judge says background, nothing is removed; this cuts wrong removals of the character at the cost of removing only part of the remaining background (0.49 in 12).
 
 Faces are also searched for in pictures where the background was not searched (background separation off, transparent-background PNG) or not found, and are used for part names and character splitting.
 For transparent-background pictures, transparent places are treated as background and the "face-like position" condition of 4.5 is checked.
@@ -828,6 +833,14 @@ Problems that came up while verifying with real pictures during development, and
 | (0.48 cycle 6) Stopping scene filling at a sharp color change ($`\Delta E \ge 20`$) in front of bright pixels ($`L^* \ge 70`$), the counterpart of the dark-area block | 185-picture BER ×1.017; 51% of development pictures changed, screening better 6 · worse 8. On 236 of 400 hold-out pictures (128 in the blind test): candidate 60 · base 47 · ties 21 ($`p = 0.25`$). Pictures where bright clothes are kept and pictures where bright background stays are mixed |
 | (0.48 cycle 7) Finding the scene inside a wide frame margin around the picture (filling the margin with inner values and using it as the picture border) | 0 of 185 changed; only 1.5% of development pictures (4: better 3 · similar 1). Only 1 of 400 hold-out pictures changed, so even 7 rounds for the candidate and 1 tie give $`p = 1`$ at the picture level |
 | (0.48 cycle 8) More look-back steps, 3 → 5 · 8, in the dark-area block (scene filling stops in front of dark pixels) | It returns black sleeves · legs · hats but also night skies · dark cities · walls. 8 steps: 185-picture BER ×0.994 but development screening better 5 · worse 9; 5 steps: ×1.000 · 3 : 3. The 5-step version went to 8 blind rounds over the 131 of 400 hold-out pictures that changed: candidate 42 · base 58 · ties 28 ($`p = 0.13`$). One block cannot tell dark clothes from dark backgrounds |
+| (cycle 9 after 0.48) Region vote: at the end of background detection, a weighted sum of 40 region features per color region (fitted on the synthetic ground-truth set) + a graph cut, adding and returning | The 185-picture resolving power rose to 9.67× version 0.1 (synthetic pictures), but in 8 blind rounds on the 400 hold-out pictures: candidate 53 · 0.48 69 · tie 6 ($`p = 0.17`$). On real pictures it sent character edges (hair tips · ornaments · edges of white clothes) to the background |
+| (cycle 10 after 0.48) Region vote with thresholds only · protecting character tips (no adding for regions under 1% of the picture or in head zones) · returning only | 39 · 42 · 50 · 48% in development screening by graders (bar 60%), all short. The candidate with tip protection: on the 400 hold-out pictures candidate 53 · 0.48 54 · tie 1 ($`p = 1.0`$) |
+| (0.49 preparation) Returning by instability across repeated runs (background stage rerun mirrored · at 0.7 · 0.85 · 1.15×, counting removals per region) | AUC 0.55 · 0.63 for background vs character on the development region ground truth; the interval of the area-weighted loss difference crosses 0, worse pictures 26 > better 11 |
+| (0.49 preparation) Protecting hair by hair texture alone (structure-tensor orientation coherence and 4 more) | Hair vs background AUC 0.78, short of the preset bar 0.80. The texture features are used inside the 0.49 statistical formula |
+| (0.49 preparation) Treating pictures without faces as pictures without characters and removing more | Of 36 development pictures without a found face, only 5 really had no character (precision 0.14) |
+| (0.49 preparation) Removing remaining background by the region-feature formula alone · by the network score alone | On 5-fold out-of-fold scores of the development region ground truth, 74.5% · 72.1% of the removed area was background, short of the 80% goal (75% breaks even when character loss counts 3×) |
+| (0.49 preparation, cycle 11) Removing by one formula mixing the network score with the region features | 75.9% out of fold and 83 : 51 pictures looked better, but in 8 blind rounds on the 400 hold-out pictures: candidate 57 · 0.48 70 · tie 1 ($`p = 0.29`$). "Removes more background but cuts off pieces of hair · ornaments · clothes · wings" |
+| (0.49 preparation) Returning already removed regions whose network score is high | Out of fold: better pictures 28 · worse 49 |
 
 **Note** — **Why**: Methods not adopted must be measured by the same standard to show why the current method stayed. The 𝑝 values in the table are sign-test or exact-test values from paired gradings (formulas in 11.1). **How it works**: The line-detection window $`\max(1, \mathrm{round}(4s))`$ was an attempt to make the 4px window at a 1000px long side proportional to the size ratio 𝑠 without the floor of 3. On small pictures the window shrank to 2px, fewer lines were found and results got worse. **References**: [R85 Dixon · Mood 1946](#r85) · a rule set by this program
 
@@ -861,7 +874,7 @@ Problems that came up while verifying with real pictures during development, and
 - **A split that returns to the original**: stacking the split layers gives back the original (reproduction <mark>PSNR</mark> 49–65 dB). Splitting into layers does not damage the picture.
 - **The same structure as an artist's work file**: base color folders per part, clipped 1st · 2nd shadows and highlights, multiply shading, screen light effects, line art + color trace.
 - **Lightly painted layers**: multiply · screen layers are stored with the smallest possible alpha, so they look like layers an artist painted lightly and are easy to keep working on.
-- **Many cues for background decisions**: border connection, line density, how much lines enclose a place, sharpness (focus), color distributions learned per picture, and face positions are used in turn, and cut-off character parts are picked out. Faces are found with rules and averaged patterns, without a trained model.
+- **Many cues for background decisions**: border connection, line density, how much lines enclose a place, sharpness (focus), color distributions learned per picture, and face positions are used in turn, and cut-off character parts are picked out. At the end, remaining background is removed further only when a statistical formula and a small neural network agree (0.49). Faces are found with rules and averaged patterns, without a trained model.
 - **Precise manual correction**: a brush and loop that do not cross lines and part boundaries. Even after corrections, the composite stays identical to the original.
 - **Offline, free**: no installation · server · external libraries · paid services. The picture never leaves the computer.
 - **A PSD writer built from scratch**: folders, clipping, blend modes, Korean names, merged image. Verified with two independent PSD parsers.
@@ -874,7 +887,7 @@ Problems that came up while verifying with real pictures during development, and
 
 ### 10.1 Picture types · lines · effect layers
 
-- These are image-processing rules, not a trained model. It works best on **cel shading with lines**; pictures without lines or with many brush strokes can have the base color split into several tones or much of the shading pushed into the shading layer.
+- These are mostly image-processing rules; the only learned parts are the statistical formula and the small neural network at the end of background detection (0.49, written and trained from scratch for this program). It works best on **cel shading with lines**; pictures without lines or with many brush strokes can have the base color split into several tones or much of the shading pushed into the shading layer.
   Brush grain is ignored only when most lines in the picture are grain, so hair drawn with grain in only part of a line-art picture can be split into several parts along the grain.
 - The roughs are not in the original, so they are **estimated sketches**. They guess the underdrawing the artist would have drawn, so they can differ from the artist's real rough.
   In a blind test on 40 unseen pictures rough 2 was judged more plausible as the artist's underdrawing (27 : 11) and more hand-drawn (30 : 10) than 0.45, but on form (shape and place of faces · hands · props) 0.45 is still ahead (22 : 6, 0.47 in 12).
@@ -911,6 +924,8 @@ Problems that came up while verifying with real pictures during development, and
   background props · text boxes drawn with lines stay on the character side slightly more often. From 0.33, gaps of the background's color are sent to the background on white · flat backgrounds,
   but gaps in scene · patterned backgrounds, gaps slightly different in color from the background because of shadows, and gaps in pictures with dense lines remain.
   Conversely, white character parts surrounded only by lines (one cell of white stockings · white ribbon) are sometimes sent as gaps. Move them with **Send to background** · **Return to character**.
+- The neural-network assist of 0.49 removes only where the statistical formula and the network agree, but it can still remove the character. On the region ground truth of development pictures (5-fold out-of-fold scores) about 20% of the removed area was character,
+  and in the blind test on the fixed 60 pictures it removed a second figure almost entirely in 1 picture and one clump of twin-tail hair in another (0.49 in 12). With the setting **Neural-network assist** off, pictures are split as in 0.48.
 - Background left in the character layer is mostly a result of taking the background **conservatively**. In 120 random pictures with characters (0.32), 17 (14%) had no background left in the character layer,
   38 had only small pieces left, 30 had visible background left, and 35 had it left widely (more than 10% of the picture or most of the background) (11).
   Common in the 65 with visible · wide leftovers were props · objects drawn with lines (31), blurred scene pieces (26), text · logos · frames (26), floors · ground (16), and whole scenes (13).
@@ -1075,7 +1090,7 @@ We are looking for people to help solve these weaknesses. Anyone who knows image
 
 - Send pictures that split wrongly (counterexamples), analyses of causes, or fixes as issues or pull requests.
 - Changes are measured with the same tests as section 11 (ground-truth scoring and blind grading) and go in only when they improve results.
-- Constraints kept: running only in the browser, splitting by rules without trained models or external libraries.
+- Constraints kept: running only in the browser, splitting without external libraries or other people's pretrained models (the small neural network of 0.49 was also written and trained from scratch for this program).
 
 ---
 
@@ -1103,7 +1118,7 @@ In this section:
 - [11.12 Returning islands in the scene background (0.38)](#1112-returning-islands-in-the-scene-background-038)
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
-- [11.15 Blind test (0.1 · 0.46 · 0.47 · 0.48)](#1115-blind-test-01--046--047--048)
+- [11.15 Blind test (0.1 · 0.47 · 0.48 · 0.49)](#1115-blind-test-01--047--048--049)
 
 ### 11.1 Formulas used for evaluation
 
@@ -2430,7 +2445,7 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 
 ### 11.14 Resolving power by version
 
-Every version from 0.1 to 0.48 was measured again with the same pictures and the same scoring.
+Every version from 0.1 to 0.49 was measured again with the same pictures and the same scoring.
 Each version's code was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the <mark>balanced error rate</mark>
@@ -2495,6 +2510,7 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.46 | Two roughs (concept · refined) | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 | 0.47 | Roughs that trace | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 | 0.48 | Head-structure cues for naming faces · per-stage painting folders · 8 background improvement cycles | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
+| 0.49 | Neural-network assist (remaining background removed only when the statistical formula and the network agree) | 99.5 | 95.5 | 0.0250 | 40.03 | **6.14** | 4.50–8.91 | 9.43 · 1.80 · 10.56 |
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
 0.19 recovered the synthetic pictures' characters (82.0 → 97.7%), and in 0.37 · 0.38 the posed pictures' character kept rose 81.6 → 86.7 → 91.9%, taking the posed group's multiplier 0.97 → 1.18 → 1.44×.
@@ -2507,8 +2523,10 @@ From 0.4, finding scene backgrounds let the real pictures' backgrounds be found 
 5 of the 8 real pictures keep a little more background (mean background found 41.1 → 40.9%), so the real group is 1.68 → 1.67×. 177 of the 185 pictures are synthetic, which is why the overall multiplier jumped;
 the gain on real pictures should be read from the 0.43 entry in section 12 (blind component grading on the 777 real pictures) and the blind test in 11.15.
 0.44 to 0.48 changed only the rough · naming faces · painting folders (no candidate of 0.48's 8 background improvement cycles was adopted), and all 185 background maps are byte-identical to 0.43.
+0.49 finds more background with the neural-network assist in 5 of the 8 real pictures (mean background found 40.9 → 45.3%, character kept 99.2 → 99.1%, lower BER on all 5), taking the real group 1.67 → 1.80×;
+the 177 synthetic · posed pictures have background maps byte-identical to 0.48 (mean BER 0.0259 → 0.0250, 5.91 → 6.14×).
 
-### 11.15 Blind test (0.1 · 0.46 · 0.47 · 0.48)
+### 11.15 Blind test (0.1 · 0.47 · 0.48 · 0.49)
 
 To compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the three latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the four versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), and then the key was opened.
@@ -2516,18 +2534,19 @@ For each picture, only the distinct results were collected (versions with identi
 
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
-| 0.1 | **20.0%** (12/60, 11.8–31.8) | 18.3% | 23.3% | 56.7% | 6/30 · 6/30 |
-| 0.46 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
-| 0.47 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
-| 0.48 | **36.7%** (22/60, 25.6–49.3) | 28.3% | 61.7% | 1.7% | 12/30 · 10/30 |
+| 0.1 | **26.7%** (16/60, 17.1–39.0) | 21.7% | 11.7% | 61.7% | 9/30 · 7/30 |
+| 0.47 | **50.0%** (30/60, 37.7–62.3) | 43.3% | 41.7% | 8.3% | 19/30 · 11/30 |
+| 0.48 | **50.0%** (30/60, 37.7–62.3) | 43.3% | 41.7% | 8.3% | 19/30 · 11/30 |
+| **0.49** | **48.3%** (29/60, 36.2–60.7) | 40.0% | 43.3% | 8.3% | 18/30 · 11/30 |
 
-0.44 to 0.48 have background maps byte-identical to 0.43 on all 60 pictures. Identical results share one panel, so their grades equal those of 0.43 (dropped from this table, 36.7%), and the grading of 0.1 · 0.41 · 0.42 · 0.43 done together at 0.43 is used as it is.
-In that grading four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). Pictures had 2 (23 pictures) · 3 (15) · 4 (22) distinct panels, and 0.43 differs from 0.42 on 24 pictures.
-As same-picture pairs, 0.43 to 0.48 share the same panel on all 60 pictures, so nothing is gained or lost among them; against the previous version 0.42 (dropped from this table, 35.0%), 0.42 → 0.48 gained 1 · lost 0 in "no major loss" ($`p = 1.0`$) and 1 · 0 in "character without loss", with 1 picture graded higher and 0 lower ($`p = 1.0`$).
-Version 0.1 found no background in 34 pictures and leaves them as they are, so it has few major losses (14); 0.1 → 0.48 gained 12 · lost 2 in "no major loss" ($`p = 0.013`$).
-At 0.43 the four versions were graded again from scratch together, so the rates differ from the 0.42 entry's grading (0.1 · 0.40 · 0.41 · 0.42 graded together): 0.42 went from 48.3 to 35.0%, 0.41 from 48.3 to 33.3%, and 0.1 from 31.7 to 20.0%.
-These graders also counted crowds and faintly drawn large figures in the background as characters and graded their losses as major, so every version's rate is lower. Read this as the difference between four versions graded together by the same standard rather than as the size of the rates.
-The table at the end of the 0.48 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+0.49 has background maps different from 0.48 on 16 of the 60 pictures, so the earlier grades were not reused: the four versions 0.1 · 0.47 · 0.48 · 0.49 were graded again from scratch, together.
+Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.47 and 0.48 have identical background maps on all 60 pictures and share panels; pictures had 2 (44 pictures) · 3 (16) distinct panels.
+As same-picture pairs, 0.48 → 0.49 gained 0 · lost 1 in "no major loss" ($`p = 1.0`$) and 0 · 2 in "character without loss", with 0 pictures graded higher and 2 lower ($`p = 0.50`$).
+The 2 pictures 0.49 graded lower are one where a second figure was removed almost entirely along with the main figure's outstretched arm (character intact → major loss) and one where a clump of twin-tail hair was lost (character intact → small pieces lost); the other 14 kept their grades.
+Version 0.1 leaves pictures almost as they are, so much that 37 were graded "no background found", and has few major losses (7); 0.1 → 0.49 gained 16 · lost 3 in "no major loss" ($`p = 0.004`$), and 0.1 → 0.48 gained 17 · lost 3 ($`p = 0.003`$).
+Every version's rate is higher than in the grading done together at 0.43 (36.7% for all of 0.43 to 0.48) because the graders changed. Graders differ slightly in what they count as characters (crowds in the background · large monsters · cut-off figures in a doorway), so the size of the rates moves with the graders.
+Read this as the difference between four versions graded together by the same standard rather than as the size of the rates.
+The table at the end of the 0.49 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
@@ -2536,6 +2555,46 @@ The table at the end of the 0.48 entry in section 12 gives the resolving power a
 Newest versions are at the top.
 
 **Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
+### 0.49 (2026-10-15) Neural-network assist (remaining background removed only when the statistical formula and the network agree)
+
+- Resolving power: 6.14× version 0.1 (95% CI 4.50–8.91×, 11)
+- **Blind test: lower than the previous version (0.48).** 0.49 differs from 0.48 on 16 of the fixed 60 pictures (11.15), so the four versions (0.1 · 0.47 · 0.48 · 0.49) were graded again together. "No major loss" went from 50.0% (30/60) for 0.48 to 48.3% (29/60) for 0.49,
+  and of the 16 changed pictures 0 were graded higher and 2 lower ($`p = 0.50`$). The 2 lower ones are a picture where a second figure was removed almost entirely along with the main figure's outstretched arm (character intact → major loss)
+  and one where a clump of twin-tail hair was lost (character intact → small pieces lost). The other 14 kept their grades. The difference is not significant, but no picture got better.
+- **Neural-network-assisted removal** (12 in 3.5, 4.5): at the end of background detection, of the color regions left on the character side (at least 0.2% of the picture), only those that both a statistical formula and a small neural network call background are sent to the background.
+  Line pixels are left as they are, and nothing is returned to the character. With the setting **Neural-network assist** (on by default) turned off, results are the same as 0.48 (byte-identical on the 185 ground-truth pictures and the 60 blind-test pictures).
+  - **Statistical formula**: per region, 40 features (log ratios of the average templates for color · position · face-relative coordinates, line · background shares of the surroundings, area, lightness spread and more) plus **5 hair-texture features** (structure-tensor orientation coherence · gradient strength · local lightness standard deviation · edge share · lightness standard deviation), 45 in all,
+    and an additive logit built from the first 40, standardized and combined by <mark>logistic regression</mark>.
+  - **Neural network**: a small convolutional neural network written from scratch for this program (<mark>U-Net</mark>-like, 109,073 weights). Training uses convolution · backpropagation · <mark>Adam</mark> written directly with numpy matrix operations, inference is plain JS,
+    and no external learning library or pretrained weights are used. From seven planes of the picture downscaled to a long side of 256 (R · G · B · background found so far · dark-part protection · lines · face zones) it gives a character score at half resolution, averaged per region.
+  - **Training data**: 460 synthetic pictures made by pasting pixiv characters with transparent backgrounds onto pixiv background pictures without characters (pixel ground truth), and 1,498 region labels that graders gave on 207 of the 293 development pixiv pictures.
+    The 400 hold-out pictures · the fixed 60 (11.15) · the 185 ground-truth pictures were not used for training or for choosing thresholds.
+  - **How it was chosen, and the evidence**: the 207 labeled pictures were split into 5 folds by picture and measured with out-of-fold scores whose thresholds were all chosen on the other 4 folds (regions of at least 0.2% of the picture). The preset goals were at least 80% background in the removed area (75% breaks even when character loss counts 3×) and removing at least 30% of the remaining background.
+    The formula alone gave 74.5% background in the removed area · 56.6% of the remaining background removed (93 character regions removed), mixing the network score into one formula 75.9% · 58.1%, and the network alone 72.1% · 24.8%, all short of the first goal.
+    **Removing only when both agree gave 80.4% · 17.6%** (17 character regions removed), 48 pictures better · 12 worse: the first to pass 80%, but short of the 30% goal.
+    The area-weighted loss difference with character loss counted 3× is −0.25 (95% picture-level bootstrap interval −0.76 to +0.32), crossing 0. The network threshold −1.25 is the median of the per-fold choices (−1.25 to −1.75).
+  - **Added without a hold-out blind test.** The candidate mixing the network score into one formula (cycle 11) looked better on the same out-of-fold scores (83 : 51 pictures), but in 8 blind rounds (new graders each round) on the 128 changed pictures of the 400 hold-out pictures
+    it lost, candidate 57 · 0.48 70 · tie 1 ($`p = 0.29`$), and was not added (7.5). The graders' notes mostly said "removes more background but cuts off pieces of hair · ornaments · clothes · wings".
+    The agreement rule removes far less than that, but there is no evidence yet that the 48 : 12 out of fold carries over to whole real pictures. It was added without the hold-out blind test by the owner's decision, and kept on by default by the owner's decision after the fixed-60 blind test came out slightly lower than 0.48.
+  - **185 ground-truth pictures**: more background found in 5 of the 8 real pictures (background found 40.9 → 45.3%, character kept 99.2 → 99.1%), with lower BER on all 5 (largest: t26 0.295 → 0.206).
+    The 177 synthetic · posed pictures have background maps byte-identical to 0.48. Real group 1.67 → 1.80×, overall 5.91 → 6.14× (mean BER 0.0259 → 0.0250).
+  - **Time · size**: on the 185 ground-truth pictures and the fixed 60, each picture takes 0.31 s (4%) longer at the median. The weights (float32) are inside the app file, which grew by about 0.6 MB.
+    Network inference uses only additions · multiplications · maxima · averages in a fixed order, so it adds no new source of differences between devices.
+- Removed the program-save link under **Open file** on the left of the app (the app is the single `illustracy.html` in the repository).
+- Cycles 9 · 10 (region vote) and the tests of instability · hair texture alone · pictures without faces · returning did not meet their bars and were not added (7.5).
+- Remaining weaknesses: most remaining background (objects · props · flowers · furniture · scenery without characters) stays, and this version does not address losses where the scene stage swallows hair · clothes · legs in softly painted pictures.
+
+| | Version 0.1 | Version 0.47 | Version 0.48 | Version 0.49 |
+|---|---|---|---|---|
+| Resolving power | 100% | 591% | 591% | 614% |
+| Resolving power 95% CI | — | 433–863% | 433–863% | 450–891% |
+| Resolving power 80% CI | — | 482–754% | 482–754% | 500–779% |
+| Blind test | 27% | 50% | 50% | 48% |
+| Blind test 95% CI | 17–39% | 38–62% | 38–62% | 36–61% |
+| Blind test 80% CI | 20–35% | 42–58% | 42–58% | 40–57% |
+
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (0.1 is the reference, so it has no interval). The blind test is the share of "no major loss" pictures when the four versions' results on 60 pixiv pictures were mixed and graded without knowing the version, with <mark>Wilson intervals</mark>. The four versions were graded again together (11).
 
 ### 0.48 (2026-10-13) Head-structure cues for naming faces · per-stage painting folders · 8 background improvement cycles
 
@@ -3424,3 +3483,7 @@ These are the works cited by number under **References** in the formula notes. "
 - <a id="r83"></a>**[R83]** N. I. Fisher, <i>Statistical Analysis of Circular Data</i>, Cambridge University Press, 1993.
 - <a id="r84"></a>**[R84]** M. J. Swain, D. H. Ballard, "Color Indexing," <i>International Journal of Computer Vision</i> 7(1), 11–32, 1991.
 - <a id="r85"></a>**[R85]** W. J. Dixon, A. M. Mood, "The Statistical Sign Test," <i>JASA</i> 41(236), 557–566, 1946.
+- <a id="r86"></a>**[R86]** O. Ronneberger, P. Fischer, T. Brox, "U-Net: Convolutional Networks for Biomedical Image Segmentation," <i>MICCAI 2015</i>, LNCS 9351, 234–241, 2015.
+- <a id="r87"></a>**[R87]** D. P. Kingma, J. Ba, "Adam: A Method for Stochastic Optimization," <i>ICLR 2015</i>.
+- <a id="r88"></a>**[R88]** F. Yu, V. Koltun, "Multi-Scale Context Aggregation by Dilated Convolutions," <i>ICLR 2016</i>.
+- <a id="r89"></a>**[R89]** J. Bigün, G. H. Granlund, "Optimal Orientation Detection of Linear Symmetry," <i>Proc. 1st ICCV</i>, 433–438, 1987.
