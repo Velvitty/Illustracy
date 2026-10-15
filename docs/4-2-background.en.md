@@ -6,7 +6,7 @@
 
 ## 4.5 Background
 
-### Cutout model (0.51 · 0.52, default)
+### Cutout model (0.51 – 0.53, default)
 
 When the "Cutout model" setting is on and the picture has no transparent pixels, this decides the character instead of the background steps below. The picture $`I`$ (processing resolution $`W \times H`$) is shrunk to a long side of 1024 px and placed in the middle of a 1024×1024 frame (the rest 0), and the sigmoid output of the network $`f_\theta`$ is brought back to the original size the same way. Shrinking and enlarging use pixel-center-aligned <mark>bilinear</mark> interpolation (edge pixels repeated).
 
@@ -33,6 +33,16 @@ p \text{ is character} \iff m(p) + \alpha\,\bigl(c(p) - \tfrac12\bigr) \ge \tfra
 Where the two agree, that is the answer; where they disagree, $`m(p) \ge 0.3`$ (previous method says character) or $`m(p) \ge 0.7`$ (previous method says background) decides. This result is the background layer as it is; outer glow and the small-pieces-on-background rule are not applied. α was chosen on 498 synthetic pictures (0.2 · 0.4 · 0.6 on set A, 299 pictures, confirmed on set B, 199) and the 14 artist-made cutouts (README 7.5 · 12, 0.52).
 
 **Notes** — **Why**: the model alone (0.51) misses some of the background the previous method found on real pictures (background found 94.7% on the 14 artist-made cutouts), while the previous method alone hands a lineless arm to the background. Letting the model's confidence decide only where the two disagree lets each cover the other's mistakes. **Principle**: a linear combination of two classifiers' scores; α is the weight that gives one vote of the previous method the value of 0.2 of model probability.
+
+**Pictures the model missed use the previous method (0.53)**: when the area the model calls character is under 1% of the picture while the previous method calls 5% or more character, the model is taken to have missed the character entirely, and that picture uses the previous method's decision as it is ($`N`$ is the number of pixels in the picture).
+
+```math
+\frac1N\,\bigl|\{p : m(p) \ge \tfrac12\}\bigr| < 0.01 \ \text{and}\ \frac1N\,\bigl|\{p : c(p) = 1\}\bigr| \ge 0.05 \quad\Rightarrow\quad p \text{ is character} \iff c(p) = 1
+```
+
+It is not a weight that changes gradually but a rule switched per picture, so pictures that do not meet the condition equal 0.52.
+
+**Notes** — **Why**: the model can miss a character that is not human-shaped (animal · monster fan art) entirely, and then even in the addition one vote of the previous method (0.2) cannot overcome a model probability near 0, so the character disappears. Only on such pictures is the previous method followed as it is. **Principle**: the areas of the two decisions are compared, and the picture is handed to the other side only when one is almost empty. The rule was made after seeing results (the Bulbasaur fan art among the 14 artist-made cutouts), and 1% · 5% are the first values set. Raising the previous method's weight on a log scale with how far the model falls short was also measured, but worsened more synthetic pictures than it improved and was not adopted (README 7.5 · 12, 0.53).
 
 ### Find at reduced size (setting, off by default)
 
