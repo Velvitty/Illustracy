@@ -468,6 +468,39 @@ Done after the gaps. For every 4-connected component 𝑟 of painted pixels left
 Window panes · shelves · books of line-drawn rooms (synthetic pictures) are caught here. Being enclosed by lines, the scene background · color model · face-based widening do not take them, and with an almost one-color background face-based widening is not done either.
 Only 1 of the 777 real pictures changed (0.43 in 12).
 
+### Neural-network-assisted removal (0.49)
+
+Done at the very end of background detection (after the rectangular background objects, when the setting "Neural-network assist" is on). For each color region 𝑟 still on the character side with an area of at least $`0.002N`$, two scores are computed.
+
+1. **Statistical formula**: the region features $`x_{r,1}, \ldots, x_{r,45}`$ (log ratios of the average templates for color · position · face-relative coordinates, line · background shares of the surroundings, area, lightness spread and more: 40, plus 5 texture features) and an additive logit $`\ell_r`$ built from the first 40 are standardized and summed.
+
+```math
+s_r = b_0 + \sum_{j=1}^{46} b_j\,\frac{F_{r,j} - \mu_j}{\sigma_j},\qquad F_r = (\ell_r, x_{r,1}, \ldots, x_{r,45})
+```
+
+   - **Note** — **Why**: the color · position · surroundings · texture of a single region are weak cues to whether it belongs to the background; none separates on its own, so several are weighted and summed. **How it works**: each feature is standardized by its mean $`\mu_j`$ and standard deviation $`\sigma_j`$, the weights $`b_j`$ are fitted by <mark>logistic regression</mark> (regularization $`\lambda = 30`$), and $`s_r`$ is the "log-odds of being background". The threshold 0.358 is the value at which 80% of the removed area is background on the development region ground truth. **References**: [R69 Cox 1958](../README.en.md#r69)
+2. **Texture features**: a structure tensor is built from the Sobel gradients $`I_x, I_y`$ of the lightness $`I = L^*/100`$ and pooled with a $`\sigma = 2`$ Gaussian $`G_\sigma`$.
+
+```math
+J_{ab} = G_\sigma \ast (I_a I_b),\qquad c = \frac{\sqrt{(J_{xx} - J_{yy})^2 + 4J_{xy}^2}}{J_{xx} + J_{yy}} = \frac{\lambda_1 - \lambda_2}{\lambda_1 + \lambda_2},\qquad \mathrm{coh}_r = \frac{\sum_{p \in r} c(p)\,(J_{xx} + J_{yy})(p)}{\sum_{p \in r} (J_{xx} + J_{yy})(p)}
+```
+
+   The other four are the mean gradient strength $`\sqrt{I_x^2 + I_y^2}`$, the mean local lightness standard deviation ($`\sigma = 2`$), the share of pixels with gradient above 0.3, and the standard deviation of the region's lightness.
+   - **Note** — **Why**: hair flows in fine strands in one direction, while sky · walls · blurred backgrounds have no strands or scattered directions. **How it works**: the two eigenvalues $`\lambda_1 \ge \lambda_2`$ of the structure tensor show how much the surrounding gradients gather in one direction; $`c`$ is 1 for strands in one direction and 0 for no direction. Averaging with the tensor energy $`J_{xx} + J_{yy}`$ as weight barely counts the noise directions of flat places. The texture features alone give hair vs background AUC 0.78, so they are not used on their own but inside the formula. **References**: [R89 Bigün · Granlund 1987](../README.en.md#r89)
+3. **Neural network**: seven planes of the picture downscaled by area averaging to a long side of 256 (R · G · B · background found so far · dark-part protection · lines · face zones), scaled to $`[-0.5, 0.5]`$, give a character logit $`z`$ at half resolution.
+   The face-zone plane is the maximum over faces of $`\max\bigl(0,\ 1 - \sqrt{(u/1.3)^2 + ((v + 0.2)/1.5)^2}\,/\,2.5\bigr)`$ in face-frame coordinates $`(u, v)`$.
+   The structure is three levels of two 3×3 convolutions (ReLU) each (8 · 16 · 32 channels, 2×2 averaging between levels), dilated 2 · 4 · 8 convolutions at the deepest level (48 channels), two levels that upsample 2× and join the same-size level, and a final 1×1 convolution (109,073 weights, about 240 million multiply-adds for a 4:3 picture).
+   Binary cross-entropy against the ground-truth character share on synthetic pictures and the cells covered by region labels on development pictures was minimized with <mark>Adam</mark> (real-picture cells weighted 8, 15 epochs).
+
+```math
+\bar z_r = \frac{1}{\lvert r\rvert}\sum_{p \in r} z(p),\qquad r \text{ to background} \quad\text{if}\quad s_r \ge 0.358 \ \land\ \bar z_r < -1.25
+```
+
+   Line pixels are not changed (the later line clean-up rule decides them), and background is never returned to the character.
+   - **Note** — **Why**: rules that remove more of the remaining background easily remove the character by mistake, and losing the character is much worse than leaving background. Neither the formula alone nor one formula mixing in the network score reached 80% background in the removed area. **How it works**: the formula looks at one region's color · position · texture, the network at the shape of the whole downscaled picture. The less their mistakes overlap, the smaller the chance that both are wrong together, so removing only when both say background raises precision (80.4%) and removes less (17.6%). Like <mark>U-Net</mark>, the network shrinks and grows while joining same-size levels so it keeps positions, and the dilated convolutions at the deepest level see wide surroundings. The threshold −1.25 is the median of the per-fold choices in 5-fold splitting. **References**: [R86 Ronneberger et al. 2015](../README.en.md#r86) · [R87 Kingma · Ba 2015](../README.en.md#r87) · [R88 Yu · Koltun 2016](../README.en.md#r88) · a rule set by this program
+
+The training and inference code was written from scratch for this program (training with numpy matrix operations, inference in plain JS). The weights are stored as float32 inside the app file, and inference uses only additions · multiplications · maxima · averages. Evidence and test results are in 0.49 in 12.
+
 ### Outer glow
 
 A saturated, bright band around the character (neon glow, fluorescent outline) is taken out separately.
