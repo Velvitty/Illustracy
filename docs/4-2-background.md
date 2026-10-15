@@ -6,6 +6,24 @@
 
 ## 4.5 배경
 
+### 누끼 모델(0.51, 기본)
+
+설정 "누끼 모델"이 켜져 있고 그림에 투명한 픽셀이 없으면, 아래 배경 단계 대신 이것으로 캐릭터를 정합니다. 그림 $`I`$(처리 해상도 $`W \times H`$)를 긴 변 1024px로 줄여 1024×1024 칸 가운데에 놓고(남는 곳 0), 신경망 $`f_\theta`$의 시그모이드 출력을 같은 방식으로 원래 크기로 되돌립니다. 줄이고 늘리는 것은 픽셀 가운데를 맞춘 <mark>쌍선형</mark> 보간(가장자리는 끝 픽셀)입니다.
+
+```math
+x = \mathrm{pad}_{1024}\!\left(\mathrm{resize}\!\left(\tfrac{I}{255},\ \tfrac{1024}{\max(W,H)}\right)\right),\qquad m = \mathrm{resize}^{-1}\!\left(\sigma(f_\theta(x))\right),\qquad p \text{는 캐릭터} \iff m(p) \ge 0.5
+```
+
+$`f_\theta`$는 SkyTNT의 anime-segmentation이 공개한 <mark>ISNet</mark> 모델(skytnt/anime-seg, Apache-2.0, 합성곱 114개 · 가중치 44,004,873개)입니다[R90 Qin 외 2022](../README.md#r90) · [R91 SkyTNT anime-segmentation](../README.md#r91). 앱 파일에 넣으려고 합성곱 가중치를 출력 채널 $`c`$마다 대칭 8비트로 줄였습니다[R92 Krishnamoorthi 2018](../README.md#r92).
+
+```math
+s_c = \frac{\max_k \lvert W_{c,k}\rvert}{127},\qquad q_{c,k} = \mathrm{round}\!\left(\frac{W_{c,k}}{s_c}\right) \in [-127, 127],\qquad \hat W_{c,k} = s_c\, q_{c,k}
+```
+
+앱은 처음 쓸 때 $`q`$와 $`s`$로 $`\hat W`$를 다시 만들어 ONNX Runtime Web(1.29.0, MIT, [R93 ONNX Runtime Web](../README.md#r93))의 WASM 실행기(스레드 1개)로 별도 워커에서 돌립니다. 외곽 글로우 · 배경 효과 · 보정 칠하기는 이 결과 위에 그대로 적용합니다.
+
+**풀이** — **왜**: 테두리에서 채워 들어가는 배경 찾기는 선이 없는 경계를 막지 못해, 테두리빛으로 처리한 팔이 배경과 한 덩어리가 됩니다. 색 · 넓이 · 경계 단서로 그런 조각을 가려내는 규칙은 개발 그림 207장에서 AUC 0.69를 넘지 못했습니다(README 7.5의 0.51 준비). 누끼 모델은 몸의 모양을 보고 캐릭터 전체를 한 번에 고릅니다. **원리**: ISNet은 이미지를 여러 해상도로 줄였다 늘이며 전경 · 배경 경계를 세밀하게 맞추는 분할 신경망입니다. 8비트 줄이기는 채널마다 최대 절댓값을 127에 맞추는 대칭 양자화라 가중치 오차가 채널 최댓값의 0.4% 이하이고, 정답 185장에서 32비트 모델과 다른 픽셀이 0.035%였습니다. **참고**: [R90 Qin 외 2022](../README.md#r90) · [R91 SkyTNT anime-segmentation](../README.md#r91) · [R92 Krishnamoorthi 2018](../README.md#r92) · [R93 ONNX Runtime Web](../README.md#r93).
+
 ### 줄여서 찾기(설정, 기본 꺼짐)
 
 "배경 · 얼굴만 줄여서 찾기"이고 $`\max(W, H) > S`$(줄일 크기)이면, 각 채널을 면적 평균으로 $`k = S / \max(W, H)`$배 줄인 그림에서 아래 배경 단계와 얼굴 찾기까지만 돌립니다
