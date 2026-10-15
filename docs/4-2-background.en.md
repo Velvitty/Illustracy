@@ -468,7 +468,7 @@ Done after the gaps. For every 4-connected component 𝑟 of painted pixels left
 Window panes · shelves · books of line-drawn rooms (synthetic pictures) are caught here. Being enclosed by lines, the scene background · color model · face-based widening do not take them, and with an almost one-color background face-based widening is not done either.
 Only 1 of the 777 real pictures changed (0.43 in 12).
 
-### Neural-network-assisted removal (0.49)
+### Neural-network-assisted removal (0.49 · 0.50)
 
 Done at the very end of background detection (after the rectangular background objects, when the setting "Neural-network assist" is on). For each color region 𝑟 still on the character side with an area of at least $`0.002N`$, two scores are computed.
 
@@ -493,13 +493,13 @@ J_{ab} = G_\sigma \ast (I_a I_b),\qquad c = \frac{\sqrt{(J_{xx} - J_{yy})^2 + 4J
    Binary cross-entropy against the ground-truth character share on synthetic pictures and the cells covered by region labels on development pictures was minimized with <mark>Adam</mark> (real-picture cells weighted 8, 15 epochs).
 
 ```math
-\bar z_r = \frac{1}{\lvert r\rvert}\sum_{p \in r} z(p),\qquad r \text{ to background} \quad\text{if}\quad s_r \ge 0.358 \ \land\ \bar z_r < -1.25
+\bar z_r = \frac{1}{\lvert r\rvert}\sum_{p \in r} z(p),\qquad p_r = \sigma\!\left(1.148\,\frac{s_r - 0.059}{1.492} - 0.466\,\frac{\bar z_r + 0.095}{1.662} + 0.055\right),\qquad r \text{ to background} \quad\text{if}\quad p_r > 0.8
 ```
 
    Line pixels are not changed (the later line clean-up rule decides them), and background is never returned to the character.
-   - **Note** — **Why**: rules that remove more of the remaining background easily remove the character by mistake, and losing the character is much worse than leaving background. Neither the formula alone nor one formula mixing in the network score reached 80% background in the removed area. **How it works**: the formula looks at one region's color · position · texture, the network at the shape of the whole downscaled picture. The less their mistakes overlap, the smaller the chance that both are wrong together, so removing only when both say background raises precision (80.4%) and removes less (17.6%). Like <mark>U-Net</mark>, the network shrinks and grows while joining same-size levels so it keeps positions, and the dilated convolutions at the deepest level see wide surroundings. The threshold −1.25 is the median of the per-fold choices in 5-fold splitting. **References**: [R86 Ronneberger et al. 2015](../README.en.md#r86) · [R87 Kingma · Ba 2015](../README.en.md#r87) · [R88 Yu · Koltun 2016](../README.en.md#r88) · a rule set by this program
+   - **Note** — **Why**: rules that remove more of the remaining background easily remove the character by mistake, and losing the character is much worse than leaving background. Neither the formula alone nor one formula mixing in the network score reached 80% background in the removed area. **How it works**: the formula looks at one region's color · position · texture, the network at the shape of the whole downscaled picture. The less their mistakes overlap, the smaller the chance that both are wrong together, so 0.49 removed only when both said background ($`s_r \ge 0.358 \land \bar z_r < -1.25`$), raising precision (80.4%, removing 17.6%). 0.50 combines the two scores in one two-input logistic formula, so a very sure judge can remove even when the other is a little less sure. On nested out-of-fold scores, where the formula, the combiner and the threshold never see the outer fold, the background share of the removed area rose from 76% (the 0.49 rule) to 90% while the amount removed stayed similar (28% → 27%). Like <mark>U-Net</mark>, the network shrinks and grows while joining same-size levels so it keeps positions, and the dilated convolutions at the deepest level see wide surroundings. The combiner coefficients are a <mark>logistic regression</mark> fitted on the out-of-fold scores of both judges, and the threshold 0.8 minimizes the area-weighted loss counting character loss 3×. The network weights are the same as in 0.49. **References**: [R86 Ronneberger et al. 2015](../README.en.md#r86) · [R87 Kingma · Ba 2015](../README.en.md#r87) · [R88 Yu · Koltun 2016](../README.en.md#r88) · a rule set by this program
 
-The training and inference code was written from scratch for this program (training with numpy matrix operations, inference in plain JS). The weights are stored as float32 inside the app file, and inference uses only additions · multiplications · maxima · averages. Evidence and test results are in 0.49 in 12.
+The training and inference code was written from scratch for this program (training with numpy matrix operations, inference in plain JS). The weights are stored as float32 inside the app file, and inference uses only additions · multiplications · maxima · averages. Evidence and test results are in 0.49 · 0.50 in 12.
 
 ### Outer glow
 

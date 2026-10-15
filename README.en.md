@@ -11,7 +11,7 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **6.14× version 0.1** (0.49, 95% CI 4.50–8.91×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller; in the blind test on 60 real pictures it is slightly lower than 0.48, 11).
+- Resolving power: **6.40× version 0.1** (0.50, 95% CI 4.73–9.25×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller, 11).
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -125,7 +125,7 @@ PSB files and files converted to 16 · 32 bits also work. If the file is already
 | Folder layout (`폴더 나누는 방식`) | **Per-part folders** (`파츠별 폴더`, default): in each of [Skin] [Hair] … folders, base color · 1st · 2nd shadow · highlight.<br>**Per-stage folders** (`단계별 폴더`): in each of [Base color] [1st shadow] [2nd shadow] [Highlight] folders, one layer per part (3.12). Available only when splitting by part; no clipping is used |
 | Clip shadows · highlights to the base color | Keeps shadows and highlights from going outside the base color |
 | Automatic flat background separation | Turns background detection on and off |
-| Neural-network assist | On by default. At the end of background detection, of the color regions left on the character side, only those that both a statistical formula and a small neural network call background are sent to the background (12 in 3.5). Turned off, results are the same as 0.48 |
+| Neural-network assist | On by default. At the end of background detection, of the color regions left on the character side, only those whose background probability, from a statistical score and a small neural network's score combined in one formula, exceeds 0.8 are sent to the background (12 in 3.5). Turned off, results are the same as 0.48 |
 | Tilted picture (`기울어진 그림`) | Off by default. Turn it on for pictures that are strongly tilted overall (more than 45°) or lying on their side: faces are searched at several angles (0 · ±30 · ±60 · ±90°) and names · character folders · background rules follow the most face-like angle. The chosen tilt appears in the result line as "tilt N°".<br>On upright pictures it finds slightly fewer faces and slightly more fake faces (82 ground-truth pictures: real faces 29/35 → 26/35, fake faces 15 → 17), so it is better left off for pictures that are not tilted.<br>Pictures saved rotated, whose four corners are white · one color · transparent, are recognized without turning it on |
 | Generate rough sketch · rough color | Whether to make the two rough layers (rough 1 · rough 2), and in what color to draw them |
 
@@ -385,10 +385,11 @@ so faces are searched for at that tilt (4.5) and the bottom-border · upper-corn
    and for pictures where 30% or more of the character-side pixels are lines (particles · halftone dots picked up as lines) (4.5).
 11. **Rectangular background objects drawn with lines** (4.5, 0.43): finally, axis-aligned rectangular pieces enclosed by lines that remain on the character side (window panes · shelves · books · frames) are sent to the background
    when at least half of their surroundings is background, they lie outside the faces' head · body zones, and they do not touch the border. In a window made of same-colored panes, panes hidden by the character so that they are no longer rectangles are also sent if they have the same color.
-12. **Neural-network-assisted removal** (4.5, 0.49, setting "Neural-network assist"): finally, each color region left on the character side that covers at least 0.2% of the picture is put to two judges.
-   It is sent to the background only when a statistical score over 45 region features (color · position · face-relative coordinates · surroundings · hair texture) passes its threshold and the region mean of the character score
-   from a small convolutional neural network, written and trained from scratch for this program and looking at the whole downscaled picture, is also below its threshold. Line pixels are left as they are, and nothing is returned to the character.
-   If only one judge says background, nothing is removed; this cuts wrong removals of the character at the cost of removing only part of the remaining background (0.49 in 12).
+12. **Neural-network-assisted removal** (4.5, 0.49 · 0.50, setting "Neural-network assist"): finally, each color region left on the character side that covers at least 0.2% of the picture is put to two judges.
+   A statistical score over 45 region features (color · position · face-relative coordinates · surroundings · hair texture) and the region mean of the character score from a small convolutional neural network,
+   written and trained from scratch for this program and looking at the whole downscaled picture, are combined in one <mark>logistic regression</mark> formula, and the region is sent to the background only when its background probability exceeds 0.8 (0.50).
+   Line pixels are left as they are, and nothing is returned to the character. 0.49 removed only when each judge passed its own threshold. Combined in one formula, a very sure judge can remove even when the other is a little less sure, and vice versa,
+   so about the same amount of remaining background is removed while fewer character regions are removed by mistake (0.50 in 12).
 
 Faces are also searched for in pictures where the background was not searched (background separation off, transparent-background PNG) or not found, and are used for part names and character splitting.
 For transparent-background pictures, transparent places are treated as background and the "face-like position" condition of 4.5 is checked.
@@ -846,6 +847,8 @@ Problems that came up while verifying with real pictures during development, and
 | (0.50 preparation) Returning with the statistical formula as a restraint on the network score (both thresholds passed · formula features and network score in one logistic formula) | With thresholds chosen for a character share of 60% or more, combining with the 0.49 network in one formula reached a character share of 84% but returned only 6%. With the retrained network, 48% · 5% |
 | (0.50 preparation) A network without the background map in its input (character recognition from picture · lines · faces only, trained quickly on 600 synthetic pictures · 6 epochs) with the statistical formula | AUC for separating character among regions that went to the background was 0.667, no better than the network with the background map (0.705) or the formula alone (0.687). The best rule had character share 51% · returning 13% · 3 : 3. Merely hiding the background map from an already trained network lowered AUC from 0.705 to 0.618 (0.49 network 0.723 to 0.645) |
 | (0.50 preparation) Whether a region that went to the background continues in color with the neighboring character region (non-line boundary · including line boundary · most similar neighbor) | Character vs background AUC 0.47 · 0.53 · 0.44, no separating power. Background next to the character is just as often of a similar color |
+| (0.50 preparation) Treating a piece whose border run ends at a crisp outline on both sides with background beyond as a body continuing outside the picture | On 330 candidates touching the border (44 character · 286 background), AUC 0.54; among pieces with at least half such ends, character share 10%. Hair · legs usually continue softly into neighboring color regions at the border, so crisp lines are rare at region-level ends. Pieces touching a picture corner differ (background 38% · character 9%) |
+| (0.50 preparation) Widening the return of body parts cut off by the border (in step 7 of 3.5, area cap for border pieces 6% → 12%, perimeter touching the character 75% → 60%) | Of 176 development pictures with a sure face, in the first 78 only 3 pictures changed: improved 0 · worsened 2. More background came back as character than character was recovered. Not adopted |
 
 **Note** — **Why**: Methods not adopted must be measured by the same standard to show why the current method stayed. The 𝑝 values in the table are sign-test or exact-test values from paired gradings (formulas in 11.1). **How it works**: The line-detection window $`\max(1, \mathrm{round}(4s))`$ was an attempt to make the 4px window at a 1000px long side proportional to the size ratio 𝑠 without the floor of 3. On small pictures the window shrank to 2px, fewer lines were found and results got worse. **References**: [R85 Dixon · Mood 1946](#r85) · a rule set by this program
 
@@ -929,8 +932,8 @@ Problems that came up while verifying with real pictures during development, and
   background props · text boxes drawn with lines stay on the character side slightly more often. From 0.33, gaps of the background's color are sent to the background on white · flat backgrounds,
   but gaps in scene · patterned backgrounds, gaps slightly different in color from the background because of shadows, and gaps in pictures with dense lines remain.
   Conversely, white character parts surrounded only by lines (one cell of white stockings · white ribbon) are sometimes sent as gaps. Move them with **Send to background** · **Return to character**.
-- The neural-network assist of 0.49 removes only where the statistical formula and the network agree, but it can still remove the character. On the region ground truth of development pictures (5-fold out-of-fold scores) about 20% of the removed area was character,
-  and in the blind test on the fixed 60 pictures it removed a second figure almost entirely in 1 picture and one clump of twin-tail hair in another (0.49 in 12). With the setting **Neural-network assist** off, pictures are split as in 0.48.
+- The neural-network assist can still remove the character. With the combining formula of 0.50, about 10% of the removed area was character on the region ground truth of development pictures (nested out-of-fold scores; the two-threshold rule of 0.49 measured the same way, about 24%).
+  In the blind test on the fixed 60 pictures, 0.49 removed a second figure almost entirely in 1 picture and one clump of twin-tail hair in another (0.49 in 12). 0.50 had no blind test. With the setting **Neural-network assist** off, pictures are split as in 0.48.
 - Where 0.49 loses the character is mostly **body parts cut off by the picture border**. On 207 development pictures with region ground truth, 19% of the ground-truth character region area went to the background in the background stages (53 pictures),
   and the neural-network assist of 0.49 removed about 3.1% more by an out-of-fold estimate. Of the character area that went to the background, the scene stage took 69% · flat background 18% · color model 5% · face-anchored 5% · gaps 2%,
   and 67% was in pieces touching the picture border (hair · horns · hat ribbons cut off at the top, legs cut off at the bottom, wings · hands cut off at the sides).
@@ -2458,7 +2461,7 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 
 ### 11.14 Resolving power by version
 
-Every version from 0.1 to 0.49 was measured again with the same pictures and the same scoring.
+Every version from 0.1 to 0.50 was measured again with the same pictures and the same scoring.
 Each version's code was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the <mark>balanced error rate</mark>
@@ -2524,6 +2527,15 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.47 | Roughs that trace | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 | 0.48 | Head-structure cues for naming faces · per-stage painting folders · 8 background improvement cycles | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 | 0.49 | Neural-network assist (remaining background removed only when the statistical formula and the network agree) | 99.5 | 95.5 | 0.0250 | 40.03 | **6.14** | 4.50–8.91 | 9.43 · 1.80 · 10.56 |
+| 0.50 | Neural-network assist strengthened (statistical score and network score combined in one formula) | 99.5 | 95.7 | 0.0240 | 41.75 | **6.40** | 4.73–9.25 | 9.67 · 1.90 · 10.96 |
+
+```mermaid
+xychart-beta
+    title "Resolving power by version (0.1 = 100%)"
+    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50"]
+    y-axis "Resolving power (%)" 0 --> 700
+    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640]
+```
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
 0.19 recovered the synthetic pictures' characters (82.0 → 97.7%), and in 0.37 · 0.38 the posed pictures' character kept rose 81.6 → 86.7 → 91.9%, taking the posed group's multiplier 0.97 → 1.18 → 1.44×.
@@ -2538,6 +2550,7 @@ the gain on real pictures should be read from the 0.43 entry in section 12 (blin
 0.44 to 0.48 changed only the rough · naming faces · painting folders (no candidate of 0.48's 8 background improvement cycles was adopted), and all 185 background maps are byte-identical to 0.43.
 0.49 finds more background with the neural-network assist in 5 of the 8 real pictures (mean background found 40.9 → 45.3%, character kept 99.2 → 99.1%, lower BER on all 5), taking the real group 1.67 → 1.80×;
 the 177 synthetic · posed pictures have background maps byte-identical to 0.48 (mean BER 0.0259 → 0.0250, 5.91 → 6.14×).
+0.50 combines the same statistical · network scores in one formula; 26 of the 185 pictures changed (BER improved 19 · worsened 7), background found on the 8 real pictures went 45.3 → 48.4% (character kept 99.1 → 98.8%), and synthetic · posed pictures also found a little more background (mean BER 0.0250 → 0.0240, 6.14 → 6.40×).
 
 ### 11.15 Blind test (0.1 · 0.47 · 0.48 · 0.49)
 
@@ -2568,6 +2581,18 @@ The table at the end of the 0.49 entry in section 12 gives the resolving power a
 Newest versions are at the top.
 
 **Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
+### 0.50 (2026-10-15) Neural-network assist strengthened (statistical score and network score combined in one formula)
+
+- Resolving power: 6.40× version 0.1 (95% CI 4.73–9.25×, 11)
+
+| | Version 0.1 | Version 0.48 | Version 0.49 | Version 0.50 |
+|---|---|---|---|---|
+| Resolving power | 100% | 591% | 614% | 640% |
+| Resolving power 95% CI | — | 433–863% | 450–891% | 473–925% |
+| Resolving power 80% CI | — | 482–754% | 500–779% | 524–810% |
+
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (0.1 is the reference, so it has none). Measured with the default settings, neural-network assist on.
 
 ### 0.49 (2026-10-15) Neural-network assist (remaining background removed only when the statistical formula and the network agree)
 
