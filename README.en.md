@@ -2579,7 +2579,7 @@ Newest versions are at the top.
     The agreement rule removes far less than that, but there is no evidence yet that the 48 : 12 out of fold carries over to whole real pictures. It was added without the hold-out blind test by the owner's decision, and kept on by default by the owner's decision after the fixed-60 blind test came out slightly lower than 0.48.
   - **185 ground-truth pictures**: more background found in 5 of the 8 real pictures (background found 40.9 → 45.3%, character kept 99.2 → 99.1%), with lower BER on all 5 (largest: t26 0.295 → 0.206).
     The 177 synthetic · posed pictures have background maps byte-identical to 0.48. Real group 1.67 → 1.80×, overall 5.91 → 6.14× (mean BER 0.0259 → 0.0250).
-  - **Time · size**: on the 185 ground-truth pictures and the fixed 60, each picture takes 0.31 s (4%) longer at the median. The weights (float32) are inside the app file, which grew by about 0.6 MB.
+  - **Time · size**: on the 185 ground-truth pictures and the fixed 60, each picture takes 0.31 s (4%) longer at the median. The weights (float32) are inside the app file, so the downloadable app grew from 1.8 MB to 3.1 MB.
     Network inference uses only additions · multiplications · maxima · averages in a fixed order, so it adds no new source of differences between devices.
 - Removed the program-save link under **Open file** on the left of the app (the app is the single `illustracy.html` in the repository).
 - Cycles 9 · 10 (region vote) and the tests of instability · hair texture alone · pictures without faces · returning did not meet their bars and were not added (7.5).
