@@ -11,7 +11,8 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **6.40× version 0.1** (0.50, 95% CI 4.73–9.25×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic, so the gain on real pictures is much smaller, 11).
+- Resolving power: **10.51× version 0.1** (0.51, 95% CI 6.80–17.77×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 real pictures alone it is 4.34× version 0.1, 11).
+- Cutout model (0.51, on by default): an anime-character segmentation network (ISNet, skytnt/anime-seg, Apache-2.0) reduced to 8 bits and built into the app file. It picks out the whole character and puts the rest on the background layer (3.5).
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -125,6 +126,7 @@ PSB files and files converted to 16 · 32 bits also work. If the file is already
 | Folder layout (`폴더 나누는 방식`) | **Per-part folders** (`파츠별 폴더`, default): in each of [Skin] [Hair] … folders, base color · 1st · 2nd shadow · highlight.<br>**Per-stage folders** (`단계별 폴더`): in each of [Base color] [1st shadow] [2nd shadow] [Highlight] folders, one layer per part (3.12). Available only when splitting by part; no clipping is used |
 | Clip shadows · highlights to the base color | Keeps shadows and highlights from going outside the base color |
 | Automatic flat background separation | Turns background detection on and off |
+| Cutout model | On by default (0.51). The anime-character cutout model built into the app picks out the whole character and puts the rest on the background layer (3.5); the background-detection steps and the neural-network assist are then not used. Adds about ten-odd seconds per picture and is not used on pictures with transparent pixels. Turned off, results are the same as 0.50 |
 | Neural-network assist | On by default. At the end of background detection, of the color regions left on the character side, only those whose background probability, from a statistical score and a small neural network's score combined in one formula, exceeds 0.8 are sent to the background (12 in 3.5). Turned off, results are the same as 0.48 |
 | Tilted picture (`기울어진 그림`) | Off by default. Turn it on for pictures that are strongly tilted overall (more than 45°) or lying on their side: faces are searched at several angles (0 · ±30 · ±60 · ±90°) and names · character folders · background rules follow the most face-like angle. The chosen tilt appears in the result line as "tilt N°".<br>On upright pictures it finds slightly fewer faces and slightly more fake faces (82 ground-truth pictures: real faces 29/35 → 26/35, fake faces 15 → 17), so it is better left off for pictures that are not tilted.<br>Pictures saved rotated, whose four corners are white · one color · transparent, are recognized without turning it on |
 | Generate rough sketch · rough color | Whether to make the two rough layers (rough 1 · rough 2), and in what color to draw them |
@@ -320,6 +322,8 @@ The color trace is clipped to the line art, so it only changes the line color wi
 **Note** — **Why**: Separating the line-art layer requires knowing how much the line covers each pixel (alpha) (formulas in 4.4). **How it works**: The standard compositing formula $`O = aK + (1 - a)U`$, opaque ink covering a share 𝑎 of the pixel, is solved for 𝑎. Knowing the line color 𝐾 and the color beneath 𝑈 fixes 𝑎, and the actual line color is found separately only where the base line color fails to reproduce the original. **References**: [R1 Porter · Duff 1984](#r1) · [R2 Smith 1995](#r2)
 
 ### 3.5 Finding the background
+
+**Cutout model (0.51, default)**: the picture (at processing resolution) is shrunk to a long side of 1024 px, placed in the middle of a 1024×1024 frame and fed to the anime-character segmentation network built into the app. The per-pixel character probability (0–1) is brought back to the original size, and 0.5 or more counts as character, the rest as background (4.5). The network was pretrained on many anime-character pictures and their cutouts, so it recognizes, by the shape of the body, parts the steps below cannot tell from the background, such as an arm rendered with a bright rim light and no outline, or hair touching the border. Outer glow (14), small pieces on the background (15) and correction painting still apply afterwards. With the setting off, or in a browser that cannot run the model, the steps below are used.
 
 Several methods are used in turn, and the backgrounds found are merged.
 If a thin border line (a frame) runs around the edge of the picture, background detection cannot start from the border, so while the background is being found, the outside up to the frame's thickness is
@@ -578,6 +582,7 @@ The program contains the following.
 |---|---|
 | Screen | settings on the left, preview in the middle, layer list on the right |
 | `IllustracyCore()` | the whole splitting algorithm. Closed in one function, so it moves to a worker as is via `toString()` |
+| Cutout-model worker (0.51) | unpacks the 8-bit cutout model and ONNX Runtime Web (WASM), stored in the app as base64, on first use and runs them in a separate worker; makes a character map per picture and hands it to the core, reusing it for the same picture |
 | Worker connection | runs the core in a Blob URL worker and receives the result layers' buffers without copying (transferable). If it fails, runs on the page |
 | `PSD.write()` | PSD file writer |
 | `PSD.rename()` | fixing layer names of PSDs saved by older versions (4.15) |
@@ -589,7 +594,9 @@ The program contains the following.
 ### 6.2 Data flow
 
 ```
-input picture ─(shrink to processing resolution)→ ImageData ─(sent to worker)→ IllustracyCore.process
+input picture ─(shrink to processing resolution)→ ImageData
+  ─(cutout model on: cutout worker)→ character map (0/1) ─(as option cutMask)
+  ─(sent to worker)→ IllustracyCore.process
   → per-channel Float32Array (R, G, B, A, restored color U, line alpha, line color, masks …)
   → buildLayers: per layer, an RGBA Uint8ClampedArray cropped to the rectangle with content { x, y, w, h, data }
   → layer tree + statistics (time, number of parts, reproduction PSNR)
@@ -849,6 +856,8 @@ Problems that came up while verifying with real pictures during development, and
 | (0.50 preparation) Whether a region that went to the background continues in color with the neighboring character region (non-line boundary · including line boundary · most similar neighbor) | Character vs background AUC 0.47 · 0.53 · 0.44, no separating power. Background next to the character is just as often of a similar color |
 | (0.50 preparation) Treating a piece whose border run ends at a crisp outline on both sides with background beyond as a body continuing outside the picture | On 330 candidates touching the border (44 character · 286 background), AUC 0.54; among pieces with at least half such ends, character share 10%. Hair · legs usually continue softly into neighboring color regions at the border, so crisp lines are rare at region-level ends. Pieces touching a picture corner differ (background 38% · character 9%) |
 | (0.50 preparation) Widening the return of body parts cut off by the border (in step 7 of 3.5, area cap for border pieces 6% → 12%, perimeter touching the character 75% → 60%) | Of 176 development pictures with a sure face, in the first 78 only 3 pictures changed: improved 0 · worsened 2. More background came back as character than character was recovered. Not adopted |
+| (0.51 preparation) A rule to return arms · hair near the border: after step 7 of 3.5, re-split the remaining background at faint color edges (ΔE 8 or more across 2 px) and lines, and sort each piece by color-distribution comparison · share of perimeter on the border · share joined to the character without a line · area · difference from the face skin color | On 508 pieces (106 character) of the 207 development pictures with region ground truth: AUC color distribution 0.69 · border share 0.66 · skin color 0.50 · joined share 0.44. Anime skin is almost the same color as white · pale backgrounds, so many background pieces are ΔE 0 from the skin color. Split the pictures in half: a rule chosen on one half returned area of which the character share was 72% there but 44% on the other half, improved 12 · worsened 13; chosen on the other half, no rule passed the gate (improved > worsened, character share ≥ 60%). Not adopted |
+| (0.51 preparation) Cutting out with graph cut (GrabCut), starting from the 0.50 result with faces as sure character; two variants, one with the scene-background stage-1 area set to "unknown" | On one user picture with a rim-lit arm, neither variant brought the arm back and both cut away even the skin beside the armpit. The color models are learned from the starting labels and the boundary cost is only neighbor color contrast, so the cut follows the dark clothes · hair outlines and drops pale skin. Not adopted |
 
 **Note** — **Why**: Methods not adopted must be measured by the same standard to show why the current method stayed. The 𝑝 values in the table are sign-test or exact-test values from paired gradings (formulas in 11.1). **How it works**: The line-detection window $`\max(1, \mathrm{round}(4s))`$ was an attempt to make the 4px window at a 1000px long side proportional to the size ratio 𝑠 without the floor of 3. On small pictures the window shrank to 2px, fewer lines were found and results got worse. **References**: [R85 Dixon · Mood 1946](#r85) · a rule set by this program
 
@@ -884,7 +893,7 @@ Problems that came up while verifying with real pictures during development, and
 - **Lightly painted layers**: multiply · screen layers are stored with the smallest possible alpha, so they look like layers an artist painted lightly and are easy to keep working on.
 - **Many cues for background decisions**: border connection, line density, how much lines enclose a place, sharpness (focus), color distributions learned per picture, and face positions are used in turn, and cut-off character parts are picked out. At the end, remaining background is removed further only when a statistical formula and a small neural network agree (0.49). Faces are found with rules and averaged patterns, without a trained model.
 - **Precise manual correction**: a brush and loop that do not cross lines and part boundaries. Even after corrections, the composite stays identical to the original.
-- **Offline, free**: no installation · server · external libraries · paid services. The picture never leaves the computer.
+- **Offline, free**: no installation · server · paid services. The only outside code is the cutout model (Apache-2.0) and its runtime ONNX Runtime Web (MIT), both built into the app file. The picture never leaves the computer.
 - **A PSD writer built from scratch**: folders, clipping, blend modes, Korean names, merged image. Verified with two independent PSD parsers.
 - **Deterministic results**: the same picture with the same settings always gives the same result.
 - **Fast**: usually 4–9 seconds for pictures with a long side around 1200px, around 15 seconds for 2048px pictures (on the computer used for verification).
@@ -932,6 +941,9 @@ Problems that came up while verifying with real pictures during development, and
   background props · text boxes drawn with lines stay on the character side slightly more often. From 0.33, gaps of the background's color are sent to the background on white · flat backgrounds,
   but gaps in scene · patterned backgrounds, gaps slightly different in color from the background because of shadows, and gaps in pictures with dense lines remain.
   Conversely, white character parts surrounded only by lines (one cell of white stockings · white ribbon) are sometimes sent as gaps. Move them with **Send to background** · **Return to character**.
+- **Weak points of the cutout model (0.51)**: characters that are not human-shaped (animal · monster fan art) can be missed entirely; in one of the 14 artist-made cutouts (11.16), a Bulbasaur fan art, the character was not found at all.
+  Effects wrapped around the character, such as an aura or flames, go to the background (character kept 74% on the one picture whose artist put the effect on the character layer). Programmatically drawn synthetic characters are recognized less well, so the synthetic group of the 185 ground-truth pictures is lower than 0.50 (9.67 → 7.32× version 0.1). On the 8 real pictures, background found rose 48.4 → 82.7% and character kept fell slightly, 98.8 → 94.2%.
+  It adds about ten-odd seconds per picture (single-thread WASM), a few more seconds on first use to unpack the model, and around 0.5 GB of browser memory. The app file is about 58 MB. 0.51 was added after measuring resolving power only, without a blind test.
 - The neural-network assist can still remove the character. With the combining formula of 0.50, about 10% of the removed area was character on the region ground truth of development pictures (nested out-of-fold scores; the two-threshold rule of 0.49 measured the same way, about 24%).
   In the blind test on the fixed 60 pictures, 0.49 removed a second figure almost entirely in 1 picture and one clump of twin-tail hair in another (0.49 in 12). 0.50 had no blind test. With the setting **Neural-network assist** off, pictures are split as in 0.48.
 - Where 0.49 loses the character is mostly **body parts cut off by the picture border**. On 207 development pictures with region ground truth, 19% of the ground-truth character region area went to the background in the background stages (53 pictures),
@@ -1106,7 +1118,7 @@ We are looking for people to help solve these weaknesses. Anyone who knows image
 
 - Send pictures that split wrongly (counterexamples), analyses of causes, or fixes as issues or pull requests.
 - Changes are measured with the same tests as section 11 (ground-truth scoring and blind grading) and go in only when they improve results.
-- Constraints kept: running only in the browser, splitting without external libraries or other people's pretrained models (the small neural network of 0.49 was also written and trained from scratch for this program).
+- Constraints kept: running only in the browser. Up to 0.50 the split used no external libraries or other people's pretrained models (the small neural network of 0.49 was also written and trained from scratch for this program); from 0.51 the default setting uses a pretrained cutout model (Apache-2.0) and ONNX Runtime Web (MIT) built into the app file. With the **Cutout model** setting off, the split runs under the same conditions as 0.50.
 
 ---
 
@@ -1135,6 +1147,7 @@ In this section:
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
 - [11.15 Blind test (0.1 · 0.47 · 0.48 · 0.49)](#1115-blind-test-01--047--048--049)
+- [11.16 14 artist-made cutouts (0.51)](#1116-14-artist-made-cutouts-051)
 
 ### 11.1 Formulas used for evaluation
 
@@ -2461,7 +2474,7 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 
 ### 11.14 Resolving power by version
 
-Every version from 0.1 to 0.50 was measured again with the same pictures and the same scoring.
+Every version from 0.1 to 0.51 was measured again with the same pictures and the same scoring.
 Each version's code was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the <mark>balanced error rate</mark>
@@ -2528,13 +2541,14 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.48 | Head-structure cues for naming faces · per-stage painting folders · 8 background improvement cycles | 99.5 | 95.3 | 0.0259 | 38.58 | **5.91** | 4.33–8.63 | 9.43 · 1.67 · 10.56 |
 | 0.49 | Neural-network assist (remaining background removed only when the statistical formula and the network agree) | 99.5 | 95.5 | 0.0250 | 40.03 | **6.14** | 4.50–8.91 | 9.43 · 1.80 · 10.56 |
 | 0.50 | Neural-network assist strengthened (statistical score and network score combined in one formula) | 99.5 | 95.7 | 0.0240 | 41.75 | **6.40** | 4.73–9.25 | 9.67 · 1.90 · 10.96 |
+| 0.51 | Character decided by the cutout model (anime-character segmentation network reduced to 8 bits, built into the app) | 98.1 | 99.0 | 0.0146 | 68.59 | **10.51** | 6.80–17.77 | 7.32 · 4.34 · 24.51 |
 
 ```mermaid
 xychart-beta
     title "Resolving power by version (0.1 = 100%)"
-    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50"]
-    y-axis "Resolving power (%)" 0 --> 700
-    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640]
+    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51"]
+    y-axis "Resolving power (%)" 0 --> 1200
+    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051]
 ```
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
@@ -2551,6 +2565,7 @@ the gain on real pictures should be read from the 0.43 entry in section 12 (blin
 0.49 finds more background with the neural-network assist in 5 of the 8 real pictures (mean background found 40.9 → 45.3%, character kept 99.2 → 99.1%, lower BER on all 5), taking the real group 1.67 → 1.80×;
 the 177 synthetic · posed pictures have background maps byte-identical to 0.48 (mean BER 0.0259 → 0.0250, 5.91 → 6.14×).
 0.50 combines the same statistical · network scores in one formula; 26 of the 185 pictures changed (BER improved 19 · worsened 7), background found on the 8 real pictures went 45.3 → 48.4% (character kept 99.1 → 98.8%), and synthetic · posed pictures also found a little more background (mean BER 0.0250 → 0.0240, 6.14 → 6.40×).
+0.51 decides the character with the cutout model; compared with 0.50, 170 of the 185 pictures changed (BER improved 118 · worsened 52). Background found on the 8 real pictures rose 48.4 → 82.7% and character kept fell 98.8 → 94.2%; the posed group rose 10.96 → 24.51× and the synthetic group fell 9.67 → 7.32× (mean BER 0.0240 → 0.0146).
 
 ### 11.15 Blind test (0.1 · 0.47 · 0.48 · 0.49)
 
@@ -2576,11 +2591,38 @@ The table at the end of the 0.49 entry in section 12 gives the resolving power a
 
 ---
 
+### 11.16 14 artist-made cutouts (0.51)
+
+To get pixel-level ground truth for real pictures without hand labeling, posts were collected in which the artist uploaded the same picture both with and without a background. If the version without background is a transparent PNG, its alpha is the cutout the artist made; if it is on a plain color, the pixels that are not that color are. Two checks were automatic: the character pixels of both versions match in color (median ΔE ≤ 3, and ΔE ≤ 8 for at least 85% or 90%), and the background of the version with background is not plain · white.
+Of 165 multi-page Pixiv posts (tags such as background variant · transparent background · no background; all-ages; hold-out · fixed pictures excluded), 16 pictures from 12 posts passed; excluding a decorative frame (not a character) and one whose plain-color version was a different picture, so that its truth was wrong, 14 were measured. Scoring is the same as for the 185 (3 px around ground-truth boundaries and pixels of unknown class, where both versions have the same color, excluded).
+
+| Version | Character kept % | Background found % | Mean BER |
+|---|---|---|---|
+| 0.50 | 99.1 | 59.7 | 0.2060 |
+| 0.51 | 88.3 | 94.7 | 0.0851 |
+
+0.51 lowered BER on 12 of the 14 and raised it on 1. The one where it rose is a character that is not human-shaped (a Bulbasaur fan art); the character was not found at all. One picture has transparent pixels, so the cutout model was not used and the result equals 0.50. On the picture whose artist put aura flames on the character, the aura went to the background and character kept was 74%, but BER still fell because more background was found. These pictures were used only for development · verification and are not in the repository.
+
 ## 12. Release history
 
 Newest versions are at the top.
 
 **Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
+### 0.51 (2026-10-15) Cutout model (anime-character segmentation network reduced to 8 bits, built into the app) picks out the whole character, the rest goes to the background layer
+
+- Resolving power: 10.51× version 0.1 (95% CI 6.80–17.77×, 11)
+- Why: in a picture whose raised arm had its outer edge rendered with a bright rim light and no outline, stage 1 of the scene background filled from the top-border background through the arm and armpit as one piece, so the arm went to the background layer. Hair tips near the border also went to the background. Neither a rule to sort such pieces nor graph cut could be adopted (0.51 preparation in 7.5).
+- Change: setting **Cutout model** (on by default). The convolution weights of the ISNet model published by SkyTNT's anime-segmentation (Apache-2.0) were reduced to 8 bits per output channel (176 MB → 37 MB compressed) and built into the app file together with the WASM runtime of ONNX Runtime Web 1.29.0 (MIT) (4.5). The character is decided by the model, and the background-detection steps and neural-network assist are skipped. On the 185 ground-truth pictures, the 8-bit model differs from the 32-bit original on 0.035% of pixels.
+- 14 artist-made cutouts (11.16): mean BER 0.206 (0.50) → 0.085 (0.51).
+
+| | Version 0.1 | Version 0.49 | Version 0.50 | Version 0.51 |
+|---|---|---|---|---|
+| Resolving power | 100% | 614% | 640% | 1051% |
+| Resolving power 95% CI | — | 450–891% | 473–925% | 680–1777% |
+| Resolving power 80% CI | — | 500–779% | 524–810% | 794–1480% |
+
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference, so it has no interval). Measured with the default settings, cutout model on.
 
 ### 0.50 (2026-10-15) Neural-network assist strengthened (statistical score and network score combined in one formula)
 
@@ -3525,3 +3567,7 @@ These are the works cited by number under **References** in the formula notes. "
 - <a id="r87"></a>**[R87]** D. P. Kingma, J. Ba, "Adam: A Method for Stochastic Optimization," <i>ICLR 2015</i>.
 - <a id="r88"></a>**[R88]** F. Yu, V. Koltun, "Multi-Scale Context Aggregation by Dilated Convolutions," <i>ICLR 2016</i>.
 - <a id="r89"></a>**[R89]** J. Bigün, G. H. Granlund, "Optimal Orientation Detection of Linear Symmetry," <i>Proc. 1st ICCV</i>, 433–438, 1987.
+- <a id="r90"></a>**[R90]** X. Qin, H. Dai, X. Hu, D.-P. Fan, L. Shao, L. Van Gool, "Highly Accurate Dichotomous Image Segmentation," <i>Computer Vision – ECCV 2022</i>, LNCS 13678, 38–56, 2022.
+- <a id="r91"></a>**[R91]** SkyTNT, "anime-segmentation" (ISNet anime-character segmentation model skytnt/anime-seg), GitHub · Hugging Face, Apache License 2.0.
+- <a id="r92"></a>**[R92]** R. Krishnamoorthi, "Quantizing Deep Convolutional Networks for Efficient Inference: A Whitepaper," arXiv:1806.08342, 2018.
+- <a id="r93"></a>**[R93]** Microsoft, "ONNX Runtime Web" 1.29.0, MIT License.

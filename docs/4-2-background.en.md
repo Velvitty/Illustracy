@@ -6,6 +6,24 @@
 
 ## 4.5 Background
 
+### Cutout model (0.51, default)
+
+When the "Cutout model" setting is on and the picture has no transparent pixels, this decides the character instead of the background steps below. The picture $`I`$ (processing resolution $`W \times H`$) is shrunk to a long side of 1024 px and placed in the middle of a 1024×1024 frame (the rest 0), and the sigmoid output of the network $`f_\theta`$ is brought back to the original size the same way. Shrinking and enlarging use pixel-center-aligned <mark>bilinear</mark> interpolation (edge pixels repeated).
+
+```math
+x = \mathrm{pad}_{1024}\!\left(\mathrm{resize}\!\left(\tfrac{I}{255},\ \tfrac{1024}{\max(W,H)}\right)\right),\qquad m = \mathrm{resize}^{-1}\!\left(\sigma(f_\theta(x))\right),\qquad p \text{ is character} \iff m(p) \ge 0.5
+```
+
+$`f_\theta`$ is the <mark>ISNet</mark> model published by SkyTNT's anime-segmentation (skytnt/anime-seg, Apache-2.0, 114 convolutions · 44,004,873 weights) [R90 Qin et al. 2022](../README.en.md#r90) · [R91 SkyTNT anime-segmentation](../README.en.md#r91). To fit it in the app file, the convolution weights were reduced to symmetric 8 bits per output channel $`c`$ [R92 Krishnamoorthi 2018](../README.en.md#r92).
+
+```math
+s_c = \frac{\max_k \lvert W_{c,k}\rvert}{127},\qquad q_{c,k} = \mathrm{round}\!\left(\frac{W_{c,k}}{s_c}\right) \in [-127, 127],\qquad \hat W_{c,k} = s_c\, q_{c,k}
+```
+
+On first use the app rebuilds $`\hat W`$ from $`q`$ and $`s`$ and runs it with the WASM runtime (one thread) of ONNX Runtime Web (1.29.0, MIT, [R93 ONNX Runtime Web](../README.en.md#r93)) in a separate worker. Outer glow · background effects · correction painting are applied on top of this result as before.
+
+**Notes** — **Why**: background detection that fills inward from the border cannot stop at boundaries without a line, so an arm rendered with a rim light becomes one piece with the background. Rules that sort such pieces by color · area · boundary cues did not exceed AUC 0.69 on 207 development pictures (0.51 preparation in README 7.5). The cutout model looks at the shape of the body and picks out the whole character at once. **Principle**: ISNet is a segmentation network that shrinks and enlarges the image over several resolutions to fit the foreground · background boundary finely. The 8-bit reduction is symmetric quantization that maps each channel's largest absolute value to 127, so the weight error is at most 0.4% of the channel maximum; on the 185 ground-truth pictures the 32-bit and 8-bit models differ on 0.035% of pixels. **References**: [R90 Qin et al. 2022](../README.en.md#r90) · [R91 SkyTNT anime-segmentation](../README.en.md#r91) · [R92 Krishnamoorthi 2018](../README.en.md#r92) · [R93 ONNX Runtime Web](../README.en.md#r93).
+
 ### Find at reduced size (setting, off by default)
 
 With "Find only background · faces at reduced size" and $`\max(W, H) > S`$ (the target size), the background stages below and face finding alone run on a picture with each channel area-averaged down by $`k = S / \max(W, H)`$
