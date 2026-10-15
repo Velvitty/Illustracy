@@ -6,7 +6,7 @@
 
 ## 4.5 Background
 
-### Cutout model (0.51, default)
+### Cutout model (0.51 · 0.52, default)
 
 When the "Cutout model" setting is on and the picture has no transparent pixels, this decides the character instead of the background steps below. The picture $`I`$ (processing resolution $`W \times H`$) is shrunk to a long side of 1024 px and placed in the middle of a 1024×1024 frame (the rest 0), and the sigmoid output of the network $`f_\theta`$ is brought back to the original size the same way. Shrinking and enlarging use pixel-center-aligned <mark>bilinear</mark> interpolation (edge pixels repeated).
 
@@ -23,6 +23,16 @@ s_c = \frac{\max_k \lvert W_{c,k}\rvert}{127},\qquad q_{c,k} = \mathrm{round}\!\
 On first use the app rebuilds $`\hat W`$ from $`q`$ and $`s`$ and runs it with the WASM runtime (one thread) of ONNX Runtime Web (1.29.0, MIT, [R93 ONNX Runtime Web](../README.en.md#r93)) in a separate worker. Outer glow · background effects · correction painting are applied on top of this result as before.
 
 **Notes** — **Why**: background detection that fills inward from the border cannot stop at boundaries without a line, so an arm rendered with a rim light becomes one piece with the background. Rules that sort such pieces by color · area · boundary cues did not exceed AUC 0.69 on 207 development pictures (0.51 preparation in README 7.5). The cutout model looks at the shape of the body and picks out the whole character at once. **Principle**: ISNet is a segmentation network that shrinks and enlarges the image over several resolutions to fit the foreground · background boundary finely. The 8-bit reduction is symmetric quantization that maps each channel's largest absolute value to 127, so the weight error is at most 0.4% of the channel maximum; on the 185 ground-truth pictures the 32-bit and 8-bit models differ on 0.035% of pixels. **References**: [R90 Qin et al. 2022](../README.en.md#r90) · [R91 SkyTNT anime-segmentation](../README.en.md#r91) · [R92 Krishnamoorthi 2018](../README.en.md#r92) · [R93 ONNX Runtime Web](../README.en.md#r93).
+
+**Adding the previous method (0.52)**: with the cutout model, the background steps below (flat · scene · color model · face-based · gaps · neural-network assist) still run and give a decision $`c(p)`$ (character 1 · background 0), which is added to the model probability.
+
+```math
+p \text{ is character} \iff m(p) + \alpha\,\bigl(c(p) - \tfrac12\bigr) \ge \tfrac12,\qquad \alpha = 0.4
+```
+
+Where the two agree, that is the answer; where they disagree, $`m(p) \ge 0.3`$ (previous method says character) or $`m(p) \ge 0.7`$ (previous method says background) decides. This result is the background layer as it is; outer glow and the small-pieces-on-background rule are not applied. α was chosen on 498 synthetic pictures (0.2 · 0.4 · 0.6 on set A, 299 pictures, confirmed on set B, 199) and the 14 artist-made cutouts (README 7.5 · 12, 0.52).
+
+**Notes** — **Why**: the model alone (0.51) misses some of the background the previous method found on real pictures (background found 94.7% on the 14 artist-made cutouts), while the previous method alone hands a lineless arm to the background. Letting the model's confidence decide only where the two disagree lets each cover the other's mistakes. **Principle**: a linear combination of two classifiers' scores; α is the weight that gives one vote of the previous method the value of 0.2 of model probability.
 
 ### Find at reduced size (setting, off by default)
 
