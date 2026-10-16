@@ -6,7 +6,7 @@
 
 ## 4.5 Background
 
-### Cutout model (0.51 – 0.53, default)
+### Cutout model (0.51 – 0.54, default)
 
 When the "Cutout model" setting is on and the picture has no transparent pixels, this decides the character instead of the background steps below. The picture $`I`$ (processing resolution $`W \times H`$) is shrunk to a long side of 1024 px and placed in the middle of a 1024×1024 frame (the rest 0), and the sigmoid output of the network $`f_\theta`$ is brought back to the original size the same way. Shrinking and enlarging use pixel-center-aligned <mark>bilinear</mark> interpolation (edge pixels repeated).
 
@@ -43,6 +43,16 @@ Where the two agree, that is the answer; where they disagree, $`m(p) \ge 0.3`$ (
 It is not a weight that changes gradually but a rule switched per picture, so pictures that do not meet the condition equal 0.52.
 
 **Notes** — **Why**: the model can miss a character that is not human-shaped (animal · monster fan art) entirely, and then even in the addition one vote of the previous method (0.2) cannot overcome a model probability near 0, so the character disappears. Only on such pictures is the previous method followed as it is. **Principle**: the areas of the two decisions are compared, and the picture is handed to the other side only when one is almost empty. The rule was made after seeing results (the Bulbasaur fan art among the 14 artist-made cutouts), and 1% · 5% are the first values set. Raising the previous method's weight on a log scale with how far the model falls short was also measured, but worsened more synthetic pictures than it improved and was not adopted (README 7.5 · 12, 0.53).
+
+**Averaging with a fine-tuned copy (0.54)**: the model probability is the weighted average (0.6 · 0.4) of the original cutout model's probability $`p_0`$ and the probability $`p_1`$ of a copy of the same network trained for 12 more epochs on 290 synthetic composites (pixel ground truth) and 292 pixiv development pictures (the mean of the original model's black-filled · mirror-filled probabilities as soft targets); the addition threshold rises to 0.55 and the 0.53 rule is unchanged.
+
+```math
+m(p) = 0.6\,p_0(p) + 0.4\,p_1(p),\qquad p \text{ is character} \iff m(p) + 0.4\,\bigl(c(p) - \tfrac12\bigr) \ge 0.55
+```
+
+In the app the fine-tuned copy's 8-bit values are stored as the difference from the original 8-bit values (modulo 256, same scales), and the two models are run one after the other.
+
+**Notes** — **Why**: the two remaining causes of loss in 0.53 (a boundary colored like the background · a body cut off at the edge) are places where the model is confidently wrong with a low probability, which thresholds · filling · cohesion could not fix (README 7.5). So the model itself was trained further. **Principle**: the fine-tuned copy alone keeps more character (character kept 97.6 → 99.4% on the 14 artist-made cutouts) but takes aura · flame effects and background attached to the character as character, raising the mean BER (background found 92.5 → 89.3%); the original model is confident that such places are background, so averaging the two softens each one's confident errors. These mixing weights and threshold were chosen after seeing the fine-tuned copy's results, from 34 rule candidates and 1,089 weight · threshold combinations written down first and scored on the 14 artist-made cutouts · synthetic set B (post-hoc selection), so the value on the 14 pairs is not out of sample (README 12, 0.54).
 
 ### Find at reduced size (setting, off by default)
 
