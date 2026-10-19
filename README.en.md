@@ -11,8 +11,9 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **17.52× version 0.1** (0.55, 95% CI 11.87–29.98×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 real pictures alone it is 4.06× version 0.1. 140 of the 185 differ from 0.54 (14.80×, re-measured with the released app as it is — see the 0.55 correction in 12): improved 68 · worsened 72, 11).
+- Resolving power: **17.52× version 0.1** (0.56, 95% CI 11.87–29.98×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 real pictures alone it is 4.06× version 0.1. 140 of the 185 differ from 0.54 (14.80×, re-measured with the released app as it is — see the 0.55 correction in 12): improved 68 · worsened 72. 0.56 leaves the 'Background' layer unchanged, so the background maps of the 185 pictures are byte-identical to 0.55 and the value is the same, 11).
 - Cutout model (0.51, on by default): an anime-character segmentation network (ISNet, skytnt/anime-seg, Apache-2.0) reduced to 8 bits and built into the app file. It picks out the whole character and puts the rest on the background layer (3.5). From 0.52 the character probability it gives is added to the decision of the previous method (background detection + neural-network assist), from 0.53 pictures where the model finds almost no character use the previous method's decision as it is, and from 0.54 a copy of the same network fine-tuned on synthetic · pixiv pictures is run as well, a weighted average of the two probabilities is used as the model probability and the threshold is raised slightly; 0.55 uses a copy further trained to count effects (glow · particles · light rays) as background and averages the two probabilities with equal weights.
+- Background fill (0.56, default "network + patches"): a 'Background fill' layer that estimates the background behind the character with the bundled inpainting network big-lama (reconnects broken structure), patch matching (original texture) and a seam membrane, placed directly above the 'Background' layer (3.5). The difference from the synthetic ground truth (MAE) is scene 2.9 · bokeh 9.0 · stripes 0.4 (patches only 18.3 · 9.2 · 2.0; left white 66.0 · 167.7 · 29.2), and the naturalness grading of 120 unseen pixiv pictures (8 graders, 0–100) is 59.2 (patches only 44.7). The meaning of hidden objects cannot be invented (10.2 · 11.17). The fp16 weights (102 MB) live in illustracy-fill-1.js · illustracy-fill-2.js (about 127 MB together) next to the app file (about 78 MB); kept in the same folder they are read automatically the first time a picture is filled (without them the patch method is used).
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -62,6 +63,7 @@ The program's screen and the layer names in the PSD are in Korean. The Korean na
 | Reflected light · rim light (`반사광` · `림라이트`) | Areas that brighten again inside a shadow, light along the edge of the body |
 | Light · sparkle (`빛` · `반짝임`) | Glowing effects, sparkles in the eyes, stars |
 | Background · background FX (`배경` · `배경 효과`) | The background behind the character, flecks of light floating over the background |
+| Background fill (`배경 메꿈`) | The character's area filled with an estimate from an inpainting network (big-lama) and patch matching (0.56, directly above 'Background') |
 | Outer glow (`외곽 글로우`) | A neon band drawn around the character (only in pictures that have one) |
 
 Each part gets its own folder, and the folder holds that part's base color · shadows · highlights (choosing **per-stage folders** in the settings turns this around: the parts sit inside [Base color] · [1st shadow] · [2nd shadow] · [Highlight] folders).
@@ -403,6 +405,13 @@ When "Find only background · faces at reduced size" of the setting "Split large
 Then the corrections the user painted (send to background / return to character) are applied with priority over the automatic decisions.
 For pictures where no background was found, a background layer appears only once send-to-background is painted.
 
+#### Filling the background behind the character (0.56)
+
+The 'Background' layer with the character removed is transparent where the character was. 0.56 adds a **'Background fill'** layer (`배경 메꿈`) estimated for that area, directly **above** the 'Background' layer inside the 'Background' group (below glows and background FX; setting "Fill the background behind the character": network + patches (default) · patches only · off; off, the layer is absent and everything else is the same). The fill layer covers only the character's area plus a narrow band around it (1/160 of the long side, 3–12 px) and is transparent elsewhere, so the background layer is left as it is, yet the two together look like a background that never had the character. The band is covered because a few pixels of the character's outline and blended colors remain at the edge of the background layer.
+At this stage the character is already gone, so unlike a photo editor's generative fill the program never has to invent "anything": it only has to continue the **background**. So it uses a background-only inpainting network trained on scene photos, takes texture only from the remaining background, and spends the remaining computation on the **seam** where the filled area meets the original background (formulas in [4.5](docs/4-2-background.en.md#background-fill-056)). ① **Network estimate**: the picture with the hole blanked and the hole mask are reduced to a long side of 512 (averaging known pixels only), placed on a 512×512 canvas with reflection padding, and fed to the bundled inpainting network <mark>big-lama</mark> (18 Fourier-convolution ResNet blocks, 50.9 M weights, trained on Places scene photos, Apache-2.0). Its Fourier convolutions see the whole picture at once, so distant structure (window frames, floor boards, trees, patterns) is continued across the hole. The output is cropped and upsampled (bicubic) to full resolution: the initial estimate G. The model runs in the browser's ONNX Runtime (WASM, one thread); no internet is needed. ② **Original texture (<mark>PatchMatch</mark>)**: at full resolution (long side ≤ 1024) hole pixels start at G; for every 7×7 patch the most similar known patch is found (propagation and random search, 2 rounds × 3 sweeps) and voted. Final color = w·patch + (1 − w)·G with w = exp(−max(0, D − τ₀)/(2·max(med D, τ₁))) (τ₀ · τ₁ = the distances of an RMS of 0.02 · 0.05 per channel): where a good match exists (fully, when the distance is at noise level) the original texture is used, where none exists (structure absent from the known background) the network estimate stays. An absolute threshold is needed because with the median alone, on flat pictures such as a white background, a distance at JPEG-noise level counts as a bad match and the network's gray noise would remain. ③ **Seam membrane**: on the one-pixel ring of known pixels just outside the hole, the difference between what the fill "predicts" there (patch vote mixed with G by the local weight) and the actual pixels is the boundary value of a harmonic membrane (Laplace = 0 inside the hole, solved by multigrid) added to the fill, the same formulation as <mark>Poisson seamless cloning</mark>. The color and brightness step at the seam becomes zero and spreads smoothly inward; texture and lines are untouched.
+"Patches only" is the method developed first for 0.56 without the network (halving pyramid → diffusion at the coarsest level → coarse-to-fine patch matching → regularity gate → distance-graded blend); it finishes in 1–5 s but cannot reconnect broken structure. The weights are stored as fp16 (102 MB), not 8-bit: per-channel 8-bit quantization flipped the colors of flat backgrounds (a 1% weight perturbation changed the output by up to 0.6–0.8 against fp32) and was unusable, while fp16 differs by at most 0.007–0.03. The weights are kept next to the app file (about 78 MB) in illustracy-fill-1.js · illustracy-fill-2.js (about 127 MB together; split in two because of GitHub's 100 MiB file limit); in the same folder they are read automatically the first time a picture is filled (without them the patch method is used).
+The color difference from the synthetic ground truth re-rendered without the character (MAE, 0–255) is network + patches 2.82 (scene 2.9 · bokeh 9.0 · stripes 0.4 · posed synthetic 1.9), network only 6.08, patches only 3.94 (scene 18.3), left white 84.20, and the MAE in the seam band (8 px from the boundary) is 1.96 · 3.99 · 2.91 (11.17). The naturalness grading of 120 unseen pixiv pictures (8 graders × 15, 0–100) is network + patches 59.2 · network only 60.2 · patches only 44.7. None of this knows the meaning of hidden objects, so nothing the character hid is invented.
+
 ### 3.6 Cleaning pieces on the background and lines in the background
 
 - Small pieces surrounded by background (particles, fragments of light rays) are not character parts; the background color below is guessed from the surroundings and they are split into **background + background FX (screen)**.
@@ -611,7 +620,7 @@ input picture ─(shrink to processing resolution)→ ImageData
 { name, kind: 'group', group: true, blend: 'pass', open, children }  // folder
 ```
 
-`kind` is `line`, `trace`, `flat`, `shadow`, `shadow2`, `highlight`, `gradient`, `shade`, `reflect`, `rim`, `effect`, `sparkle`, `bg`, `bgfx`, `glow`, `silhouette`, `rough`.
+`kind` is `line`, `trace`, `flat`, `shadow`, `shadow2`, `highlight`, `gradient`, `shade`, `reflect`, `rim`, `effect`, `sparkle`, `bg`, `bgfill` (0.56), `bgfx`, `glow`, `silhouette`, `rough`.
 The correction tools and the PSD writer recognize a layer's role by this value.
 
 ### 6.4 State and undo
@@ -996,6 +1005,7 @@ Problems that came up while verifying with real pictures during development, and
   So in the changed pictures character losses fell sharply, but "perfect separation" fell 4 → 1 on hold-out pictures and 3 → 1 on development pictures, and side-by-side preference was about even: 0.37 better 52 · 0.38 better 55 · same 7
   (judgments choosing the side with less background left concentrated on 0.37's side, 11). It was added because leftover background pieces are easier to fix than lost character.
   The flat background share · color difference around islands could not separate attached background shapes from clothes (7.5).
+- **Background fill (0.56)** runs the network at 512×512, so fine structure in large pictures comes from the patch stage, and fine structure absent from the known background (hidden text, small patterns) is estimated blurry. The meaning of hidden objects cannot be invented (naturalness grading of 120 pixiv pictures, mean 59.2 of 100, 11.17). Where the background layer's decision is wrong (hair strands left in the background, for example), that part is not filled. Each picture takes about 23–29 s more (browser, 800×800 to 2048×2048; the first run spends 2 s preparing the model), and the two weight files (about 127 MB together) must sit next to the app. The setting can be switched to "patches only" (1–5 s) or off.
 
 ### 10.3 Faces · names · character folders
 
@@ -1159,8 +1169,9 @@ In this section:
 - [11.12 Returning islands in the scene background (0.38)](#1112-returning-islands-in-the-scene-background-038)
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
-- [11.15 Blind test (0.1 · 0.53 · 0.54 · 0.55)](#1115-blind-test-01--053--054--055)
+- [11.15 Blind test (0.1 · 0.54 · 0.55 · 0.56)](#1115-blind-test-01--054--055--056)
 - [11.16 14 artist-made cutouts (0.51)](#1116-14-artist-made-cutouts-051)
+- [11.17 Background fill (0.56)](#1117-background-fill-056)
 
 ### 11.1 Formulas used for evaluation
 
@@ -2559,13 +2570,14 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.53 | Pictures where the cutout model finds almost no character use the previous method's decision (neural network + statistics) as it is | 99.0 | 98.7 | 0.0115 | 87.23 | **13.37** | 9.24–22.15 | 13.13 · 3.96 · 33.16 |
 | 0.54 | Character decided from a weighted average (0.6 · 0.4) of the cutout model and a fine-tuned copy of it run together, with the threshold raised to 0.55 (re-measured with the released app as it is; 0.55 correction in 12) | 99.4 | 98.6 | 0.0104 | 96.51 | **14.80** | 10.09–24.70 | 24.77 · 3.88 · 29.04 |
 | 0.55 | Character decided from the average (0.5 · 0.5) of the cutout model and a copy further trained to count effects (glow · particles · light rays) as background, with threshold 0.55 | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
+| 0.56 | A 'Background fill' layer that estimates the background behind the character with an inpainting network (big-lama) and patch matching, placed directly above the 'Background' layer (the background layer is unchanged, so all 185 are byte-identical to 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 
 ```mermaid
 xychart-beta
     title "Resolving power by version (0.1 = 100%)"
-    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51", "0.52", "0.53", "0.54", "0.55"]
+    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51", "0.52", "0.53", "0.54", "0.55", "0.56"]
     y-axis "Resolving power (%)" 0 --> 1800
-    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051, 1133, 1337, 1480, 1752]
+    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051, 1133, 1337, 1480, 1752, 1752]
 ```
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
@@ -2587,8 +2599,9 @@ the 177 synthetic · posed pictures have background maps byte-identical to 0.48 
 0.53 differs from 0.52 on only 1 of the 185 pictures: on the synthetic picture lineless_scene (lineless character · scene background) the model found almost no character, so the previous method's decision was used as it is (BER 0.500 → 0.118). The fall of mean BER 0.0135 → 0.0115 and the rise of the synthetic group 8.13 → 13.13× come entirely from this one picture. The other 184 equal 0.52, and the 95% interval largely overlaps 0.52's (7.13–20.43×). These 185 were not used to make the 0.53 rule.
 0.54 averages two models, so 154 of the 185 differ from 0.53 (BER improved 119 · worsened 35; the changed pictures are synthetic 42 · real 8 · posed synthetic 104). Mean BER 0.0115 → 0.0104, 13.37 → 14.80× version 0.1, higher than 0.53. On the 8 real pictures, character kept 96.4 → 97.0% · background found 78.3 → 77.3% (3.96 → 3.88×); synthetic group 13.13 → 24.77×, posed synthetic group 33.16 → 29.04×. These values were re-measured for 0.55 with the released app as it is (probabilities weighted 0.6 · 0.4); the values written at the 0.54 release (15.06×, 155 changed) came from a measurement bench that mixed the two probabilities with equal weights (0.5 · 0.5) (0.55 correction in 12). The 185 were not used to train the 0.54 model or to choose its rule.
 0.55 swaps the fine-tuned copy for the effect-trained copy and averages the two probabilities with equal weights, so 140 of the 185 differ from 0.54 (BER improved 68 · worsened 72; the changed pictures are synthetic 37 · real 8 · posed synthetic 95). Mean BER 0.0104 → 0.0088, 14.80 → 17.52× version 0.1, higher than 0.54. On the 8 real pictures, character kept 97.0 → 96.4% · background found 77.3 → 78.9% (3.88 → 4.06×); synthetic group 24.77 → 55.71×, posed synthetic group 29.04 → 33.24×. The picture that changed most is lineless_scene (BER 0.1175 → 0.0165). The 185 were not used to train the 0.55 model or to choose it.
+0.56 leaves the 'Background' layer unchanged and adds a 'Background fill' layer above it, so the background maps of all 185 are byte-identical to 0.55 (confirmed by re-running the same app code; 17.52× unchanged).
 
-### 11.15 Blind test (0.1 · 0.53 · 0.54 · 0.55)
+### 11.15 Blind test (0.1 · 0.54 · 0.55 · 0.56)
 
 To compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), then the key was opened.
@@ -2597,11 +2610,11 @@ For each picture, only the distinct results were collected (versions with identi
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
 | 0.1 | **31.7%** (19/60, 21.3–44.2) | 26.7% | 6.7% | 61.7% | 10/30 · 9/30 |
-| 0.53 | **81.7%** (49/60, 70.1–89.4) | 71.7% | 13.3% | 5.0% | 23/30 · 26/30 |
 | 0.54 | **85.0%** (51/60, 73.9–91.9) | 80.0% | 11.7% | 3.3% | 24/30 · 27/30 |
-| **0.55** | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| 0.55 | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| **0.56** | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
 
-For 0.55 the earlier grades were not reused: the four versions 0.1 · 0.53 · 0.54 · 0.55 were graded again from scratch, together. Each version was run with its own app code and default settings (cutout model on); 0.54 was re-run with the released app's weighted average (0.6 · 0.4) (the blind test at the 0.54 release used a measurement bench that mixed the two probabilities with equal weights; 0.55 correction in 12). Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.55 differs from 0.54 on 58 pictures (panel counts: 2 panels 2 · 3 panels 1 · 4 panels 57 pictures).
+0.56 leaves the 'Background' layer unchanged, so the background maps of the 60 pictures are byte-identical to 0.55 (confirmed by re-running the same app code); they share a panel, and the grades given at 0.55 are reused (as for 0.39 = 0.38; the background fill layer is not part of the background map). For 0.55 the earlier grades were not reused: the four versions 0.1 · 0.53 · 0.54 · 0.55 were graded again from scratch, together (0.53: 86.7 → 81.7%). Each version was run with its own app code and default settings (cutout model on); 0.54 was re-run with the released app's weighted average (0.6 · 0.4) (the blind test at the 0.54 release used a measurement bench that mixed the two probabilities with equal weights; 0.55 correction in 12). Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.55 differs from 0.54 on 58 pictures (panel counts: 2 panels 2 · 3 panels 1 · 4 panels 57 pictures).
 As same-picture pairs, 0.54 → 0.55 gained 1 · lost 0 in "no major loss" ($`p = 1.00`$), grade up 2 · down 6. 0.53 → 0.55 gained 3 · lost 0 ($`p = 0.25`$), 0.1 → 0.55 gained 35 · lost 2 ($`p = 1.0 \times 10^{-8}`$), and 0.53 → 0.54 gained 3 · lost 1 ($`p = 0.62`$).
 The rates differ from the grading done together at 0.54 (0.1 26.7% · 0.52 83.3% · 0.53 86.7% · 0.54 86.7%) because the graders changed and because the 0.54 maps changed. Graders differ slightly in what they count as characters (held objects · animals · figures in the background), so the size of the rates moves with the graders.
 Read this as the difference between versions graded together by the same standard rather than as the size of the rates.
@@ -2610,12 +2623,12 @@ For panels that lost character (small pieces lost · major loss), graders also p
 
 | Version | Colored like background | Edge | Effect | Non-human | Tilted | Occluded | Other |
 |---|---|---|---|---|---|---|---|
-| 0.53 | 9 | 2 | 3 | 3 | 1 | 0 | 4 |
 | 0.54 | 9 | 1 | 2 | 3 | 2 | 0 | 1 |
 | 0.55 | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
+| 0.56 | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
 
-"Colored like background" is where character and background have similar colors, "Edge" a part cut off at the picture edge, "Effect" light · aura over the character, "Non-human" a body · wings · tail that is not human-shaped, "Tilted" a lying or tilted pose, and "Occluded" a character hidden by props. 0.55 is the version whose model was trained further to count effects as background, so the "Effect" column watches that goal.
-The table at the end of the 0.55 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+"Colored like background" is where character and background have similar colors, "Edge" a part cut off at the picture edge, "Effect" light · aura over the character, "Non-human" a body · wings · tail that is not human-shaped, "Tilted" a lying or tilted pose, and "Occluded" a character hidden by props. 0.55 is the version whose model was trained further to count effects as background, so the "Effect" column watches that goal. The 0.56 row is the same grading as 0.55.
+The table at the end of the 0.56 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
@@ -2635,11 +2648,69 @@ Of 165 multi-page Pixiv posts (tags such as background variant · transparent ba
 
 0.51 lowered BER on 12 of the 14 and raised it on 1. The one where it rose is a character that is not human-shaped (a Bulbasaur fan art); the character was not found at all. One picture has transparent pixels, so the cutout model was not used and the result equals 0.50. On the picture whose artist put aura flames on the character, the aura went to the background and character kept was 74%, but BER still fell because more background was found. Compared with 0.51, 0.52 lowered BER on 10 of the 14 and raised it on 2 (mean 0.0851 → 0.0778). These 14 were used to choose the 0.52 candidates, so the 0.52 value is not an out-of-sample estimate. Compared with 0.52, 0.53 lowered BER on 1 of the 14 (the Bulbasaur fan art, 0.500 → 0.106) and left the rest unchanged (mean 0.0778 → 0.0497). The 0.53 rule was made after seeing this picture, so this value is not out of sample either. Compared with 0.53, 0.54 lowered BER on 7 of the 14 and raised it on 4 (mean 0.0497 → 0.0456; character kept 97.6 → 99.2%, background found 92.5 → 91.7%; re-measured with the released app as it is — the 0.0471 written at the 0.54 release came from a bench that averaged the two probabilities with equal weights). The mixing weights · threshold of 0.54 were chosen on these 14 (0.54 in 12), so this value is not out of sample either. Compared with 0.54, 0.55 lowered BER on 7 of the 14, raised it on 4 and left 3 unchanged (mean 0.0456 → 0.0440; character kept 99.2 → 98.5%, background found 91.7 → 92.7%). 0.55's w was also gated and chosen on these 14, so it is not out of sample. These pictures were used only for development · verification and are not in the repository.
 
+### 11.17 Background fill (0.56)
+
+The background fill layer (3.5) was measured on the 177 synthetic pictures with ground truth and on 120 pixiv pictures without. For the 177 synthetic pictures (nm2 57 · posed 120) the same generators re-rendered the background without the character as ground truth (the posed pictures include the chair · desk, so pixels outside the character equal the original), and the MAE (0–255, mean over RGB) between the fill and the ground truth is measured inside the hole H that the fill layer covers (the character's area plus the band). The hole and the known background come from the ground-truth character map (independent of the app's background decision), so this measures the filling itself. The candidates are: leaving it white (what 0.55 did) · patches only (no network) · network only (the upsampled big-lama estimate with the seam membrane) · network + patches (the 0.56 default).
+
+| Background | Pictures | White | Patches only | Network only | Network + patches |
+|---|---|---|---|---|---|
+| Flat | 6 | 12.0 | 0.0 | 2.0 | **0.0** |
+| Gradient | 6 | 22.7 | 0.4 | 2.4 | **1.1** |
+| Dark flat | 6 | 223.0 | 0.0 | 0.8 | **0.0** |
+| Stripes | 6 | 29.2 | 2.0 | 6.7 | **0.4** |
+| Bokeh | 6 | 167.7 | 9.2 | 9.8 | **9.0** |
+| Line-drawn scene | 6 | 66.0 | 18.3 | 6.0 | **2.9** |
+| Lineless scene | 2 | 44.0 | 8.4 | 3.5 | **1.5** |
+| With glow | 5 | 98.8 | 12.3 | 76.7 | **38.2** |
+| Several characters | 2 | 17.5 | 0.3 | 1.2 | **0.2** |
+| Face variants | 11 | 12.0 | 0.0 | 2.9 | **0.1** |
+| Trace | 1 | 12.0 | 0.0 | 2.3 | **0.0** |
+| Posed synthetic | 120 | 91.8 | 3.7 | 4.0 | **1.9** |
+| All | 177 | 84.20 | 3.94 | 6.08 | **2.82** |
+
+For the 5 glow pictures this measurement treats the glow band as unknown (the app uses the base color under the glow as known), so the hole the network sees grows to character + glow band and its estimate goes far off: network only 76.7, network + patches 38.2, worse than patches only (12.3). When the network's estimate is wrong in a large hole the blend uses it; the gains on scenes, stripes and the posed pictures carry the mean.
+Seam: the MAE in the band within 8 px of the hole boundary is network + patches 1.96 · network only 3.99 · patches only 2.91 (white 85.6), and the "seam-step excess", the mean |fill − original| over boundary pairs (a hole pixel and the known pixel next to it) minus the same value in the ground truth (0.53), is 0.41 · 0.90 · 1.20. The membrane cuts the step excess a lot when only the network is used (12 development pictures: 0.85 → 0.26) and changes almost nothing for network + patches, whose patch votes already match the boundary.
+Time (node, working at a long side of ≤ 1024; the 120 pictures were run with four benches in parallel, so these are above an idle machine): on the 120 pixiv pictures the medians are network 31.3 s (maximum 109.9 s) plus texture · seam 8.2 s (maximum 22.6 s), patches only 3.7 s; on an idle machine the 4 same-condition pictures took 22–24 s for the network plus 3–14 s for texture and seam. The fill step alone in the browser (worker) took 23.4 s at 800×800 · 28.5 s at 1600×2000 · 24.6 s at 2048×2048, and preparing the model the first time 2 s (the published file is the source as it is; from 0.56 it is not obfuscated).
+
+**Naturalness grading (120 pixiv pictures)**: on real pictures without ground truth, the three candidates were produced with the 0.56 app code as it is (the fixed 60 plus 60 newly sampled from the approved lists with seed 20261019); for each picture the original and the three results (random letters) were put on one sheet, and eight graders, 15 pictures each, scored "does it look natural, like a background that never had the character?" from 0 to 100 without knowing the methods (told to look at the seam, at broken structure, and at anything invented).
+
+| Method | Mean | Bootstrap 95% | SD | Median | ≥ 70 | ≤ 40 |
+|---|---|---|---|---|---|---|
+| **network + patches (0.56)** | 59.2 | 56.1–62.3 | 17.5 | 58 | 27% | 15% |
+| network only | 60.2 | 57.4–63.1 | 15.8 | 60 | 29% | 12% |
+| patches only | 44.7 | 40.3–49.3 | 25.3 | 36 | 23% | 55% |
+
+Same-picture pairs: network + patches − patches only +14.5 (95% +10.2 to +18.7, wins 82 : 31, ties 7, sign test p = 1.7e-06); network + patches − network only -1.0 (-3.3 to +1.2, 39 : 52, p = 0.21); network only − patches only +15.5 (+10.3 to +20.4, 81 : 34, p = 1.4e-05). Means per grader (network + patches · network only · patches only): grader 1 62.3 · 61.8 · 46.2 · grader 2 50.6 · 51.0 · 47.3 · grader 3 65.6 · 67.3 · 35.9 · grader 4 64.2 · 62.7 · 44.3 · grader 5 60.3 · 63.8 · 42.3 · grader 6 51.5 · 55.6 · 37.5 · grader 7 65.3 · 62.5 · 55.1 · grader 8 53.7 · 57.0 · 49.1.
+Both network candidates are clearly above patches only (for all eight graders), and network + patches is indistinguishable from network only. The sheets show four pictures reduced to a long side of 480 px, so the full-resolution texture that the patch stage adds is barely visible; structure, seams and blotches are. The default is network + patches because of its much lower error on the synthetic ground truth (hole MAE 2.82 vs 6.08). A mean of 59.2 lies in the "silhouette, blur or seam visible but not very distracting" range (50–69), the limit of filling a large hole (the character covers about half the picture) from a 512-px estimate (10.2).
+
+---
+
 ## 12. Release history
 
 Newest versions are at the top.
 
 **Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
+### 0.56 (2026-10-20) A 'Background fill' layer that estimates the background behind the character with an inpainting network (big-lama) and patch matching, placed directly above the 'Background' layer (the background layer itself unchanged)
+
+- Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version, 11)
+- Result: the 'Background' (kind bg) layer is unchanged, and the background maps of the 185 ground-truth pictures and the 60 blind-test pictures, re-run with the same app code, are byte-identical to 0.55, so the resolving power and the blind test keep 0.55's values (table below).
+- Change: instead of leaving the character's area transparent, a 'Background fill' layer (`배경 메꿈`) estimated for it is placed directly above the 'Background' layer inside the 'Background' group (below glows and background FX) (3.5; formulas in docs 4-2). The hole is dilated by 1/160 of the long side (3–12 px) to drop the outline and blended edge → reduced to a long side of 512 and fed to the bundled inpainting network big-lama (Fourier convolutions, 50.9 M weights in fp16, trained on scene photos, Apache-2.0), which continues broken structure (window frames, floors, trees, patterns) → 7×7 patch matching at full resolution for the original texture (patches where a good match exists, the network estimate elsewhere) → seam membrane (a harmonic membrane with the difference between the fill's prediction and the actual pixels on the ring around the hole as boundary values, the formulation of Poisson seamless cloning). At this stage the character is already gone, so only the background has to be continued; hence a background-only model, patches only from the remaining background, and the spare computation spent on the seam. Setting "Fill the background behind the character": network + patches (default) · patches only (no network, 1–5 s, the pyramid patch method developed first for 0.56) · off (same as 0.55). In the PSD the layer is '배경 메꿈' (ASCII name Background fill).
+- Fill quality (11.17): on the 177 synthetic pictures with the background re-rendered as ground truth, the color difference inside the hole (MAE, 0–255) is white 84.20 → patches only 3.94 → network only 6.08 → network + patches 2.82 (flat 0.0 · gradient 1.1 · stripes 0.4 · bokeh 9.0 · scene 2.9 · posed synthetic 1.9; patches only 0.0 · 0.4 · 2.0 · 9.2 · 18.3 · 3.7). Seam band (8 px) MAE 1.96 · 3.99 · 2.91, seam-step excess 0.41 · 0.90 · 1.20.
+- Naturalness grading (11.17): the three candidates were run on 120 unseen pixiv pictures (the fixed 60 + 60 new) and eight graders, 15 pictures each, scored "natural, like a background that never had the character" from 0 to 100: network + patches 59.2 (95% 56.1–62.3) · network only 60.2 (57.4–63.1) · patches only 44.7 (40.3–49.3); same-picture pairs network + patches − patches only +14.5 (wins 82 : 31, sign test p = 1.7e-06) · − network only -1.0 (39 : 52, p = 0.21).
+- The weights are stored as fp16 (102 MB; at most 0.007–0.03 from fp32) because 8-bit quantization flipped the colors of flat backgrounds (up to 0.6–0.8 error from a 1% weight perturbation). From 0.56 the published files (app · help) are the source as it is, not obfuscated.
+- Processing time · size: on an idle machine the fill adds, per picture, 22–24 s for the network plus 3–14 s for texture and seam (4 same-condition pictures; patches only median 3.7 s), and in the browser worker 23.4 s at 800×800 · 28.5 s at 1600×2000 · 24.6 s at 2048×2048, with 2 s to prepare the model the first time. On 4 pictures (2 real · picture 39 · 1 posed synthetic) run one after another under the same conditions, the time per picture is 1.53× version 0.55 (patches only 1.05×, median). The app file is about 78 MB and the two weight files (illustracy-fill-1.js · illustracy-fill-2.js) about 127 MB together.
+
+| | Version 0.1 | Version 0.54 | Version 0.55 | Version 0.56 |
+|---|---|---|---|---|
+| Resolving power | 100% | 1480% | 1752% | 1752% |
+| Resolving power 95% CI | — | 1009–2470% | 1187–2998% | 1187–2998% |
+| Resolving power 80% CI | — | 1146–2045% | 1352–2434% | 1352–2434% |
+| Blind test (no major loss) | 31.7% | 85.0% | 86.7% | 86.7% |
+| Blind test 95% CI | 21.3–44.2% | 73.9–91.9% | 75.8–93.1% | 75.8–93.1% |
+| Blind test 80% CI | 24.5–39.8% | 78.2–90.0% | 80.1–91.3% | 80.1–91.3% |
+
+Resolving power is relative to version 0.1 (= 100%); its intervals come from a <mark>bootstrap</mark> resampling the same pictures in pairs (10,000 draws, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (version 0.1 is the reference, so it has no interval). The blind test is the share of pictures graded "no major loss" when the versions' results on 60 pixiv pictures were mixed and graded without knowing the version; the intervals are <mark>Wilson intervals</mark> (z = 1.96 · 1.2816). 0.56 keeps 0.55's values because its background layer is byte-identical to 0.55's (the grading done together for 0.1 · 0.53 · 0.54 · 0.55 at the 0.55 release), and 0.54 is the released app re-run as it is.
 
 ### 0.55 (2026-10-19) Character decided from the average (0.5 · 0.5) of the cutout model and a copy further trained to count effects (glow · particles · light rays) as background, with threshold 0.55
 
