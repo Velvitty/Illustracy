@@ -6,7 +6,7 @@
 
 ## 4.5 Background
 
-### Cutout model (0.51 – 0.54, default)
+### Cutout model (0.51 – 0.55, default)
 
 When the "Cutout model" setting is on and the picture has no transparent pixels, this decides the character instead of the background steps below. The picture $`I`$ (processing resolution $`W \times H`$) is shrunk to a long side of 1024 px and placed in the middle of a 1024×1024 frame (the rest 0), and the sigmoid output of the network $`f_\theta`$ is brought back to the original size the same way. Shrinking and enlarging use pixel-center-aligned <mark>bilinear</mark> interpolation (edge pixels repeated).
 
@@ -53,6 +53,16 @@ m(p) = 0.6\,p_0(p) + 0.4\,p_1(p),\qquad p \text{ is character} \iff m(p) + 0.4\,
 In the app the fine-tuned copy's 8-bit values are stored as the difference from the original 8-bit values (modulo 256, same scales), and the two models are run one after the other.
 
 **Notes** — **Why**: the two remaining causes of loss in 0.53 (a boundary colored like the background · a body cut off at the edge) are places where the model is confidently wrong with a low probability, which thresholds · filling · cohesion could not fix (README 7.5). So the model itself was trained further. **Principle**: the fine-tuned copy alone keeps more character (character kept 97.6 → 99.4% on the 14 artist-made cutouts) but takes aura · flame effects and background attached to the character as character, raising the mean BER (background found 92.5 → 89.3%); the original model is confident that such places are background, so averaging the two softens each one's confident errors. These mixing weights and threshold were chosen after seeing the fine-tuned copy's results, from 34 rule candidates and 1,089 weight · threshold combinations written down first and scored on the 14 artist-made cutouts · synthetic set B (post-hoc selection), so the value on the 14 pairs is not out of sample (README 12, 0.54).
+
+**Averaging with the effect-trained copy (0.55)**: in place of 0.54's fine-tuned copy, a copy trained further to count effects (glow · particles · light rays · aura) as background is run, and the two probabilities are averaged with equal weights.
+
+```math
+m(p) = 0.5\,p_0(p) + 0.5\,p_1(p),\qquad p \text{ is character} \iff m(p) + 0.4\,\bigl(c(p) - \tfrac12\bigr) \ge 0.55
+```
+
+The training data are synthetic set A 290 (pixel ground truth) · 300 effect composites (generated on the fly during training, effect pixels as background ground truth) · 292 pixiv development pictures (soft targets); the copy is the uniform mean of the six epochs trained from the 0.54 copy at learning rate 5e-6. The app stores it quantized with the original 8-bit scales as the difference from the original values (0.0175% of weights clipped).
+
+**Explanation** — **Why**: 0.54's fine-tuned copy leans toward taking effects and background attached to the character as character, so the aim was to swap in a copy that counts effects as background and return to a single model. **Principle**: the effect-trained copy alone improves the effect composites (rceB) from 0.54's 0.0383 to 0.0179 and synthetic set B from 0.0200 to 0.0117, but on the region ground truth of the 176 pixiv development pictures it takes background objects such as bowls · props as character and fails with ΔW -0.131 (character regions +0.001 · background regions -0.133). In the 0.54 mix a pixel cannot become character when the original model is confident it is background (a veto), which filters such objects, so only the fine-tuned copy was swapped for the effect-trained one and the weight w ∈ {0.4, 0.5, 0.6} was examined with the same gates. The rule's pick w 0.6 flipped the picture-count condition on the 176 when re-scored with the 8 bits the app ships, so it was stopped; after seeing results w 0.5 was registered and passed all four gates under both quantizations (0.55 in README 12).
 
 ### Find at reduced size (setting, off by default)
 
