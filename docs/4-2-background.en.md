@@ -588,6 +588,46 @@ and the background-effect layer gets (excluding outer glow places), when $`U_c >
 
 **Note** — **Why**: Separating small light or sparkle effects over the background into their own screen layer keeps the effects when the background is edited. **How it works**: Screen compositing is $`1 - (1 - a)(1 - b)`$, so solving for the 𝑆 that gives 𝑈 when screened over base yields $`S = 1 - (1 - U)/(1 - \mathrm{base})`$. Setting $`\mathrm{base} = \min(U, U^{bg})`$ keeps 𝑆 non-negative. Division is unstable as base nears 1, so only base below 0.9999 is used, and only pixels brighter by more than 1.2/255 to skip 8-bit noise. $`U^{bg}`$ is inpainted from the surrounding background. **References**: [R3 ISO 32000-1 2008](../README.en.md#r3) · [R20 Telea 2004](../README.en.md#r20)
 
+### Background fill (0.56)
+
+A 'Background fill' layer that estimates the character's area with an inpainting network and patch matching is placed directly above the 'Background' layer (3.5). The background layer itself is unchanged.
+
+**Hole and known region**: the hole $`H`$ is the character's area (opaque non-background pixels) dilated by $`r`$ pixels, and the known region $`K`$ is the fully opaque background pixels outside $`H`$ (under a glow, the base color beneath it).
+
+```math
+r = \operatorname{clamp}\bigl(\lfloor L/160 \rceil,\ 3,\ 12\bigr),\qquad L = \text{long side}
+```
+
+**Network estimate**: the picture with the hole blanked, $`I\,(1 - M)`$, and the mask $`M`$ are reduced by $`s = \min(1, 512/L)`$ (averaging known pixels only; a cell with a known fraction below 0.8 becomes hole 1), placed on a 512×512 canvas with reflection padding and fed to big-lama (FFC ResNet: 18 Fourier-convolution ResNet blocks, Suvorov et al. 2022; weights embedded as fp16, run as fp32). The output, cropped and upsampled bicubically, is the initial estimate $`G`$.
+
+```math
+x = \operatorname{down}_s\bigl(I\,(1 - M)\bigr),\qquad m = \operatorname{down}_s M,\qquad G = \operatorname{up}\bigl(\mathrm{LaMa}(x, m)\bigr)
+```
+
+**Original texture (PatchMatch)**: at full resolution (long side ≤ 1024) hole pixels start at $`G`$, and every hole pixel $`p`$ gets a match $`f(p) \in K`$ in the known region minimizing the 7×7 patch distance (propagation, a neighbor's match shifted by one pixel, and random search with a radius halving from 32, three sweeps, then once more after the vote). The color of a hole pixel is the distance-weighted mean (vote $`P`$) of all matched patches covering it, and $`P`$ and $`G`$ are mixed by the match distance.
+
+```math
+D(p, q) = \sum_{\delta \in [-3,3]^2} \lVert I(p+\delta) - I(q+\delta) \rVert^2,\qquad
+P(p) = \frac{\sum_{q:\,p \in N(q)} w_q\, I\bigl(f(q) + (p - q)\bigr)}{\sum_{q} w_q},\qquad w_q = \exp\!\Bigl(-\frac{D_q}{2\,\operatorname{med} D}\Bigr),\qquad I(p) = w_p\,P(p) + (1 - w_p)\,G(p),\qquad w_p = \exp\!\Bigl(-\frac{\max(0, D_p - \tau_0)}{2\max(\operatorname{med} D, \tau_1)}\Bigr)
+```
+
+$`\tau_0`$ · $`\tau_1`$ are the distances of an RMS of 0.02 · 0.05 per channel ($`7^2 \cdot 3 \cdot \mathrm{RMS}^2`$): a match at noise level counts as perfect, and above it the weight decays against the larger of the median and $`\tau_1`$ (with the median alone, on a flat background a distance at noise level would count as a bad match and the network's gray noise would remain).
+
+**Seam membrane**: on the ring $`R`$ of known pixels 4-adjacent to the hole, the difference $`b(q)`$ between what the fill predicts there (the ring vote $`P(q)`$ mixed with $`G(q)`$ by the mean weight $`\bar{w}_q`$ of the adjacent hole pixels) and the actual value $`I(q)`$ is the boundary value of a harmonic membrane $`h`$ inside the hole, solved by multigrid (2×2 averaging down to 16 px, 400 Gauss–Seidel sweeps there, 24 per level on the way up) and added to the fill. This is Poisson seamless cloning (Pérez et al. 2003) with the fill's own gradient as guidance.
+
+```math
+b(q) = I(q) - \bigl(\bar{w}_q\,P(q) + (1 - \bar{w}_q)\,G(q)\bigr),\qquad \Delta h = 0\ \text{on}\ H,\quad h = b\ \text{on}\ R,\qquad I \leftarrow \operatorname{clip}(I + h)
+```
+
+**Patches only (no network)**: a pyramid of half-size levels $`I_0 \supset I_1 \supset \cdots \supset I_n`$ (a pixel of $`I_{l+1}`$ is the mean of its known children of four and a hole if fewer than half are known; it stops at a short side ≤ 24) is filled at the coarsest level by Laplace diffusion (Gauss–Seidel ≤ 2000 sweeps); each level inherits the matches of the level above at twice the scale and runs patch matching (coarsest 4 votes · 6 searches, middle 2 · 3, finest 1 · 2, the last vote taking the center pixel of the matched patch); then the regularity $`\rho = e_{80} / c_{80}`$ (at the level with a long side ≤ 320, 1,500 known 11×11 patches matched to other known patches more than 6 px away; $`e`$ the RMS error of the best match and $`c`$ the standard deviation inside the patch, both at the 80th percentile) and $`w_{\mathrm{reg}} = \operatorname{clamp}\bigl((0.7 - \rho) / 0.35,\ 0,\ 1\bigr)`$ mix the results of the two neighboring levels (coarse ones upsampled) with triangular weights by the distance $`d`$ of each hole pixel to the boundary.
+
+```math
+s(p) = \log_2\!\Bigl(\frac{\max(d(p), r_0)}{r_0}\Bigr)\,(1 - w_{\mathrm{reg}}),\qquad r_0 = \max(6,\ L/60),\qquad
+I(p) = \sum_{l} \max\bigl(0,\ 1 - \lvert s(p) - l \rvert\bigr)\, \uparrow\! I_l(p)
+```
+
+**Explanation** — **why**: with patches alone, propagation does not reach deep into the hole, so wrong pieces or smears appear and broken structure such as window frames and trees is never reconnected. The network sees the whole picture and reconnects structure, but it runs at 512 px so its texture is blurry. Hence structure from the network, texture from original patches, and the seam from the membrane. **Principle**: a Fourier convolution sees the periods and structure of the whole picture in the frequency domain within one layer, so it continues distant patterns across the hole, and a harmonic membrane spreads the boundary values inward as smoothly as possible without adding high frequencies (texture, lines). On the 177 synthetic pictures the MAE inside the hole is white 84.20 · patches only 3.94 · network only 6.08 · network + patches 2.82, the seam-band MAE 2.91 · 3.99 · 1.96, and the seam-step excess 1.20 · 0.90 · 0.41 (11.17); the naturalness grading of 120 pixiv pictures (0–100) is 44.7 · 60.2 · 59.2. **References**: Suvorov et al. 2022 (LaMa, WACV), Barnes et al. 2009 (PatchMatch), Pérez et al. 2003 (Poisson image editing).
+
 ### Removing lines in the background
 
 For each line-connected piece:
