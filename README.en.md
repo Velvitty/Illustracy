@@ -11,11 +11,12 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **17.52× version 0.1** (0.59h, 95% CI 11.87–29.98×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 real pictures alone it is 4.06× version 0.1. 140 of the 185 differ from 0.54 (14.80×, re-measured with the released app as it is — see the 0.55 correction in 12): improved 68 · worsened 72. 0.56 · 0.57 · 0.58 · 0.59e · 0.59h leave the 'Background' layer unchanged, so the background maps of the 185 pictures are byte-identical to 0.55 and the value is the same, 11).
-- Rough skill: **247% of version 0.1** (0.59h = 0.59e, 95% CI 156–419%; on the fixed 60 pixiv pictures, AI graders ranked versions side by side by "which looks more like a rough an illustrator drew by hand", and the value is the odds of being picked over version 0.1, as a multiple. The highest version is 0.56 (367%); it went down with the G-pen tracing of 0.57 · 0.58 and back up at 0.59e. All versions in [11.20](#1120-rough-skill-by-version))
+- Resolving power: **17.52× version 0.1** (0.59i, 95% CI 11.87–29.98×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 real pictures alone it is 4.06× version 0.1. 140 of the 185 differ from 0.54 (14.80×, re-measured with the released app as it is — see the 0.55 correction in 12): improved 68 · worsened 72. 0.56 · 0.57 · 0.58 · 0.59e · 0.59h · 0.59i leave the 'Background' layer unchanged, so the background maps of the 185 pictures are byte-identical to 0.55 and the value is the same, 11).
+- Rough skill: **247% of version 0.1** (0.59i = 0.59e, 95% CI 156–419%; on the fixed 60 pixiv pictures, AI graders ranked versions side by side by "which looks more like a rough an illustrator drew by hand", and the value is the odds of being picked over version 0.1, as a multiple. The highest version is 0.56 (367%); it went down with the G-pen tracing of 0.57 · 0.58 and back up at 0.59e. All versions in [11.20](#1120-rough-skill-by-version))
 - Cutout model (0.51, on by default): an anime-character segmentation network (ISNet, skytnt/anime-seg, Apache-2.0) reduced to 8 bits and built into the app file. It picks out the whole character and puts the rest on the background layer (3.5). From 0.52 the character probability it gives is added to the decision of the previous method (background detection + neural-network assist), from 0.53 pictures where the model finds almost no character use the previous method's decision as it is, and from 0.54 a copy of the same network fine-tuned on synthetic · pixiv pictures is run as well, a weighted average of the two probabilities is used as the model probability and the threshold is raised slightly; 0.55 uses a copy further trained to count effects (glow · particles · light rays) as background and averages the two probabilities with equal weights.
 - Background fill (0.56, default "network + patches"): a 'Background fill' layer that estimates the background behind the character with the bundled inpainting network big-lama (reconnects broken structure), patch matching (original texture) and a seam membrane, placed directly above the 'Background' layer (3.5). The difference from the synthetic ground truth (MAE) is scene 2.9 · bokeh 9.0 · stripes 0.4 (patches only 18.3 · 9.2 · 2.0; left white 66.0 · 167.7 · 29.2), and the naturalness grading of 120 unseen pixiv pictures (8 graders, 0–100) is 59.2 (patches only 44.7). The meaning of hidden objects cannot be invented (10.2 · 11.17). The fp16 weights (102 MB) are embedded, so the app file is about 205 MB, and because of GitHub's 100 MiB file limit the repository holds it as a split archive (section 1).
 - Rough 2 traced with a G-pen, with pen pressure (0.57–0.59e): rough 2 picks only the parts of the line art clearly darker than their surroundings (leaving out areas that are broadly dark from fill · shading · texture) and traces each once with a G-pen matched to the picture's own pen width (0.57 · 0.58). From 0.59 each stroke gets a pressure curve that varies its width · darkness, important lines are drawn darker and weak lines lighter, and part of long strokes is drawn over once more. 0.59e draws the eyes · mouth inside a face area straight from the line art as single strokes. Rough 1 is drawn with pencil grain. 15 AI graders given the role of experts compared the same 138 pictures blind: "more like a rough drawn by a person" 0.59e 100 · 0.56 33 · tie 5 ($`p = 5.0 \times 10^{-9}`$), and judged on its own as a rough drawn by a person 54 → 83 (11.19). 0.58 alone lost to 0.56 (65 : 153 on 240 pictures, 11.18). From 0.59e versions are named like `0.59e;4_5[20]` (12).
+- Sample image (0.59i;0_1[20]): **Sample image** (`예제 그림`) opens one of 10 pictures bundled in the app (pixiv works tagged AI-generated; sources in [the 0.59i entry of section 12](#059i0_120-2026-10-20-sample-image-one-of-10-bundled-pictures-at-random)) at random, never the same one twice in a row.
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -78,9 +79,9 @@ If the program finds a face in the picture (also in PNGs with a transparent back
 
 ### How to use it
 
-1. Download [`illustracy-0.59h.zip.001`](illustracy-0.59h.zip.001) and [`illustracy-0.59h.zip.002`](illustracy-0.59h.zip.002) into the same folder and extract them: open `.001` in 7-Zip (it shows `illustracy-0.59h.zip` inside; extract that), or join the parts first (Windows command prompt `copy /b illustracy-0.59h.zip.001 + illustracy-0.59h.zip.002 illustracy-0.59h.zip`, macOS · Linux `cat illustracy-0.59h.zip.* > illustracy-0.59h.zip`) and unzip. You get `illustracy.html` (the app, about 196 MB) and `illustracy-help.html` (the help); keep both in the same folder and open `illustracy.html` in a browser. It is split because of GitHub's 100 MiB file limit.
+1. Download [`illustracy-0.59i.zip.001`](illustracy-0.59i.zip.001) and [`illustracy-0.59i.zip.002`](illustracy-0.59i.zip.002) into the same folder and extract them: open `.001` in 7-Zip (it shows `illustracy-0.59i.zip` inside; extract that), or join the parts first (Windows command prompt `copy /b illustracy-0.59i.zip.001 + illustracy-0.59i.zip.002 illustracy-0.59i.zip`, macOS · Linux `cat illustracy-0.59i.zip.* > illustracy-0.59i.zip`) and unzip. You get `illustracy.html` (the app, about 223 MB) and `illustracy-help.html` (the help); keep both in the same folder and open `illustracy.html` in a browser. It is split because of GitHub's 100 MiB file limit.
 2. Drag an image onto the window, click the box at the top left to choose one, or paste a copied image with `Ctrl+V`.
-   To try it first, click **Sample image** (`예제 그림`).
+   To try it first, click **Sample image** (`예제 그림`). It opens one of 10 pictures bundled in the app at random (never the same one twice in a row).
 3. Wait a few seconds and the layer list appears on the right.
    - Circle button: turn that layer on or off
    - Click a layer name: change the blend mode and opacity, save only that layer as an image file
@@ -608,7 +609,7 @@ The program contains the following.
 | `PSD.rename()` | fixing layer names of PSDs saved by older versions (4.15) |
 | Compositor | preview, difference view, PNG save, PSD merged image |
 | Correction tools | send to background, return to character, loop, undo stack |
-| Sample picture | a cel-shaded picture drawn directly on a canvas |
+| Sample picture | one of 10 pictures bundled in the app (pixiv works tagged AI-generated; sources in the 0.59i entry of section 12), chosen at random (never the same one twice in a row). Up to 0.59h, a cel-shaded picture drawn directly on a canvas |
 | Help | a page on usage · principles · formulas · validation (`illustracy-help.html`). From 0.59h it is no longer inside the app file but sits next to it; the help button in the header checks that the file exists and opens it in a new window (if not, it says so and stops); the help's own button closes that window and returns to the app (a help page opened on its own opens `illustracy.html`) |
 
 ### 6.2 Data flow
@@ -1195,7 +1196,7 @@ In this section:
 - [11.12 Returning islands in the scene background (0.38)](#1112-returning-islands-in-the-scene-background-038)
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
-- [11.15 Blind test (0.1 · 0.58 · 0.59e · 0.59h)](#1115-blind-test-01--058--059e--059h)
+- [11.15 Blind test (0.1 · 0.59e · 0.59h · 0.59i)](#1115-blind-test-01--059e--059h--059i)
 - [11.16 14 artist-made cutouts (0.51)](#1116-14-artist-made-cutouts-051)
 - [11.17 Background fill (0.56)](#1117-background-fill-056)
 - [11.18 Rough 2 traced with a G-pen (0.57 · 0.58)](#1118-rough-2-traced-with-a-g-pen-057--058)
@@ -2604,13 +2605,14 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.58 | Rough 2's thick lines (eye rims · lashes) drawn as one center line with two window sizes (background layer unchanged, so all 185 are byte-identical to 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 | 0.59e | Rough 2 gets a pressure curve · darkness from line importance · overstrokes, and traces eye · mouth boxes (background layer unchanged, so all 185 are byte-identical to 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 | 0.59h | The help is taken out of the app file and the help button opens the help file in the same folder (core · models byte-identical to 0.59e, so all 185 equal 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
+| 0.59i | The sample button opens one of 10 pictures bundled in the app at random (core · models byte-identical to 0.59h, so all 185 equal 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 
 ```mermaid
 xychart-beta
     title "Resolving power by version (0.1 = 100%)"
-    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51", "0.52", "0.53", "0.54", "0.55", "0.56", "0.57", "0.58", "0.59e", "0.59h"]
+    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51", "0.52", "0.53", "0.54", "0.55", "0.56", "0.57", "0.58", "0.59e", "0.59h", "0.59i"]
     y-axis "Resolving power (%)" 0 --> 1800
-    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051, 1133, 1337, 1480, 1752, 1752, 1752, 1752, 1752, 1752]
+    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051, 1133, 1337, 1480, 1752, 1752, 1752, 1752, 1752, 1752, 1752]
 ```
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
@@ -2635,7 +2637,7 @@ the 177 synthetic · posed pictures have background maps byte-identical to 0.48 
 0.56 leaves the 'Background' layer unchanged and adds a 'Background fill' layer above it, so the background maps of all 185 are byte-identical to 0.55 (confirmed by re-running the same app code; 17.52× unchanged).
 0.57 · 0.58 · 0.59e change only the roughs, so the background maps of all 185 are byte-identical to 0.55 (confirmed by re-running 245 pictures with the 0.59e app code, and 122 of them with the 0.58 app code · 45 with the 0.57 app code too; 17.52× unchanged).
 
-### 11.15 Blind test (0.1 · 0.58 · 0.59e · 0.59h)
+### 11.15 Blind test (0.1 · 0.59e · 0.59h · 0.59i)
 
 To compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), then the key was opened.
@@ -2644,11 +2646,11 @@ For each picture, only the distinct results were collected (versions with identi
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
 | 0.1 | **31.7%** (19/60, 21.3–44.2) | 26.7% | 6.7% | 61.7% | 10/30 · 9/30 |
-| 0.58 | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
 | 0.59e | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
-| **0.59h** | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| 0.59h | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| **0.59i** | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
 
-0.56 · 0.57 · 0.58 · 0.59e · 0.59h leave the 'Background' layer unchanged, so the background maps of the 60 pictures are byte-identical to 0.55 (confirmed by re-running the 0.56 · 0.59e app code; 0.57 · 0.58 share all code outside the rough function with 0.59e, and 0.59h's core is byte-identical to 0.59e); they share a panel, and the grades given at 0.55 are reused (as for 0.39 = 0.38; the background fill layer and the roughs are not part of the background map). For 0.55 the earlier grades were not reused: the four versions 0.1 · 0.53 · 0.54 · 0.55 were graded again from scratch, together (0.53: 86.7 → 81.7%). Each version was run with its own app code and default settings (cutout model on); 0.54 was re-run with the released app's weighted average (0.6 · 0.4) (the blind test at the 0.54 release used a measurement bench that mixed the two probabilities with equal weights; 0.55 correction in 12). Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.55 differs from 0.54 on 58 pictures (panel counts: 2 panels 2 · 3 panels 1 · 4 panels 57 pictures).
+0.56 · 0.57 · 0.58 · 0.59e · 0.59h · 0.59i leave the 'Background' layer unchanged, so the background maps of the 60 pictures are byte-identical to 0.55 (confirmed by re-running the 0.56 · 0.59e app code; 0.57 · 0.58 share all code outside the rough function with 0.59e, and 0.59h's and 0.59i's cores are byte-identical to 0.59e); they share a panel, and the grades given at 0.55 are reused (as for 0.39 = 0.38; the background fill layer and the roughs are not part of the background map). For 0.55 the earlier grades were not reused: the four versions 0.1 · 0.53 · 0.54 · 0.55 were graded again from scratch, together (0.53: 86.7 → 81.7%). Each version was run with its own app code and default settings (cutout model on); 0.54 was re-run with the released app's weighted average (0.6 · 0.4) (the blind test at the 0.54 release used a measurement bench that mixed the two probabilities with equal weights; 0.55 correction in 12). Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.55 differs from 0.54 on 58 pictures (panel counts: 2 panels 2 · 3 panels 1 · 4 panels 57 pictures).
 As same-picture pairs, 0.54 → 0.55 gained 1 · lost 0 in "no major loss" ($`p = 1.00`$), grade up 2 · down 6. 0.53 → 0.55 gained 3 · lost 0 ($`p = 0.25`$), 0.1 → 0.55 gained 35 · lost 2 ($`p = 1.0 \times 10^{-8}`$), and 0.53 → 0.54 gained 3 · lost 1 ($`p = 0.62`$).
 The rates differ from the grading done together at 0.54 (0.1 26.7% · 0.52 83.3% · 0.53 86.7% · 0.54 86.7%) because the graders changed and because the 0.54 maps changed. Graders differ slightly in what they count as characters (held objects · animals · figures in the background), so the size of the rates moves with the graders.
 Read this as the difference between versions graded together by the same standard rather than as the size of the rates.
@@ -2657,12 +2659,12 @@ For panels that lost character (small pieces lost · major loss), graders also p
 
 | Version | Colored like background | Edge | Effect | Non-human | Tilted | Occluded | Other |
 |---|---|---|---|---|---|---|---|
-| 0.58 | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
 | 0.59e | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
 | 0.59h | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
+| 0.59i | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
 
 "Colored like background" is where character and background have similar colors, "Edge" a part cut off at the picture edge, "Effect" light · aura over the character, "Non-human" a body · wings · tail that is not human-shaped, "Tilted" a lying or tilted pose, and "Occluded" a character hidden by props. The 0.57 · 0.58 · 0.59e rows are the same grading as 0.55 (the 0.54 row is in the 0.55 entry of 12, the 0.56 row in the 0.58 entry).
-The table at the end of the 0.59h entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+The table at the end of the 0.59i entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
@@ -2929,7 +2931,8 @@ The tie weight is 𝜈 = 0.18. "Looks drawn by a person" is counted over the she
 | **0.57** | 0.57 | **174%** | 111–285% | 129–242% | graded |
 | **0.58** | 0.58 | **157%** | 97–265% | 113–222% | graded |
 | **0.59e** | 0.59e | **247%** | 156–419% | 184–351% | graded |
-| **0.59h** | 0.59e | **247%** | 156–419% | 184–351% | = 0.59e (core · models byte-identical, so the roughs are too) |
+| 0.59h | 0.59e | **247%** | 156–419% | 184–351% | = 0.59e (core · models byte-identical, so the roughs are too) |
+| **0.59i** | 0.59e | **247%** | 156–419% | 184–351% | = 0.59h (core · models byte-identical, so the roughs are too) |
 
 ---
 
@@ -2938,6 +2941,31 @@ The tie weight is 𝜈 = 0.18. "Looks drawn by a person" is counted over the she
 Newest versions are at the top.
 
 **Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
+### 0.59i;0_1[20] (2026-10-20) Sample image: one of 10 bundled pictures at random
+
+- Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version, 11)
+- Rough skill: 247% of version 0.1 (95% CI 156–419% · rough same as the previous version, 11.20)
+- **Sample image**: at the user's request, **Sample image** (`예제 그림`) now opens one of 10 pictures bundled in the app at random instead of the picture drawn in code (never the same one twice in a row).
+  The pictures are embedded as base64 without changing the original files (about 22 MB; the app grows from about 196 MB to 223 MB) and are split like any loaded picture at the default processing size (long side 2048 px). The picture drawn in code is no longer used and was removed.
+  Checked in Chromium: all 10 decode, 30 clicks never repeat the previous picture (9 of the 10 appeared in 30 clicks), and one of them (144221130, processed at 1170×2048) splits completely into 49 layers (composite PSNR 57.8 dB).
+- Sample image sources: 10 pixiv works chosen by the user (tagged AI-generated) — [150730595](https://www.pixiv.net/artworks/150730595) · [150847462](https://www.pixiv.net/artworks/150847462) · [150881490](https://www.pixiv.net/artworks/150881490) · [150988710](https://www.pixiv.net/artworks/150988710) · [150999564](https://www.pixiv.net/artworks/150999564) · [151001952](https://www.pixiv.net/artworks/151001952) · [144221130](https://www.pixiv.net/artworks/144221130) · [149272285](https://www.pixiv.net/artworks/149272285) · [150456139](https://www.pixiv.net/artworks/150456139) · [150706121](https://www.pixiv.net/artworks/150706121).
+- The core (separation · rough code) and the 10 neural-network blocks are byte-identical to 0.59h (hash check), so background maps · roughs · resolving power · blind test · rough skill are those of 0.59h.
+- Version name: added 0, updated · fixed 1 (sample image), build 20 (core settings same as 0.59h, so no new build). The minor letter i is the ninth candidate of 0.59.
+
+| | Version 0.1 | Version 0.59e | Version 0.59h | Version 0.59i |
+|---|---|---|---|---|
+| Resolving power | 100% | 1752% | 1752% | 1752% |
+| Resolving power 95% CI | — | 1187–2998% | 1187–2998% | 1187–2998% |
+| Resolving power 80% CI | — | 1352–2434% | 1352–2434% | 1352–2434% |
+| Blind test (no major loss) | 31.7% | 86.7% | 86.7% | 86.7% |
+| Blind test 95% CI | 21.3–44.2% | 75.8–93.1% | 75.8–93.1% | 75.8–93.1% |
+| Blind test 80% CI | 24.5–39.8% | 80.1–91.3% | 80.1–91.3% | 80.1–91.3% |
+| Rough skill | 100% | 247% | 247% | 247% |
+| Rough skill 95% CI | — | 156–419% | 156–419% | 156–419% |
+| Rough skill 80% CI | — | 184–351% | 184–351% | 184–351% |
+
+Resolving power · blind test · rough skill are computed as in the 0.59h entry's table. 0.59i has the same core as 0.59h, so all three equal 0.59h's.
 
 ### 0.59h;0_1[20] (2026-10-20) Help moved out of the app file, rough skill by version
 
