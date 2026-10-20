@@ -11,9 +11,10 @@ A program that takes a single finished illustration and **splits it back into ma
 
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
-- Resolving power: **17.52× version 0.1** (0.56, 95% CI 11.87–29.98×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 real pictures alone it is 4.06× version 0.1. 140 of the 185 differ from 0.54 (14.80×, re-measured with the released app as it is — see the 0.55 correction in 12): improved 68 · worsened 72. 0.56 leaves the 'Background' layer unchanged, so the background maps of the 185 pictures are byte-identical to 0.55 and the value is the same, 11).
+- Resolving power: **17.52× version 0.1** (0.59e, 95% CI 11.87–29.98×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 real pictures alone it is 4.06× version 0.1. 140 of the 185 differ from 0.54 (14.80×, re-measured with the released app as it is — see the 0.55 correction in 12): improved 68 · worsened 72. 0.56 · 0.57 · 0.58 · 0.59e leave the 'Background' layer unchanged, so the background maps of the 185 pictures are byte-identical to 0.55 and the value is the same, 11).
 - Cutout model (0.51, on by default): an anime-character segmentation network (ISNet, skytnt/anime-seg, Apache-2.0) reduced to 8 bits and built into the app file. It picks out the whole character and puts the rest on the background layer (3.5). From 0.52 the character probability it gives is added to the decision of the previous method (background detection + neural-network assist), from 0.53 pictures where the model finds almost no character use the previous method's decision as it is, and from 0.54 a copy of the same network fine-tuned on synthetic · pixiv pictures is run as well, a weighted average of the two probabilities is used as the model probability and the threshold is raised slightly; 0.55 uses a copy further trained to count effects (glow · particles · light rays) as background and averages the two probabilities with equal weights.
 - Background fill (0.56, default "network + patches"): a 'Background fill' layer that estimates the background behind the character with the bundled inpainting network big-lama (reconnects broken structure), patch matching (original texture) and a seam membrane, placed directly above the 'Background' layer (3.5). The difference from the synthetic ground truth (MAE) is scene 2.9 · bokeh 9.0 · stripes 0.4 (patches only 18.3 · 9.2 · 2.0; left white 66.0 · 167.7 · 29.2), and the naturalness grading of 120 unseen pixiv pictures (8 graders, 0–100) is 59.2 (patches only 44.7). The meaning of hidden objects cannot be invented (10.2 · 11.17). The fp16 weights (102 MB) are embedded, so the app file is about 205 MB, and because of GitHub's 100 MiB file limit the repository holds it as a split archive (section 1).
+- Rough 2 traced with a G-pen, with pen pressure (0.57–0.59e): rough 2 picks only the parts of the line art clearly darker than their surroundings (leaving out areas that are broadly dark from fill · shading · texture) and traces each once with a G-pen matched to the picture's own pen width (0.57 · 0.58). From 0.59 each stroke gets a pressure curve that varies its width · darkness, important lines are drawn darker and weak lines lighter, and part of long strokes is drawn over once more. 0.59e draws the eyes · mouth inside a face area straight from the line art as single strokes. Rough 1 is drawn with pencil grain. 15 AI graders given the role of experts compared the same 138 pictures blind: "more like a rough drawn by a person" 0.59e 100 · 0.56 33 · tie 5 ($`p = 5.0 \times 10^{-9}`$), and judged on its own as a rough drawn by a person 54 → 83 (11.19). 0.58 alone lost to 0.56 (65 : 153 on 240 pictures, 11.18). From 0.59e versions are named like `0.59e;4_5[20]` (12).
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -76,7 +77,7 @@ If the program finds a face in the picture (also in PNGs with a transparent back
 
 ### How to use it
 
-1. Download [`illustracy-0.56.zip.001`](illustracy-0.56.zip.001) and [`illustracy-0.56.zip.002`](illustracy-0.56.zip.002) into the same folder and extract them: open `.001` in 7-Zip (it shows `illustracy-0.56.zip` inside; extract that), or join the parts first (Windows command prompt `copy /b illustracy-0.56.zip.001 + illustracy-0.56.zip.002 illustracy-0.56.zip`, macOS · Linux `cat illustracy-0.56.zip.* > illustracy-0.56.zip`) and unzip. You get `illustracy.html` (the app, one file of about ' + str(PUB_MB) + ' MB that also contains the help) and `illustracy-help.html`; open `illustracy.html` in a browser. It is split because of GitHub's 100 MiB file limit.
+1. Download [`illustracy-0.59e.zip.001`](illustracy-0.59e.zip.001) and [`illustracy-0.59e.zip.002`](illustracy-0.59e.zip.002) into the same folder and extract them: open `.001` in 7-Zip (it shows `illustracy-0.59e.zip` inside; extract that), or join the parts first (Windows command prompt `copy /b illustracy-0.59e.zip.001 + illustracy-0.59e.zip.002 illustracy-0.59e.zip`, macOS · Linux `cat illustracy-0.59e.zip.* > illustracy-0.59e.zip`) and unzip. You get `illustracy.html` (the app, one file of about 205 MB that also contains the help) and `illustracy-help.html`; open `illustracy.html` in a browser. It is split because of GitHub's 100 MiB file limit.
 2. Drag an image onto the window, click the box at the top left to choose one, or paste a copied image with `Ctrl+V`.
    To try it first, click **Sample image** (`예제 그림`).
 3. Wait a few seconds and the layer list appears on the right.
@@ -257,13 +258,22 @@ The only things recognized are the big masses (the part map) and found faces (co
 - **Rough 1 (concept)**: the crude rough an artist dashes off the moment an idea comes. The big masses are lumped together and drawn quickly with long strokes 2–3 times over, the face construction lines are dark, and the long lines and short marks in places that are sparse on a wider view (eyes · mouths · fingers) are traced.
   The composition is slightly off from the original (the whole is turned a few degrees, scaled a few percent, and smoothly warped by about 3.5% of the character size), because a hurried first rough rarely matches the finished picture exactly.
 - **Rough 2 (refined)**: rough 1 traced over and refined, with the composition matched to the original. Outlines where line art exists are redrawn from the line art, and mass outlines remain only where there is none.
-  Even faint and short lines are traced, but dense patterns · hatching · lettering added when finishing and small repeated loops (sweater patterns · snowflakes · petals · railing cells) are left out.
+  From 0.57 only the parts of the line art clearly darker than their surroundings count as lines (areas broadly dark from fill · shading · hair texture drop out); small holes such as sparkles · dots are filled, solid filled masses keep only their outline, and each line is traced once with a G-pen.
+  Dense ornament lines such as lace · flower decorations are still traced as they are and can look like a net (10.1).
   The lines of the background picture have moved to the background layer, so the long brightness edges of the background are drawn faintly to catch the background composition and character parts wrongly split into the background (skirts · arms).
-- **Faces**: inside a found face area (from eyebrows to chin), the eyes · nose · mouth of the line art are redrawn darker with less wobble. Thick, round painted shapes such as painted irises would become a dot if thinned to a line, so their outer contour is traced.
+- **Faces**: rough 1 redraws the eyes · nose · mouth inside a found face area (from eyebrows to chin) darker with less wobble. Thick, round painted shapes such as painted irises would become a dot if thinned to a line, so their outer contour is traced.
+  Rough 2 (from 0.57) traces faces with the same G-pen, and thick eye rims · lashes are drawn as one center line instead of two edge lines thanks to the two window sizes (0.58).
   Where no face was found, the inside of a skin-colored mass is taken as the face area.
-- **Strokes**: a new stroke starts at each bend (rough 2 lifts the pencil only at sharp bends and turns corners within one stroke), gentle curves are fitted in between, and long curves are split into 2–3 slightly overlapping strokes.
-  Each stroke is drawn 1–3 times slightly off, and imitating pen pressure it is thin and light at its start · end and dark in the middle. Rough 2 is the settled line, so it is a little thicker and darker and its ends taper less.
-- Coverage is computed from the distance between each pixel center and the stroke, so edges have no staircase. Pencil grain is only a soft grain 2–3px in size.
+- **Strokes**: rough 1 starts a new stroke at each bend, fits gentle curves in between, and splits long curves into 2–3 slightly overlapping strokes.
+  Each stroke is drawn 1–3 times slightly off, and imitating pen pressure it is thin and light at its start · end and dark in the middle.
+- **G-pen strokes** (rough 2, from 0.57): drawn in one go, the way a professional inks with a pen. The pen is lifted only where the line really turns (more than about 60°), gentle curves are not split, and the stroke is smoothed like the stabilizer of a drawing program.
+  The width follows the original line's width at that spot (a little wider where the artist pressed harder), it tapers short going in and long coming out, and the ink darkness is constant. Sideways it wobbles only very slightly, about half the pen width.
+- **Pen width** (rough 2, from 0.57): artists draw with the same pen for the same canvas format regardless of resolution, so each picture's mean line width (ink area ÷ center-line length) is measured and the length thresholds · pen radius are matched to it.
+- **Pressure curve** (rough 2, from 0.59): each stroke gets a pressure that rises after it starts, peaks around the middle (30–60% of the stroke) and eases off slowly, with a gentle wobble and a little more pressure at bends. Width follows the pressure only 50% and ink darkness only 25%, so the even G-pen line gains variation.
+- **Line importance** (rough 2, from 0.59): how much darker than its surroundings the line is (edge strength), its original width, its length and whether it is in a face combine so that important lines are drawn darker and weak lines lighter (the lightest at 70%), and strokes inside a face area stay crisp.
+- **Overstroke** (rough 2, from 0.59): about one in four long strokes gets part of it (30–55%) drawn once more, slightly offset, lighter and thinner, so overlaps darken. Stabilization is stronger than in 0.58 and the sideways wobble smaller.
+- **Eye · mouth boxes** (rough 2, from 0.59e): inside the eye · mouth boxes of a face area the line art counts as line without comparing it with its surroundings, and solid blobs are not hollowed, so they are drawn as one stroke through the middle. This stops eyes · mouths over dark irises from dropping out or leaving only an outline ring.
+- Coverage is computed from the distance between each pixel center and the stroke, so edges have no staircase. Rough 1's pencil grain uses paper grain at two sizes, 2.5px · 1.1px (from 0.57); rough 2 (G-pen) has no grain.
 
 ### 2.10 Adapt to the picture only when the defaults cannot cope
 
@@ -658,6 +668,10 @@ Problems that came up while verifying with real pictures during development, and
 | (0.45) Rough details broke down: eyes · mouths · fingers · ribbons turned into lumps · bead-like knots | Short face strokes (eyelash tips · nose · mouth corners) were trimmed as spurs, thick lines were drawn at their full width so small shapes became lumps, and shifted later passes covered small shapes | In face areas small strokes are kept and drawn darker with less wobble, the original lines are laid underneath at 45%, and the stroke radius is capped at 2.5px (4.14). Artist-style reference roughs on 18 crops: F 0.714 → 0.740; blind test on 40 unseen pictures, detail 36 : 0 (0.45 in 12) |
 | (0.46) The rough looked traced from the line art: not an underdrawing the artist would have drawn before the line art, but a copy down to signatures · lettering · halftone dots · background texture | The center lines of the line art were redrawn | Instead of following the line art, guess backwards "what rough led to this line art": two roughs that first block in big masses · face construction · features (2.9, 4.14). In a blind test on 40 unseen pictures rough 2 beat 0.45 on plausible-origin 29 : 11 and drawn-by-hand 34 : 6 (0.46 in 12) |
 | (0.47) Rough 2's form broke down: eyes became glasses-frame rings · flower-like clusters of circles, skirts · arms split into the background and the background composition were missing, and thin, chopped lines blurred faces · hands | Irises were "recognized" and replaced by ellipses (ellipses around whole eyes · highlight ellipses), the line-art map holds only character lines, and strokes lifted at every bend with very thin ends | Recognize only the big masses and found faces and trace eyes · hands · props from the line art (painted shapes by their contour), redraw outlines from the line art where it exists, add the long brightness edges of the background faintly, and lift the pencil only at sharp bends with slightly thicker, darker strokes (2.9, 4.14). In blind tests on four rounds of unseen pictures (40 each), each fix beat the previous version, and the last round beat the round before on form 12 : 0 (0.47 in 12) |
+| (0.57) Rough 2 became meaningless tangles of lines (a net): on about 17% of unseen pictures faces · clothes were covered by a dense mesh, hard to believe as the rough the line art was drawn over | Every pixel with line alpha ≥ 0.25 counted as line art, so masses of fill · shading · texture got in, thinning those masses gave a net of center lines (a cell mesh), and faces were redrawn several times over | Only parts at least 0.15 darker than their surroundings count as lines (local contrast); small holes are filled and solid masses keep only their outline; each line is traced once with a G-pen matched to the pen width measured per picture (pressure · stabilizer, 2.9, 4.14 step 11). 18 artist-style reference crops: F 0.728 → 0.742 · recall 0.825 → 0.845 (14 : 4, $`p = 0.03`$) |
+| (0.58) Small eyes in rough 2 were drawn like square boxes | The middle of a thick eye rim · lash (5–6px) is about as dark as its surrounding mean, so local contrast with one window kept only its two edges | Also count as line what is darker than its surroundings in a window twice as wide (two window sizes), so thick lines become one center line (4.14 step 11). Blind test on 240 unseen pictures (11.18) |
+| (0.59) Rough 2's even thin lines of constant width · darkness were judged "mechanical" · "like a trace" (0.58 lost to 0.56 in a blind test on 240 pictures, 65 : 153) | The G-pen stroke had constant ink darkness and only its width followed the original line, so there was no variation within a stroke and no difference in importance between lines | A pressure curve per stroke, darkness from line importance, overstrokes and stronger stabilization (2.9). On 240 unseen pictures 0.59 : 0.56 = 127 : 71 ($`p = 8.4 \times 10^{-5}`$, 11.19) |
+| (0.59e) Rough 2's eyes · mouths dropped out or left only an outline ring ("missing form") | Tracing only lines darker than their surroundings missed eyes · mouths over dark irises, and when caught, hollowing solid blobs left only a ring. The cleanup of short pieces outside faces also removed lone strokes such as glasses frames · fingers | Inside eye · mouth boxes the line art counts as line as is and blobs become one center stroke; the short-piece cleanup applies only to pieces running alongside another line (2.9). 15 expert-role graders: 0.59e : 0.56 = 100 : 33 ($`p = 5.0 \times 10^{-9}`$, 11.19) |
 | "Hair" names from faces were also put on black dresses · white clothes | parts are split by color, so clothes of the same color as the hair are one part | colors covering 25% or more of the torso center are not called hair. Colors that received both the skin vote and the hair vote are not named either |
 | Choosing hair around the bangs (including side hair) picked collars · hats · background | the side-hair area is occupied by clothes · hats · background depending on the picture | look only at the bangs just above the forehead, counting without the exposed forehead (skin) |
 | A pale skin part merged with white clothes into one color became "skin" | the part occupying the cheeks · nose bridge has the same color as the clothes | "skin" only for warm colors that are not too white |
@@ -842,6 +856,17 @@ Problems that came up while verifying with real pictures during development, and
 | (0.48) Naming faces: finding closed · smiling eyes as short dark arcs (scored separately by trough depth · width · skin below the eye) | On the 88 development pictures for decisions, faces found +0, and +1 with fakes +1 after widening the arc candidates (acceptance: found +2 or more with fakes +1 or less). Arc candidates appear, but closed-eye faces miss the open-eye cues (sparkle · eye pattern), leaving too few cues to tell them from fakes |
 | (0.48) Naming faces: mean patterns per eye type (real faces split into 1 · 2 · 3 · 4 clusters, per-cluster mean face · eye patterns), a chroma face pattern | In two-fold cross-validation on the 117 development pictures for choosing, all 24 variants found as many or fewer faces than the current patterns (55) at the same number of fakes (49–53). The chroma pattern separated real from fake with an AUC of only 0.52 · 0.59 |
 | (0.48) Naming faces: accepting smaller faces (eye distance 16 → 12 px on the 800 px grid) · more tilted faces (eye line ±38.7° → ±50.2°) | The 14 · 4 new detections were all fakes (text · clothing ornaments · sparkles of large eyes). The missed small · tilted faces score low on other cues too and do not come back |
+| (0.57) Selecting rough 2's lines by white top-hat · texture-orientation coherence | On development pictures the net stayed or faint real lines dropped out with it, so only the difference from the surrounding mean (local contrast) is used |
+| (0.57) Closing and filling the cells of the net (narrow cells between lines as masses) | The cells of eyes · mouths were filled too and faces collapsed |
+| (0.57) Filling between lines by grayscale closing before selecting | The space between eye whites · irises was filled and the eyes vanished |
+| (0.57) A thinner pen in dense areas | On the 18 artist-style reference crops recall fell on all 18 (0 : 18) and F 2 : 16 ($`p = 0.001`$) |
+| (0.57) Dropping short pieces inside the face area | Mouths vanished |
+| (0.57) Choosing the pen width from the character size (learning a width per size) | Over 239 pictures the rank correlation of the measured pen width with character size is 0.18 (with the picture's long side 0.20), too low, so the picture's line width is measured directly instead of guessed from size |
+| (0.58) Fitting irises with ellipses · filling eye holes scaled to the face | Hits varied from picture to picture, and even the hits looked like glasses |
+| (0.58) Filling larger holes outside faces (pen scale² × 60 · 120), changing the eye-corner split · stabilizer strength | The ornament net · eye shapes barely changed |
+| (0.59f) Making strokes in dense areas lighter in both width and darkness (multiplied, down to 0.36×) + drawing one in three crossing lines | Lost to 0.56 in the blind test by 15 expert-role graders (51 : 82, $`p = 9.0 \times 10^{-3}`$): "darkness" 12 → 94 · "broken lines" 15 → 57, read as "a faint trace of the line art". The mesh-cell and clump metrics improve automatically when lines get lighter, so the selection metrics were fooled |
+| (0.59f) Removing lines of lettering · signatures | Mistook clusters of hair highlights for text lines and caught almost no handwritten signatures or speech-balloon text |
+| (0.59g) Adding a gentler crossing-line thinning to 0.59e (one in two, crossing threshold 6, lines 40× the pen scale or longer kept) | In the blind test against 0.59e by 15 expert-role graders, 131 of 138 were ties (4 : 3, $`p = 1.00`$). The median mesh-cell count dropped 4.91 → 4.58, but not by a difference people could see, so it was not adopted |
 | (0.48 cycle 1) Face score threshold 13 → 11 in restoring swallowed character parts | The 185-picture BER improved (×0.974), but in 8 blind rounds (new graders each round) on the 97 of 400 hold-out pictures that changed: candidate 34 · 0.47 40 · ties 23 ($`p = 0.56`$). With only 8 real pictures with ground truth, the 185 pictures do not catch such a regression |
 | (0.48 cycle 2) Line-ratio threshold 0.3 → 0.4 in the gap rule between characters (only on non-white backgrounds) | Development screening better 3 · worse 2 · similar 3 (lost white stockings · a white skirt); only 1 of 400 hold-out pictures changed (candidate 1 : 0, $`p = 1`$) |
 | (0.48 cycle 3) Treating the bottom border as a wall too in the line-enclosure check | 185-picture BER ×1.016 (worse); 272 of 400 hold-out pictures changed, and in the blind test of 128: candidate 50 · 0.47 68 · ties 10 ($`p = 0.12`$). What it returned was mostly floor · background at the bottom |
@@ -929,8 +954,8 @@ Problems that came up while verifying with real pictures during development, and
 - These are mostly image-processing rules; the only learned parts are the statistical formula and the small neural network at the end of background detection (0.49, written and trained from scratch for this program). It works best on **cel shading with lines**; pictures without lines or with many brush strokes can have the base color split into several tones or much of the shading pushed into the shading layer.
   Brush grain is ignored only when most lines in the picture are grain, so hair drawn with grain in only part of a line-art picture can be split into several parts along the grain.
 - The roughs are not in the original, so they are **estimated sketches**. They guess the underdrawing the artist would have drawn, so they can differ from the artist's real rough.
-  In a blind test on 40 unseen pictures rough 2 was judged more plausible as the artist's underdrawing (27 : 11) and more hand-drawn (30 : 10) than 0.45, but on form (shape and place of faces · hands · props) 0.45 is still ahead (22 : 6, 0.47 in 12).
-  0.45 traces the line art thickly over a faint copy of the original, so its shapes read well but it was judged "copied"; rough 2 is the opposite, so form and underdrawing-likeness still trade off. Rough 1 offsets the composition on purpose, so its form does not match the original.
+  In a blind test by 15 AI graders given the role of experts (138 pictures), rough 2 (0.59e) was judged more like a rough drawn by a person than 0.56 100 : 33 (tie 5); judged on its own as a rough drawn by a person 54 → 83, and roughs that badly lost their meaning 49 → 31 (11.19).
+  However "mechanical" rose 21 → 34, and it traces lettering · signatures · watermarks and repeated patterns such as mesh · guitar frets · bricks line by line. In the round where another 15 graders compared 0.59e with 0.59g, 0.59e on its own was judged a rough drawn by a person on 45 of 138 (32.6%) and badly lost its meaning on 55 (39.9%). These are not paired against 0.56 within one sheet, so do not read them as a difference between versions; read them as a sign that the absolute level moves a lot with the group of graders (the same 0.56 roughs were rated 39.1% in one round and 53.6% in another). Strongly textured painterly pictures · dark pictures · complex scenes (crowds · mecha · checks) break into nets or broken lines, and dense ornament lines such as lace · flower decorations can look like a net. Rough 1 offsets the composition on purpose, so its form does not match the original.
   In pictures with complex scenes or small figures, or with many brush strokes, short broken lines can split like a net or nearly miss the figures, and figures whose face was not found can get scattered eyes · mouths.
 - The color under lines is a guess from the surroundings. Errors can remain in places like 1–2px gaps between two lines (reproduction is matched exactly by the color trace).
 - Light · sparkle layers are placed below the line art. In pictures with light painted over lines, that part goes into the color trace.
@@ -1169,9 +1194,11 @@ In this section:
 - [11.12 Returning islands in the scene background (0.38)](#1112-returning-islands-in-the-scene-background-038)
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
-- [11.15 Blind test (0.1 · 0.54 · 0.55 · 0.56)](#1115-blind-test-01--054--055--056)
+- [11.15 Blind test (0.1 · 0.57 · 0.58 · 0.59e)](#1115-blind-test-01--057--058--059e)
 - [11.16 14 artist-made cutouts (0.51)](#1116-14-artist-made-cutouts-051)
 - [11.17 Background fill (0.56)](#1117-background-fill-056)
+- [11.18 Rough 2 traced with a G-pen (0.57 · 0.58)](#1118-rough-2-traced-with-a-g-pen-057--058)
+- [11.19 Rough 2 pressure · eye · mouth boxes and blind tests by expert-role graders (0.59 · 0.59e)](#1119-rough-2-pressure--eye--mouth-boxes-and-blind-tests-by-expert-role-graders-059--059e)
 
 ### 11.1 Formulas used for evaluation
 
@@ -2498,7 +2525,7 @@ Regrading 67 randomly chosen real sheets (10%), renumbered and reshuffled, agree
 
 ### 11.14 Resolving power by version
 
-Every version from 0.1 to 0.55 was measured again with the same pictures and the same scoring.
+Every version from 0.1 to 0.59e was measured again with the same pictures and the same scoring.
 Each version's code was run as is, with that screen's default settings, on 185 pictures with ground truth (57 synthetic · 8 real pictures with character outline ground truth · 120 posed synthetic).
 Pixels with background-layer alpha of 128 or more count as background and the rest as character; transparent pixels (alpha under 128), a 3px band around the ground-truth character boundary, and glow pixels are excluded from scoring.
 For each picture the <mark>balanced error rate</mark>
@@ -2571,13 +2598,16 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.54 | Character decided from a weighted average (0.6 · 0.4) of the cutout model and a fine-tuned copy of it run together, with the threshold raised to 0.55 (re-measured with the released app as it is; 0.55 correction in 12) | 99.4 | 98.6 | 0.0104 | 96.51 | **14.80** | 10.09–24.70 | 24.77 · 3.88 · 29.04 |
 | 0.55 | Character decided from the average (0.5 · 0.5) of the cutout model and a copy further trained to count effects (glow · particles · light rays) as background, with threshold 0.55 | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 | 0.56 | A 'Background fill' layer that estimates the background behind the character with an inpainting network (big-lama) and patch matching, placed directly above the 'Background' layer (the background layer is unchanged, so all 185 are byte-identical to 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
+| 0.57 | Rough 2 traced with a G-pen (local-contrast lines · pen width · pressure · stabilizer), rough 1 with pencil grain (background layer unchanged, so all 185 are byte-identical to 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
+| 0.58 | Rough 2's thick lines (eye rims · lashes) drawn as one center line with two window sizes (background layer unchanged, so all 185 are byte-identical to 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
+| 0.59e | Rough 2 gets a pressure curve · darkness from line importance · overstrokes, and traces eye · mouth boxes (background layer unchanged, so all 185 are byte-identical to 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 
 ```mermaid
 xychart-beta
     title "Resolving power by version (0.1 = 100%)"
-    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51", "0.52", "0.53", "0.54", "0.55", "0.56"]
+    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51", "0.52", "0.53", "0.54", "0.55", "0.56", "0.57", "0.58", "0.59e"]
     y-axis "Resolving power (%)" 0 --> 1800
-    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051, 1133, 1337, 1480, 1752, 1752]
+    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051, 1133, 1337, 1480, 1752, 1752, 1752, 1752, 1752]
 ```
 
 From 0.4, finding scene backgrounds let the real pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
@@ -2600,8 +2630,9 @@ the 177 synthetic · posed pictures have background maps byte-identical to 0.48 
 0.54 averages two models, so 154 of the 185 differ from 0.53 (BER improved 119 · worsened 35; the changed pictures are synthetic 42 · real 8 · posed synthetic 104). Mean BER 0.0115 → 0.0104, 13.37 → 14.80× version 0.1, higher than 0.53. On the 8 real pictures, character kept 96.4 → 97.0% · background found 78.3 → 77.3% (3.96 → 3.88×); synthetic group 13.13 → 24.77×, posed synthetic group 33.16 → 29.04×. These values were re-measured for 0.55 with the released app as it is (probabilities weighted 0.6 · 0.4); the values written at the 0.54 release (15.06×, 155 changed) came from a measurement bench that mixed the two probabilities with equal weights (0.5 · 0.5) (0.55 correction in 12). The 185 were not used to train the 0.54 model or to choose its rule.
 0.55 swaps the fine-tuned copy for the effect-trained copy and averages the two probabilities with equal weights, so 140 of the 185 differ from 0.54 (BER improved 68 · worsened 72; the changed pictures are synthetic 37 · real 8 · posed synthetic 95). Mean BER 0.0104 → 0.0088, 14.80 → 17.52× version 0.1, higher than 0.54. On the 8 real pictures, character kept 97.0 → 96.4% · background found 77.3 → 78.9% (3.88 → 4.06×); synthetic group 24.77 → 55.71×, posed synthetic group 29.04 → 33.24×. The picture that changed most is lineless_scene (BER 0.1175 → 0.0165). The 185 were not used to train the 0.55 model or to choose it.
 0.56 leaves the 'Background' layer unchanged and adds a 'Background fill' layer above it, so the background maps of all 185 are byte-identical to 0.55 (confirmed by re-running the same app code; 17.52× unchanged).
+0.57 · 0.58 · 0.59e change only the roughs, so the background maps of all 185 are byte-identical to 0.55 (confirmed by re-running 245 pictures with the 0.59e app code, and 122 of them with the 0.58 app code · 45 with the 0.57 app code too; 17.52× unchanged).
 
-### 11.15 Blind test (0.1 · 0.54 · 0.55 · 0.56)
+### 11.15 Blind test (0.1 · 0.57 · 0.58 · 0.59e)
 
 To compare versions on real pictures without ground truth too, 60 pictures were drawn from the 642 pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), then the key was opened.
@@ -2610,11 +2641,11 @@ For each picture, only the distinct results were collected (versions with identi
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
 | 0.1 | **31.7%** (19/60, 21.3–44.2) | 26.7% | 6.7% | 61.7% | 10/30 · 9/30 |
-| 0.54 | **85.0%** (51/60, 73.9–91.9) | 80.0% | 11.7% | 3.3% | 24/30 · 27/30 |
-| 0.55 | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
-| **0.56** | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| 0.57 | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| 0.58 | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| **0.59e** | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
 
-0.56 leaves the 'Background' layer unchanged, so the background maps of the 60 pictures are byte-identical to 0.55 (confirmed by re-running the same app code); they share a panel, and the grades given at 0.55 are reused (as for 0.39 = 0.38; the background fill layer is not part of the background map). For 0.55 the earlier grades were not reused: the four versions 0.1 · 0.53 · 0.54 · 0.55 were graded again from scratch, together (0.53: 86.7 → 81.7%). Each version was run with its own app code and default settings (cutout model on); 0.54 was re-run with the released app's weighted average (0.6 · 0.4) (the blind test at the 0.54 release used a measurement bench that mixed the two probabilities with equal weights; 0.55 correction in 12). Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.55 differs from 0.54 on 58 pictures (panel counts: 2 panels 2 · 3 panels 1 · 4 panels 57 pictures).
+0.56 · 0.57 · 0.58 · 0.59e leave the 'Background' layer unchanged, so the background maps of the 60 pictures are byte-identical to 0.55 (confirmed by re-running the 0.56 · 0.59e app code; 0.57 · 0.58 share all code outside the rough function with 0.59e); they share a panel, and the grades given at 0.55 are reused (as for 0.39 = 0.38; the background fill layer and the roughs are not part of the background map). For 0.55 the earlier grades were not reused: the four versions 0.1 · 0.53 · 0.54 · 0.55 were graded again from scratch, together (0.53: 86.7 → 81.7%). Each version was run with its own app code and default settings (cutout model on); 0.54 was re-run with the released app's weighted average (0.6 · 0.4) (the blind test at the 0.54 release used a measurement bench that mixed the two probabilities with equal weights; 0.55 correction in 12). Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.55 differs from 0.54 on 58 pictures (panel counts: 2 panels 2 · 3 panels 1 · 4 panels 57 pictures).
 As same-picture pairs, 0.54 → 0.55 gained 1 · lost 0 in "no major loss" ($`p = 1.00`$), grade up 2 · down 6. 0.53 → 0.55 gained 3 · lost 0 ($`p = 0.25`$), 0.1 → 0.55 gained 35 · lost 2 ($`p = 1.0 \times 10^{-8}`$), and 0.53 → 0.54 gained 3 · lost 1 ($`p = 0.62`$).
 The rates differ from the grading done together at 0.54 (0.1 26.7% · 0.52 83.3% · 0.53 86.7% · 0.54 86.7%) because the graders changed and because the 0.54 maps changed. Graders differ slightly in what they count as characters (held objects · animals · figures in the background), so the size of the rates moves with the graders.
 Read this as the difference between versions graded together by the same standard rather than as the size of the rates.
@@ -2623,12 +2654,12 @@ For panels that lost character (small pieces lost · major loss), graders also p
 
 | Version | Colored like background | Edge | Effect | Non-human | Tilted | Occluded | Other |
 |---|---|---|---|---|---|---|---|
-| 0.54 | 9 | 1 | 2 | 3 | 2 | 0 | 1 |
-| 0.55 | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
-| 0.56 | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
+| 0.57 | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
+| 0.58 | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
+| 0.59e | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
 
-"Colored like background" is where character and background have similar colors, "Edge" a part cut off at the picture edge, "Effect" light · aura over the character, "Non-human" a body · wings · tail that is not human-shaped, "Tilted" a lying or tilted pose, and "Occluded" a character hidden by props. 0.55 is the version whose model was trained further to count effects as background, so the "Effect" column watches that goal. The 0.56 row is the same grading as 0.55.
-The table at the end of the 0.56 entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+"Colored like background" is where character and background have similar colors, "Edge" a part cut off at the picture edge, "Effect" light · aura over the character, "Non-human" a body · wings · tail that is not human-shaped, "Tilted" a lying or tilted pose, and "Occluded" a character hidden by props. The 0.57 · 0.58 · 0.59e rows are the same grading as 0.55 (the 0.54 row is in the 0.55 entry of 12, the 0.56 row in the 0.58 entry).
+The table at the end of the 0.59e entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
@@ -2683,6 +2714,102 @@ Time (node, working at a long side of ≤ 1024; the 120 pictures were run with f
 Same-picture pairs: network + patches − patches only +14.5 (95% +10.2 to +18.7, wins 82 : 31, ties 7, sign test p = 1.7e-06); network + patches − network only -1.0 (-3.3 to +1.2, 39 : 52, p = 0.21); network only − patches only +15.5 (+10.3 to +20.4, 81 : 34, p = 1.4e-05). Means per grader (network + patches · network only · patches only): grader 1 62.3 · 61.8 · 46.2 · grader 2 50.6 · 51.0 · 47.3 · grader 3 65.6 · 67.3 · 35.9 · grader 4 64.2 · 62.7 · 44.3 · grader 5 60.3 · 63.8 · 42.3 · grader 6 51.5 · 55.6 · 37.5 · grader 7 65.3 · 62.5 · 55.1 · grader 8 53.7 · 57.0 · 49.1.
 Both network candidates are clearly above patches only (for all eight graders), and network + patches is indistinguishable from network only. The sheets show four pictures reduced to a long side of 480 px, so the full-resolution texture that the patch stage adds is barely visible; structure, seams and blotches are. The default is network + patches because of its much lower error on the synthetic ground truth (hole MAE 2.82 vs 6.08). A mean of 59.2 lies in the "silhouette, blur or seam visible but not very distracting" range (50–69), the limit of filling a large hole (the character covers about half the picture) from a 512-px estimate (10.2).
 
+
+### 11.18 Rough 2 traced with a G-pen (0.57 · 0.58)
+
+0.57 · 0.58, which turned rough 2 into G-pen tracing, were measured two ways: against the 18 artist-style reference crops (0.45 in 12), and in a blind comparison with 0.56 on 240 unseen pixiv pictures.
+
+**18 artist-style reference crops**: on face · hand · accessory crops of 18 real pictures, a grader playing an illustrator drew reference roughs (stroke coordinates), which are matched against the program's rough 2. Reference strokes are expanded into points 1px apart; a point within 3px of program ink (alpha > 0.25) is "caught" (recall, weighted by stroke width), a pixel of the thinned program ink within 3px of a reference stroke is "on target" (precision), and F is their harmonic mean.
+"Thick-line recall" is the recall of reference strokes drawn at width 3 (outlines · main lines) only, "on-target center-line distance" the mean distance of on-target center lines from the reference strokes (smaller = more exact placement), and "breaks" the number of uncaught runs (3px or more) per 100px of reference.
+
+| Version | F | Recall | Precision | Thick-line recall | On-target center-line distance (px) | Breaks (per 100px) |
+|---|---|---|---|---|---|---|
+| 0.56 | 0.728 | 0.825 | 0.675 | 0.820 | 1.07 | 0.92 |
+| 0.57 | 0.742 | 0.845 | 0.684 | 0.847 | 1.01 | 0.81 |
+| **0.58** | 0.739 | 0.848 | 0.677 | 0.853 | 1.05 | 0.81 |
+
+In same-crop pairs (improved : worsened, sign test), 0.56 → 0.57 is F 12 : 6, $`p = 0.24`$, recall 14 : 4, $`p = 0.03`$, precision 11 : 7, $`p = 0.48`$, center-line distance 14 : 4, $`p = 0.03`$.
+0.57 → 0.58 is F 8 : 10, $`p = 0.81`$, thick-line recall 11 : 7, $`p = 0.48`$, center-line distance 0 : 18, $`p = 7.6 \times 10^{-6}`$: the two window sizes draw thick lines as one center line so eyes read, but that center line sits a little off the reference strokes (where the artist drew).
+These 18 crops were used to choose 0.57 · 0.58's values, so they are not an outside estimate.
+
+**Blind test on 240 pictures (0.56 vs 0.58)**: 97 real pictures not used in development (hold-out), and 143 pixiv pictures drawn evenly over four long-side bins (700 · 1100 · 1500 px boundaries; seed 20261020) from the 777-picture validation set minus development · reference-crop · hold-out pictures.
+For each picture, 0.56's and 0.58's rough 2 were drawn through the same app code path (the state just before the roughs was saved and only the roughs re-drawn), and one sheet showed the original · A · B in full plus the same crop around the largest face (or the character center if none), enlarged (roughs at the app's 45% opacity on white). A · B were randomized per picture (seed 58).
+The graders were not people but **12 AI graders** (separate fresh sessions of the same language model that did not know this development conversation); each took 20 pictures, so every picture was judged once by one grader (no inter-grader agreement was measured).
+They answered "which looks more like a rough drawn by a person (illustrator)?" (A · B · same), and for each version tagged strange points (tangle · face collapse · broken lines · jitter · mechanical · missing form · spurious lines · darkness) and how much meaning was lost (none · some · big: a main part cannot be recognized).
+The tally was written down before grading; caching the pictures took long, so grading was done in two rounds (the first 120 ready pictures · the other 120), which is why the first six graders saw mostly hold-out pictures.
+
+| | 0.56 | 0.58 | Same-picture pairs (0.56 only : 0.58 only) | 𝑝 |
+|---|---|---|---|---|
+| More like a rough drawn by a person | 153 | 65 | tie 22 | $`p = 2.3 \times 10^{-9}`$ (sign test) |
+| Meaning badly lost | 92 (38.3%, 32.4–44.6) | 84 (35.0%, 29.2–41.2) | 20 : 12 | $`p = 0.22`$ |
+| Some meaning lost (some · big) | 212 (88.3%, 83.7–91.8) | 190 (79.2%, 73.6–83.8) | 27 : 5 | $`p = 1.1 \times 10^{-4}`$ |
+| "tangle" | 110 (45.8%) | 131 (54.6%) | 30 : 51 | $`p = 0.03`$ |
+| "face collapse" | 88 (36.7%) | 66 (27.5%) | 36 : 14 | $`p = 2.6 \times 10^{-3}`$ |
+| "broken lines" | 72 (30.0%) | 63 (26.2%) | 35 : 26 | $`p = 0.31`$ |
+| "jitter" | 15 (6.2%) | 80 (33.3%) | 8 : 73 | $`p = 3.0 \times 10^{-14}`$ |
+| "mechanical" | 10 (4.2%) | 117 (48.8%) | 2 : 109 | $`p = 4.8 \times 10^{-30}`$ |
+| "missing form" | 124 (51.7%) | 95 (39.6%) | 38 : 9 | $`p = 2.5 \times 10^{-5}`$ |
+| "spurious lines" | 28 (11.7%) | 14 (5.8%) | 19 : 5 | $`p = 6.6 \times 10^{-3}`$ |
+| "darkness" | 67 (27.9%) | 22 (9.2%) | 63 : 18 | $`p = 5.2 \times 10^{-7}`$ |
+| Nothing strange | 12 (5.0%) | 11 (4.6%) | 10 : 9 | $`p = 1.00`$ |
+
+Excluding ties, 0.58's win rate on "more like a person's rough" is 29.8% (Wilson 95% 24.1–36.2%). Intervals next to rates are <mark>Wilson 95% intervals</mark>; pair 𝑝 values are from the <mark>exact McNemar test</mark> (a binomial test on discordant pictures only).
+
+| Group | Pictures | Person-like 0.58 : 0.56 : tie | 𝑝 | Badly lost 0.56 → 0.58 |
+|---|---|---|---|---|
+| Hold-out 97 | 97 | 29 : 60 : 8 | $`p = 1.3 \times 10^{-3}`$ | 32 → 30 |
+| New 143 | 143 | 36 : 93 : 14 | $`p = 5.4 \times 10^{-7}`$ | 60 → 54 |
+| Long side < 700 px | 51 | 16 : 26 : 9 | $`p = 0.16`$ | 38 → 33 |
+| Long side 700–1100 px | 40 | 16 : 20 : 4 | $`p = 0.62`$ | 15 → 11 |
+| Long side 1100–1500 px | 99 | 22 : 71 : 6 | $`p = 3.5 \times 10^{-7}`$ | 27 → 30 |
+| Long side ≥ 1500 px | 50 | 11 : 36 : 3 | $`p = 3.5 \times 10^{-4}`$ | 12 → 10 |
+
+Per grader, 0.58 : 0.56 is 01 4 : 14 · 02 5 : 15 · 03 11 : 9 · 04 4 : 10 · 05 4 : 13 · 06 8 : 10 · 07 1 : 18 · 08 5 : 12 · 09 9 : 11 · 10 2 : 15 · 11 7 : 13 · 12 5 : 13. Regardless of version, A was picked 91 times, B 127 times and "same" 22 times (position-bias check).
+The graders' notes show the two versions split almost every time. 0.58 traces both edges of shapes · hair strands · chains · lace with even thin lines, leaving short pieces · spurs · ladder shapes, and many notes call it "a trace of the outlines". 0.56 has long, loose strokes with varying strength, closer to a hand-drawn rough, but often drops whole faces · eyes · hands · props in front, or draws eyes as rings · letter-like scribbles. Graders usually picked the side whose face survived when only one did, and the looser strokes when both did. Pictures where both broke down were strongly textured painterly pictures · dark pictures · complex scenes (crowds · mecha · checks), and both versions also traced watermarks · sound-effect lettering · screen band edges. Regardless of version B was picked a little more often (A 91 : B 127), but 0.56 is ahead in either position: 0.58 : 0.56 = 21 : 83 when 0.58 was A and 44 : 70 when it was B. The developer disagrees with the "mechanical" · "person-like" judgments, since tracing a clean-up rough with an even pen, both edges of shapes included, is how illustrators actually work, and the release decision did not rest on them (the graders are AI, not illustrators).
+
+**Pen width**: over the 239 of the 240 pictures with a character, the measured pen width has median 1.30px (10th · 90th percentile 0.92 · 1.87px); its rank correlation with the picture's long side is 0.20 and with the character size (square root of the character area) 0.18. Pictures of the same size are drawn with different pens by different artists, so the pen width is measured from the picture's own lines rather than guessed from picture or character size.
+**Time**: on the same 240 pictures the rough 2 step takes a median 2.6 s → 3.6 s, a same-picture ratio of 1.25× (quartiles 1.11–1.64×; run 4 in parallel). It is a small share of the whole app (tens of seconds per picture including the cutout model · background fill).
+
+### 11.19 Rough 2 pressure · eye · mouth boxes and blind tests by expert-role graders (0.59 · 0.59e)
+
+0.59 adds a pressure curve · darkness from line importance · overstrokes · stronger stabilization to 0.58's G-pen tracing, and 0.59e adds eye · mouth box tracing on top (2.9). All of them change rough 2 only.
+Six blind rounds were run. The graders are not people but fresh sessions of the same language model (unaware of this development conversation); each round used new graders and new sheets (A · B positions random per picture). From round 2, at the user's request, only the 138 pictures with a character as the main subject and clear line art were used, and 5 real artists' roughs found by a fixed rule on pixiv (tag "ラフ" · 300+ bookmarks · no AI images) were shown to the graders first. From 3-A the graders were given the role of "an expert in the composition of Japanese-style illustration and digital drawing (pen pressure · stabilizer · the rough → line-art process)" (with no instruction to prefer any style). Methods · metrics · decision rules were written down before grading, and rounds with bad results are reported as they are. Only pairs within one round are tests; comparing rates across rounds is for reference only, because the groups of graders differ.
+
+| Round | Pictures | Graders | Versions | More like a rough drawn by a person (new : base : tie) | 𝑝 (sign test) | Judged on its own as a rough drawn by a person (base → new, pairs) | Badly lost meaning (base → new) |
+|---|---|---|---|---|---|---|---|
+| 1 | 240 unseen | 12 | 0.59 vs 0.56 | 127 : 71 : 42 | $`p = 8.4 \times 10^{-5}`$ | 78 → 95 (19 : 36, $`p = 0.03`$) | 96 → 85 ($`p = 0.03`$) |
+| 2 | 138 with clear character · line art | 7, 5 reference roughs | 0.59 vs 0.56 | 89 : 39 : 10 | $`p = 1.2 \times 10^{-5}`$ | 43 → 77 (5 : 39, $`p = 1.4 \times 10^{-7}`$) | 48 → 37 ($`p = 0.03`$) |
+| 2 control | same 138 | 7, 5 reference roughs | 0.58 vs 0.56 | 42 : 92 : 4 | $`p = 1.9 \times 10^{-5}`$ | 63 → 50 (30 : 17, $`p = 0.08`$) | 42 → 38 ($`p = 0.50`$) |
+| 3-A | same 138 | 15 expert-role | 0.59 vs 0.56 | 73 : 57 : 8 | $`p = 0.19`$ | 52 → 76 (25 : 49, $`p = 7.1 \times 10^{-3}`$) | 47 → 29 ($`p = 2.8 \times 10^{-4}`$) |
+| **3-B** | same 138 (new sheets) | 15 expert-role | **0.59e vs 0.56** | **100 : 33 : 5** | $`p = 5.0 \times 10^{-9}`$ | 54 → 83 (10 : 39, $`p = 3.8 \times 10^{-5}`$) | 49 → 31 ($`p = 4.0 \times 10^{-5}`$) |
+| 3-C | same 138 (new sheets) | 15 expert-role | 0.59f vs 0.56 | 51 : 82 : 5 | $`p = 9.0 \times 10^{-3}`$ | 74 → 47 (46 : 19, $`p = 1.1 \times 10^{-3}`$) | 36 → 37 ($`p = 1.00`$) |
+| 3-D | same 138 (new sheets) | 15 expert-role | 0.59g vs 0.59e | 4 : 3 : 131 | $`p = 1.00`$ | 45 → 45 (0 : 0, $`p = 1.00`$) | 55 → 55 ($`p = 1.00`$) |
+
+The pairs are (yes only for base : yes only for new), and 𝑝 is <mark>McNemar's exact test</mark>. Round 1 was the first to ask whether each rough on its own looks like one drawn by a person.
+
+**3-B (0.59e vs 0.56)**: 0.59e's win rate excluding ties is 75.2% (Wilson 95% 67.2–81.8%), and 14 of the 15 graders picked 0.59e more often. The "something strange" tags (number of pictures with that tag per version) are:
+
+| Tag | 0.56 | 0.59e | 𝑝 (pairs) |
+|---|---|---|---|
+| "tangle" | 96 (69.6%) | 62 (44.9%) | $`p = 5.7 \times 10^{-8}`$ |
+| "face collapse" | 55 (39.9%) | 35 (25.4%) | $`p = 3.6 \times 10^{-5}`$ |
+| "broken lines" | 36 (26.1%) | 18 (13.0%) | $`p = 3.9 \times 10^{-3}`$ |
+| "jitter" | 23 (16.7%) | 7 (5.1%) | $`p = 5.2 \times 10^{-3}`$ |
+| "mechanical" | 21 (15.2%) | 34 (24.6%) | $`p = 7.2 \times 10^{-3}`$ |
+| "missing form" | 25 (18.1%) | 19 (13.8%) | $`p = 0.18`$ |
+| "spurious lines" | 14 (10.1%) | 18 (13.0%) | $`p = 0.45`$ |
+| "darkness" | 26 (18.8%) | 20 (14.5%) | $`p = 0.45`$ |
+
+0.59e has less tangle · face collapse · broken lines, and more mechanical (lettering · signatures · repeated patterns copied line by line, thin even outlines) · spurious lines.
+
+**0.59f (not used)**: to reduce the "mechanical" notes of 3-B, strokes in dense areas were made lighter in both width and darkness (multiplied, down to 0.36×) and one in three crossing lines was drawn; it lost to 0.56 in 3-C (51 : 82). "Darkness" 12 → 94, "broken lines" 15 → 57, "missing form" 18 → 45; graders wrote "a faint trace of the line art". The metrics used for selection (mesh-cell count · clump) improve automatically when lines get lighter and thinner, so they were fooled by lightening.
+
+**0.59g (not used)**: dropping the lightening of 0.59f and only softening its crossing-line thinning (one in two, crossing threshold 6, lines 40× the pen scale or longer kept), it was added to 0.59e. Two gates were set before grading: on 60 pictures, ink at least 95% of 0.59e's (median 0.993×) and the share of 0.59e's ink outside faces kept, at least 95% of what a redraw of 0.59e with only the seed changed keeps (median 0.996×); it passed both, and the median mesh-cell count went 4.91 → 4.58. But in 3-D (0.59g vs 0.59e) 131 of 138 were ties (4 : 3, $`p = 1.00`$), and several graders compared the two panels pixel by pixel and wrote that they were "practically the same picture". By the rule fixed beforehand (release only if it wins the sign test excluding ties with 𝑝 < 0.05 and person-like · badly-lost do not get worse), 0.59e was released.
+
+**On absolute levels**: the same 0.56 roughs were judged on their own as drawn by a person on 54 pictures (39.1%) in 3-B and 74 (53.6%) in 3-C. Pairs are compared within one sheet, so a weak opponent makes the base look better too. In 3-D 0.59e got 45 (32.6%) and badly lost 55 (39.9%), but that round compared two nearly identical panels, so it is not read as a difference from 0.56.
+
+**Time**: on the 138 pictures the rough 2 step takes a median 2.7 s (0.56) → 4.0 s (0.59e), a same-picture ratio of 1.31× (quartiles 1.14–1.70×; measured at different times, 3 in parallel). It is a small share of the whole app (tens of seconds per picture).
+
 ---
 
 ## 12. Release history
@@ -2690,6 +2817,81 @@ Both network candidates are clearly above patches only (for all eight graders), 
 Newest versions are at the top.
 
 **Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
+### 0.59e;4_5[20] (2026-10-20) Rough 2 gets a pressure curve · darkness from line importance · overstrokes and traces eye · mouth boxes; blind tests by expert-role graders
+
+- Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version, 11)
+- Version name: from this version names are written `0.<number of version bumps><minor-version letter>;<number of added features>_<number of updated and fixed features>[<build number>]`. `0.59e;4_5[20]` is the fifth candidate made in 0.59 (a · b · c were early candidates measured only on the 18 artist-style crops; d · e · f · g went to blind tests), and features are counted from 0.56, the last public version. File names use `0.59e` only (illustracy-0.59e.zip.001 · .002).
+  - Added 4: ① paper grain for rough 1's pencil (0.57) ② pressure curve (0.59) ③ base darkness from line importance (0.59) ④ overstrokes (0.59)
+  - Updated · fixed 5: ① rough 2 traces the line art with a G-pen (0.57) ② two window sizes for thick lines (0.58) ③ stronger stabilization · less wobble (0.59) ④ cleanup of short pieces · ladder rungs outside faces (0.59; 0.59e keeps lone strokes) ⑤ eye · mouth box tracing (0.59e)
+  - Build 20: number of distinct rough settings drawn and measured in 0.59, unadopted candidates included (4 early 0.59 candidates · 3 variants on the 18 crops, 6 variants of 0.59e, 6 of 0.59f, and 0.59g)
+- Result: the 'Background' layer is unchanged, and the background maps of the 185 ground-truth pictures and the 60 blind-test pictures, re-run with the 0.59e app code, are byte-identical to 0.55, so the resolving power and the blind test keep 0.55's values (table below, 11.14 · 11.15). 0.57 · 0.58 were not distributed on their own and ship in this version.
+- Trigger: 0.58 lost to 0.56 in a blind test on 240 unseen pictures (65 : 153). Tracing every outline with even thin lines of constant width · darkness, it was often judged "mechanical" · "jitter" (11.18).
+- Change (rough 2, 2.9):
+  - **Pressure curve**: each stroke gets a pressure that rises after it starts, peaks around the middle (30–60% of the stroke) and eases off slowly, with a gentle wobble and a little more pressure at bends. Width follows the pressure only 50% and ink darkness only 25% (the rest stays fixed), so the even line of 0.58 gains variation in strength.
+  - **Base darkness from line importance**: how much darker the line is than its surroundings (edge strength), its original width, its length and whether it is in a face combine so that important lines are drawn darker and weak lines lighter (the lightest at 70%); strokes inside a face area stay crisp (95% or more).
+  - **Overstroke**: about one in four long strokes gets part of it (30–55%) drawn once more, slightly offset, lighter and thinner, so overlaps darken like a hand-drawn rough.
+  - **Stronger stabilizer, less wobble**: smoothing goes from 3.5 to 6 (in pen-scale units), sideways wobble from 0.45 to 0.15 of the pen width, and short pieces outside faces (under 8× the pen scale) and ladder rungs are cleaned up.
+  - **Trace eye · mouth boxes (0.59e)**: from 0.58 rough 2 traced only "lines darker than their surroundings", so eyes · mouths over dark irises dropped out or left only an outline ring. Inside eye · mouth boxes in a face area (with eye distance d: ±1.0d across, 0.35d above to 1.25d below the eyes) the lineart counts as line regardless of local contrast and solid blobs are not hollowed (one stroke through the middle), so eyes · mouths are drawn as single strokes. The cleanup of short pieces outside faces now applies only to pieces running alongside another line, keeping lone short strokes such as glasses frames · fingers. Width scale 1.25 → 1.4, width cap 2.8 → 3.2 (pen-scale units).
+- Blind test (11.19): on 138 pictures with a character as the main subject and clear line art, 15 AI graders given the role of experts looked at 5 real artists' roughs first and compared blind. "More like a rough drawn by a person" 0.59e 100 · 0.56 33 · tie 5 ($`p = 5.0 \times 10^{-9}`$; 0.59e win rate excluding ties 75.2%), judged on its own as a rough drawn by a person 54 → 83 ($`p = 3.8 \times 10^{-5}`$), badly lost meaning 49 → 31 ($`p = 4.0 \times 10^{-5}`$). "Tangle" 96 → 62 · "face collapse" 55 → 35 · "broken lines" 36 → 18 went down, and "mechanical" 21 → 34 · "spurious lines" 14 → 18 went up. 0.59 with pressure only scored 73 : 57 ($`p = 0.19`$) in the same setup.
+- Candidates not used (7 · 11.19): 0.59f (lightening dense areas + crossing-line thinning) lost to 0.56 (51 : 82), and 0.59g (softened crossing-line thinning) could not be told apart from 0.59e (131 of 138 ties, 4 : 3).
+- Processing time: over the 138 pictures the rough 2 step median is 2.7 s → 4.0 s (same-picture ratio vs 0.56 1.31×), a small share of the whole app. The app file is about 205 MB, uploaded like 0.56 as the split archive illustracy-0.59e.zip.001 · .002.
+
+| | Version 0.1 | Version 0.57 | Version 0.58 | Version 0.59e |
+|---|---|---|---|---|
+| Resolving power | 100% | 1752% | 1752% | 1752% |
+| Resolving power 95% CI | — | 1187–2998% | 1187–2998% | 1187–2998% |
+| Resolving power 80% CI | — | 1352–2434% | 1352–2434% | 1352–2434% |
+| Blind test (no major loss) | 31.7% | 86.7% | 86.7% | 86.7% |
+| Blind test 95% CI | 21.3–44.2% | 75.8–93.1% | 75.8–93.1% | 75.8–93.1% |
+| Blind test 80% CI | 24.5–39.8% | 80.1–91.3% | 80.1–91.3% | 80.1–91.3% |
+
+Resolving power is given with version 0.1 as 100%; its intervals come from a paired <mark>bootstrap</mark> over pictures (10,000 resamples, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (0.1 is the reference, so it has no interval). The blind test is the share of pictures graded "no major loss" when the versions' results on 60 pixiv pictures were mixed and graded without knowing the version, with <mark>Wilson intervals</mark> (z = 1.96 · 1.2816). 0.57 · 0.58 · 0.59e have a background layer byte-identical to 0.55 and keep 0.55's values (the grading done at 0.55 for the four versions 0.1 · 0.53 · 0.54 · 0.55 together).
+
+### 0.58 (2026-10-20) Rough 2's thick lines (eye rims · lashes) drawn as one center line with two window sizes; blind test on 240 unseen pictures
+
+- Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version, 11)
+- Result: the 'Background' layer is unchanged, and the background maps of the 185 ground-truth pictures and the 60 blind-test pictures are byte-identical to 0.55 (122 of them checked with the 0.58 app code, all 245 with the 0.59e app code, whose code outside the rough function is the same), so the resolving power and the blind test keep 0.55's values (table below, 11.14 · 11.15).
+- Change: 0.57's rough 2 counted as line only what is at least 0.15 darker than its surrounding mean (box of radius $`r_C = 3s_P`$), but the middle of a thick line (eye rims · lashes, 5–6px) is about as dark as that mean, so only its two edges remained and small eyes were drawn like square boxes. Anything at least 0.15 darker than its surroundings in a window twice as wide ($`2r_C`$) now also counts as line (two window sizes), so thick lines are drawn as one center line; eyes read as almond shapes · iris arcs (4.14 step 11).
+- 18 artist-style reference crops (11.18): F 0.742 → 0.739 (vs 0.57 8 : 10, $`p = 0.81`$), recall 0.845 → 0.848, thick-line recall 0.847 → 0.853, on-target center-line distance 1.01 → 1.05 px (larger on all 18: the center line sits a little off where the artist drew). Versus 0.56, F 0.728 → 0.739 (12 : 6, $`p = 0.24`$).
+- Blind test on 240 pictures (11.18): 12 AI graders compared 0.56's and 0.58's rough 2 on 240 unseen pixiv pictures (97 hold-out + 143 newly drawn) without knowing the version. "More like a rough drawn by a person": 0.58 65 · 0.56 153 · tie 22 ($`p = 2.3 \times 10^{-9}`$; 0.58 win rate excluding ties 29.8%); roughs that badly lost their meaning 92 (38.3%) → 84 (35.0%; pairs 20 : 12, $`p = 0.22`$); "tangle" 110 → 131. Face collapse (88 → 66, pairs 36 : 14) and missing form (124 → 95, 38 : 9) drop, so less meaning is lost, but "mechanical" (10 → 117, pairs 2 : 109) · "jitter" (15 → 80, 8 : 73) rise sharply, so on looking like a rough drawn by a person it is lower than 0.56 (11 of the 12 graders leaned to 0.56). The developer disagrees with the "mechanical" · "person-like" judgments, since tracing a clean-up rough with an even pen, both edges of shapes included, is how illustrators actually work, and the release decision did not rest on them (the graders are AI, not illustrators).
+- Processing time: over the 240 pictures the rough 2 step median is 2.6 s → 3.6 s (same-picture ratio 1.25×), a small share of the whole app. 0.58 was not distributed on its own; it ships with 0.59e (0.57 too was built only for review).
+
+| | Version 0.1 | Version 0.56 | Version 0.57 | Version 0.58 |
+|---|---|---|---|---|
+| Resolving power | 100% | 1752% | 1752% | 1752% |
+| Resolving power 95% CI | — | 1187–2998% | 1187–2998% | 1187–2998% |
+| Resolving power 80% CI | — | 1352–2434% | 1352–2434% | 1352–2434% |
+| Blind test (no major loss) | 31.7% | 86.7% | 86.7% | 86.7% |
+| Blind test 95% CI | 21.3–44.2% | 75.8–93.1% | 75.8–93.1% | 75.8–93.1% |
+| Blind test 80% CI | 24.5–39.8% | 80.1–91.3% | 80.1–91.3% | 80.1–91.3% |
+
+Resolving power is given with version 0.1 as 100%; its intervals come from a paired <mark>bootstrap</mark> over pictures (10,000 resamples, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (0.1 is the reference, so it has no interval). The blind test is the share of pictures graded "no major loss" when the versions' results on 60 pixiv pictures were shuffled and graded without knowing the version; its intervals are <mark>Wilson intervals</mark> (z = 1.96 · 1.2816). 0.56 · 0.57 · 0.58 have background layers byte-identical to 0.55, so they keep 0.55's values (the grading of the four versions 0.1 · 0.53 · 0.54 · 0.55 done together at 0.55).
+
+### 0.57 (2026-10-20) Rough 2 traced over the line art with a G-pen (local-contrast lines · pen width · pressure · stabilizer); rough 1 with pencil grain
+
+- Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version, 11)
+- Result: only the roughs changed and the 'Background' layer is unchanged. With the 0.57 app code the background maps of 45 ground-truth pictures were confirmed byte-identical to 0.55, and all 245 with 0.59e, whose code outside the rough function is the same (11.14). The layers other than the roughs (line art · base colors · shading · background etc.) are byte-identical to 0.56 on 2 pictures in the real app and 78 hold-out pictures.
+- Trigger: on about 17% of unseen pictures rough 2 became meaningless dense tangles of lines (a net), hard to believe as the rough the line art was drawn over. Every pixel with line alpha ≥ 0.25 counted as line art, so masses of fill · shading · texture got in, thinning those masses gave a net of center lines, and faces were redrawn several times over.
+- Change (rough 2, 4.14 step 11): instead of inner lines · face details (4.14 steps 4 · 6), the line art is traced once with a G-pen.
+  (1) **Pen width**: per picture the pen width $`w_p`$ is measured as line-art ink area ÷ center-line length, and the pen scale $`s_P = \mathrm{clamp}(w_p / 1.25,\ 0.5,\ 3)`$ sets the length thresholds · radii (artists draw with the same pen for the same canvas format regardless of resolution).
+  (2) **Local-contrast lines**: only what is at least 0.15 darker than its surrounding mean (radius $`3s_P`$) counts as line, which leaves out masses of fill · shading · texture. Small holes (area ≤ $`25s_P^2`$: sparkles · dots) are filled, and solid filled masses (inner distance over $`2.5s_P`$) keep only their outline.
+  (3) **G-pen strokes**: a moving average removes the staircase, lines are split only where they really turn (over 1.05 rad; gentle curves stay one stroke), and a stabilizer (Gaussian along arc length, $`\sigma = \min(3.5s_P,\ L/6)`$) smooths them. The width follows the median half-width of the original line, pressing a little harder where it was drawn thicker (0.85–1.2×); it tapers short going in ($`\min(0.18L,\ 5s_P)`$) and long coming out ($`\min(0.35L,\ 14s_P)`$) with a constant ink darkness of 0.92. It wobbles sideways with amplitude $`0.45s_P`$ and is drawn like a right-hander, top → bottom · left → right.
+  (4) Masses · silhouettes · background composition · face construction are still drawn, but in one pass (no re-strokes) with darkness independent of pressure.
+- Rough 1 in pencil: paper grain at two sizes, 2.5px · 1.1px ($`a = \mathrm{acc}\cdot\max(0,\ 0.74 + 0.18n + 0.22n_f)`$), gives a pencil feel.
+- 18 artist-style reference crops (11.18): F 0.728 → 0.742 (12 : 6, $`p = 0.24`$), recall 0.825 → 0.845 (14 : 4, $`p = 0.03`$), precision 0.675 → 0.684 (11 : 7, $`p = 0.48`$), on-target center-line distance 1.07 → 1.01 px (14 : 4, $`p = 0.03`$), breaks (per 100px of reference) 0.92 → 0.81.
+- 0.57 was built for the user's review and was not distributed separately; the blind test on unseen pictures was done with 0.58 (0.56 vs 0.58, 11.18).
+
+| | Version 0.1 | Version 0.55 | Version 0.56 | Version 0.57 |
+|---|---|---|---|---|
+| Resolving power | 100% | 1752% | 1752% | 1752% |
+| Resolving power 95% CI | — | 1187–2998% | 1187–2998% | 1187–2998% |
+| Resolving power 80% CI | — | 1352–2434% | 1352–2434% | 1352–2434% |
+| Blind test (no major loss) | 31.7% | 86.7% | 86.7% | 86.7% |
+| Blind test 95% CI | 21.3–44.2% | 75.8–93.1% | 75.8–93.1% | 75.8–93.1% |
+| Blind test 80% CI | 24.5–39.8% | 80.1–91.3% | 80.1–91.3% | 80.1–91.3% |
+
+Resolving power is given with version 0.1 as 100%; its intervals come from a paired <mark>bootstrap</mark> over pictures (10,000 resamples, seed 20261002), the 95% interval being the 2.5 · 97.5 percentiles and the 80% interval the 10 · 90 percentiles (0.1 is the reference, so it has no interval). The blind test is the share of pictures graded "no major loss" when the versions' results on 60 pixiv pictures were shuffled and graded without knowing the version; its intervals are <mark>Wilson intervals</mark> (z = 1.96 · 1.2816). 0.56 · 0.57 have background layers byte-identical to 0.55, so they keep 0.55's values (the grading of the four versions done together at 0.55).
 
 ### 0.56 (2026-10-20) A 'Background fill' layer that estimates the background behind the character with an inpainting network (big-lama) and patch matching, placed directly above the 'Background' layer (the background layer itself unchanged)
 
