@@ -1,6 +1,6 @@
-# Illustracy — 일러스트 레이어 분리기
+한국어&emsp;&emsp;[English](README.en.md)
 
-**한국어** | [English](README.en.md)
+# Illustracy — 일러스트 레이어 분리기
 
 다 그린 그림 한 장을, 그림을 그릴 때처럼 **여러 장의 투명한 층(레이어)으로 다시 나눠** 포토샵 파일(PSD)로 저장하는 프로그램입니다.
 

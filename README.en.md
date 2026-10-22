@@ -1,6 +1,6 @@
-# Illustracy — Illustration Layer Separator
+[한국어](README.md)&emsp;&emsp;English
 
-[한국어](README.md) | **English**
+# Illustracy — Illustration Layer Separator
 
 A program that takes a single finished illustration and **splits it back into many transparent layers**, the way it was painted, and saves them as a Photoshop file (PSD).
 
@@ -17,7 +17,7 @@ A program that takes a single finished illustration and **splits it back into ma
 - Cutout model (0.51, on by default): an anime-character segmentation network (ISNet, skytnt/anime-seg, Apache-2.0) reduced to 8 bits and built into the app file. It picks out the whole character and puts the rest on the background layer (3.5). From 0.52 the character probability it gives is added to the decision of the previous method (background detection + neural-network assist), from 0.53 pictures where the model finds almost no character use the previous method's decision as it is, and from 0.54 a copy of the same network fine-tuned on synthetic · AI-generated pixiv pictures is run as well, a weighted average of the two probabilities is used as the model probability and the threshold is raised slightly; 0.55 uses a copy further trained to count effects (glow · particles · light rays) as background and averages the two probabilities with equal weights.
 - Background fill (0.56, default "network + patches"): a 'Background fill' layer that estimates the background behind the character with the bundled inpainting network big-lama (reconnects broken structure), patch matching (original texture) and a seam membrane, placed directly above the 'Background' layer (3.5). The difference from the synthetic ground truth (MAE) is scene 2.9 · bokeh 9.0 · stripes 0.4 (patches only 18.3 · 9.2 · 2.0; left white 66.0 · 167.7 · 29.2), and the naturalness grading of 120 unseen AI-generated pixiv pictures (8 graders, 0–100) is 59.2 (patches only 44.7). The meaning of hidden objects cannot be invented (10.2 · 11.17). The fp16 weights (102 MB) are embedded, so the app file is about 205 MB, and because of GitHub's 100 MiB file limit the repository holds it as a split archive (section 1).
 - Rough 2 traced with a G-pen, with pen pressure (0.57–0.59e): rough 2 picks only the parts of the line art clearly darker than their surroundings (leaving out areas that are broadly dark from fill · shading · texture) and traces each once with a G-pen matched to the picture's own pen width (0.57 · 0.58). From 0.59 each stroke gets a pressure curve that varies its width · darkness, important lines are drawn darker and weak lines lighter, and part of long strokes is drawn over once more. 0.59e draws the eyes · mouth inside a face area straight from the line art as single strokes. Rough 1 is drawn with pencil grain. 15 AI graders given the role of experts compared the same 138 pictures blind: "more like a rough drawn by a person" 0.59e 100 · 0.56 33 · tie 5 ($`p = 5.0 \times 10^{-9}`$), and judged on its own as a rough drawn by a person 54 → 83 (11.19). 0.58 alone lost to 0.56 (65 : 153 on 240 pictures, 11.18). From 0.59e versions are named like `0.59e;4_5[20]` (12).
-- Sample image (0.59i;0_1[20]): **Sample image** (`예제 그림`) opens one of 10 pictures bundled in the app (AI-generated pixiv pictures; sources in [the 0.59i entry of section 12](#059i0_120-2026-10-20-sample-image-one-of-10-bundled-pictures-at-random)) at random, never the same one twice in a row.
+- Sample image (0.59i;0_1[20]): **Sample image** opens one of 10 pictures bundled in the app (AI-generated pixiv pictures; sources in [the 0.59i entry of section 12](#059i0_120-2026-10-20-sample-image-one-of-10-bundled-pictures-at-random)) at random, never the same one twice in a row.
 - Weaknesses and a call for help: the weaknesses found in the background, body, base colors, faces, and objects, and a request for help with them, are in [10.6](#106-weaknesses-seen-through-the-five-targets-and-a-call-for-help-039).
 
 ---
@@ -53,25 +53,25 @@ Stacking the split sheets again looks the same as the original picture, so close
 
 ### What does it split into?
 
-The program's screen and the layer names in the PSD are in Korean. The Korean names are given in parentheses.
+The program's interface and PSD layer names are in Korean; this guide gives their English translations.
 
 | Layer | What it holds |
 |---|---|
-| Rough (`러프` folder: `러프 1 (컨셉)` · `러프 2 (다듬기)`) | Two underdrawings. Rough 1 is the crude rough an artist dashes off the moment an idea comes, and rough 2 refines it and matches the composition to the original. They are not in the original picture, so they are a guess, and they start hidden |
-| Line art (`선화`) | The lines of the picture |
-| Color trace (`색 트레이스`) | The parts of the lines whose color differs (lines catching light, colored lines) |
-| Base color (`밑색`) | The single flat color painted per part, such as hair, skin, clothes |
-| 1st · 2nd shadow (`1차 그림자` · `2차 그림자`) | Darker areas laid over the base color. The 2nd is darker than the 1st |
-| Highlight (`하이라이트`) | Areas painted brighter than the base color (hair sheen, etc.) |
-| Shading · gradient (`명암` · `그라데이션`) | Areas that darken smoothly |
-| Reflected light · rim light (`반사광` · `림라이트`) | Areas that brighten again inside a shadow, light along the edge of the body |
-| Light · sparkle (`빛` · `반짝임`) | Glowing effects, sparkles in the eyes, stars |
-| Background · background FX (`배경` · `배경 효과`) | The background behind the character, flecks of light floating over the background |
-| Background fill (`배경 메꿈`) | The character's area filled with an estimate from an inpainting network (big-lama) and patch matching (0.56, directly above 'Background') |
-| Outer glow (`외곽 글로우`) | A neon band drawn around the character (only in pictures that have one) |
+| Rough (Rough folder: Rough 1 (Concept) · Rough 2 (Refinement)) | Two underdrawings. Rough 1 is the crude rough an artist dashes off the moment an idea comes, and rough 2 refines it and matches the composition to the original. They are not in the original picture, so they are a guess, and they start hidden |
+| Line art | The lines of the picture |
+| Color trace | The parts of the lines whose color differs (lines catching light, colored lines) |
+| Base color | The single flat color painted per part, such as hair, skin, clothes |
+| 1st · 2nd shadow | Darker areas laid over the base color. The 2nd is darker than the 1st |
+| Highlight | Areas painted brighter than the base color (hair sheen, etc.) |
+| Shading · gradient | Areas that darken smoothly |
+| Reflected light · rim light | Areas that brighten again inside a shadow, light along the edge of the body |
+| Light · sparkle | Glowing effects, sparkles in the eyes, stars |
+| Background · background FX | The background behind the character, flecks of light floating over the background |
+| Background fill | The character's area filled with an estimate from an inpainting network (big-lama) and patch matching (0.56, directly above 'Background') |
+| Outer glow | A neon band drawn around the character (only in pictures that have one) |
 
 Each part gets its own folder, and the folder holds that part's base color · shadows · highlights (choosing **per-stage folders** in the settings turns this around: the parts sit inside [Base color] · [1st shadow] · [2nd shadow] · [Highlight] folders).
-If the program finds a face in the picture (also in PNGs with a transparent background), it names folders **eyes · skin · hair** (`눈` · `피부` · `머리카락`) from the colors around the face; the other folders are named by color (blue `파랑`, black `검정` …).
+If the program finds a face in the picture (also in PNGs with a transparent background), it names folders **eyes · skin · hair** from the colors around the face; the other folders are named by color (blue, black …).
 
 ### What do I need?
 
@@ -82,26 +82,26 @@ If the program finds a face in the picture (also in PNGs with a transparent back
 
 1. Download [`illustracy-0.59i.zip.001`](illustracy-0.59i.zip.001) and [`illustracy-0.59i.zip.002`](illustracy-0.59i.zip.002) into the same folder and extract them: open `.001` in 7-Zip (it shows `illustracy-0.59i.zip` inside; extract that), or join the parts first (Windows command prompt `copy /b illustracy-0.59i.zip.001 + illustracy-0.59i.zip.002 illustracy-0.59i.zip`, macOS · Linux `cat illustracy-0.59i.zip.* > illustracy-0.59i.zip`) and unzip. You get `illustracy.html` (the app, about 223 MB) and `illustracy-help.html` (the help); keep both in the same folder and open `illustracy.html` in a browser. It is split because of GitHub's 100 MiB file limit.
 2. Drag an image onto the window, click the box at the top left to choose one, or paste a copied image with `Ctrl+V`.
-   To try it first, click **Sample image** (`예제 그림`). It opens one of 10 pictures bundled in the app at random (never the same one twice in a row).
+   To try it first, click **Sample image**. It opens one of 10 pictures bundled in the app at random (never the same one twice in a row).
 3. Wait a few seconds and the layer list appears on the right.
    - Circle button: turn that layer on or off
    - Click a layer name: change the blend mode and opacity, save only that layer as an image file
    - Double-click a layer name: rename it
    - **Eye button** above the list: clicking the open eye turns all layers and folders off at once and the icon changes to a closed eye. Clicking the closed eye restores the state from before.
      After turning everything off, turning one layer on also turns on the folders that contain it, so only that layer shows; turning a folder on shows the layers inside it.
-4. Click **PSD download** (`PSD 다운로드`) to save a file you can open in Photoshop. Names, opacities, and on/off states you changed in the list are saved as they are.
+4. Click **PSD download** to save a file you can open in Photoshop. Names, opacities, and on/off states you changed in the list are saved as they are.
 
 Zoom the picture in the middle with the mouse wheel and drag to move it.
-The **도움말** (help) button at the top right opens `illustracy-help.html` from the app's folder in a new window: a help page (in Korean) on how to use the program, how to fix wrongly split parts and how it works; your result stays as it is. If that file is missing, the app shows "도움말 파일이 존재하지 않는다. 확인 바란다." ("The help file does not exist. Please check.") and does not open anything (from 0.59h). To read only the help, download [`illustracy-help.html`](illustracy-help.html) and open it.
+The **Help** button at the top right opens `illustracy-help.html` from the app's folder in a new window: a help page (in Korean) on how to use the program, how to fix wrongly split parts and how it works; your result stays as it is. If that file is missing, the app shows "The help file does not exist. Please check." and does not open anything (from 0.59h). To read only the help, download [`illustracy-help.html`](illustracy-help.html) and open it.
 The theme switch next to it sets the screen colors to follow the system, light or dark. The choice is shared by the app and the help, and changing it in one updates the other if it is open.
-With the buttons at the top you can switch between **Composite** (`합성`, the split layers stacked) · **Original** (`원본`) · **Selected layer** (`선택 레이어`, only the chosen layer) · **Difference ×8** (`차이 ×8`, places that differ from the original, emphasized 8×).
+With the buttons at the top you can switch between **Composite** (the split layers stacked) · **Original** · **Selected layer** (only the chosen layer) · **Difference ×8** (places that differ from the original, emphasized 8×).
 
 ### Fixing wrongly split areas
 
 Automatic splitting sometimes leaves a background object on the character side, or sends part of the character to the background.
 
-- **Send to background** (`배경으로 보내기`): turn it on, then click or rub the object to move (table, chair, etc.) and it moves to the background. It does not drag neighboring parts across a line.
-- **Return to character** (`캐릭터로 되돌리기`): rub a part that wrongly went to the background (a cropped hat, a sleeve, a leg) and it comes back to the character, and the picture is split again (a few seconds).
+- **Send to background**: turn it on, then click or rub the object to move (table, chair, etc.) and it moves to the background. It does not drag neighboring parts across a line.
+- **Return to character**: rub a part that wrongly went to the background (a cropped hat, a sleeve, a leg) and it comes back to the character, and the picture is split again (a few seconds).
 - For a large area, draw a **loop around** the part to move (end near the starting point) and the inside is handled at once. If the inside of the loop fills faintly, it was recognized as a loop.
 - To undo, use the `↶` button or `Ctrl+Z`.
 - While these two tools are on, pan the view with the right mouse button.
@@ -110,8 +110,8 @@ Your fixes remain when you change settings and split again, and are cleared when
 
 ### Renaming layers in old PSDs
 
-PSDs saved up to 0.34 have the line-color layer named `색트레스`. Drag such a PSD onto the window like a picture, or choose it with the top-left box (several at once also work),
-and a PSD with the layer renamed to `색 트레이스` is saved right away under the same file name. Pixels · layer order · folders · clipping stay as they are, and the file never leaves the browser.
+PSDs saved up to 0.34 give the line-color layer an older, compact Korean spelling of 'Color trace'. Drag such a PSD onto the window like a picture, or choose it with the top-left box (several at once also work),
+and a PSD with the layer name changed to the corrected, spaced Korean spelling of 'Color trace' is saved right away under the same file name. Pixels · layer order · folders · clipping stay as they are, and the file never leaves the browser.
 PSB files and files converted to 16 · 32 bits also work. If the file is already fixed, the program tells you there is no layer name to fix.
 
 ### Settings
@@ -128,13 +128,13 @@ PSB files and files converted to 16 · 32 bits also work. If the file is already
 | Shadow threshold | Higher sends faintly darkened areas to the shadow layer too |
 | Maximum sparkle size | Bright dots smaller than this are treated as sparkles (0 sets it automatically for the resolution) |
 | Maximum number of parts | Maximum number of part folders (default 32). Small parts that overflow go into the "small parts" folder |
-| Split painting by part (`채색을 파츠별로 나누기`) | When off, base color · shadows · highlights become one layer each, without separating parts |
-| Folder layout (`폴더 나누는 방식`) | **Per-part folders** (`파츠별 폴더`, default): in each of [Skin] [Hair] … folders, base color · 1st · 2nd shadow · highlight.<br>**Per-stage folders** (`단계별 폴더`): in each of [Base color] [1st shadow] [2nd shadow] [Highlight] folders, one layer per part (3.12). Available only when splitting by part; no clipping is used |
+| Split painting by part | When off, base color · shadows · highlights become one layer each, without separating parts |
+| Folder layout | **Per-part folders** (default): in each of [Skin] [Hair] … folders, base color · 1st · 2nd shadow · highlight.<br>**Per-stage folders**: in each of [Base color] [1st shadow] [2nd shadow] [Highlight] folders, one layer per part (3.12). Available only when splitting by part; no clipping is used |
 | Clip shadows · highlights to the base color | Keeps shadows and highlights from going outside the base color |
 | Automatic flat background separation | Turns background detection on and off |
 | Cutout model | On by default (0.51). The character probability from the anime-character cutout model built into the app is added to the decision of the previous method (background-detection steps + neural-network assist) to decide the character; the rest goes to the background layer (3.5, 0.52). Pictures where the model finds almost no character (characters that are not human-shaped, for example) use the previous method's decision as it is (0.53). From 0.54 the original model and a fine-tuned copy are both run, their probabilities averaged with weights 0.6 · 0.4, and the addition threshold set to 0.55. 0.55 uses a copy further trained to count effects (glow · particles · light rays) as background and averages the two probabilities 0.5 · 0.5. Outer glow and the small-pieces-on-background rule are not used then. Adds tens of seconds per picture and is not used on pictures with transparent pixels. Turned off, results are the same as 0.50 |
 | Neural-network assist | On by default. At the end of background detection, of the color regions left on the character side, only those whose background probability, from a statistical score and a small neural network's score combined in one formula, exceeds 0.8 are sent to the background (12 in 3.5). Turned off, results are the same as 0.48 |
-| Tilted picture (`기울어진 그림`) | Off by default. Turn it on for pictures that are strongly tilted overall (more than 45°) or lying on their side: faces are searched at several angles (0 · ±30 · ±60 · ±90°) and names · character folders · background rules follow the most face-like angle. The chosen tilt appears in the result line as "tilt N°".<br>On upright pictures it finds slightly fewer faces and slightly more fake faces (82 ground-truth pictures: real faces 29/35 → 26/35, fake faces 15 → 17), so it is better left off for pictures that are not tilted.<br>Pictures saved rotated, whose four corners are white · one color · transparent, are recognized without turning it on |
+| Tilted picture | Off by default. Turn it on for pictures that are strongly tilted overall (more than 45°) or lying on their side: faces are searched at several angles (0 · ±30 · ±60 · ±90°) and names · character folders · background rules follow the most face-like angle. The chosen tilt appears in the result line as "tilt N°".<br>On upright pictures it finds slightly fewer faces and slightly more fake faces (82 ground-truth pictures: real faces 29/35 → 26/35, fake faces 15 → 17), so it is better left off for pictures that are not tilted.<br>Pictures saved rotated, whose four corners are white · one color · transparent, are recognized without turning it on |
 | Generate rough sketch · rough color | Whether to make the two rough layers (rough 1 · rough 2), and in what color to draw them |
 
 ### Pictures that work well, pictures that are hard
@@ -420,7 +420,7 @@ For pictures where no background was found, a background layer appears only once
 
 #### Filling the background behind the character (0.56)
 
-The 'Background' layer with the character removed is transparent where the character was. 0.56 adds a **'Background fill'** layer (`배경 메꿈`) estimated for that area, directly **above** the 'Background' layer inside the 'Background' group (below glows and background FX; setting "Fill the background behind the character": network + patches (default) · patches only · off; off, the layer is absent and everything else is the same). The fill layer covers only the character's area plus a narrow band around it (1/160 of the long side, 3–12 px) and is transparent elsewhere, so the background layer is left as it is, yet the two together look like a background that never had the character. The band is covered because a few pixels of the character's outline and blended colors remain at the edge of the background layer.
+The 'Background' layer with the character removed is transparent where the character was. 0.56 adds a **'Background fill'** layer estimated for that area, directly **above** the 'Background' layer inside the 'Background' group (below glows and background FX; setting "Fill the background behind the character": network + patches (default) · patches only · off; off, the layer is absent and everything else is the same). The fill layer covers only the character's area plus a narrow band around it (1/160 of the long side, 3–12 px) and is transparent elsewhere, so the background layer is left as it is, yet the two together look like a background that never had the character. The band is covered because a few pixels of the character's outline and blended colors remain at the edge of the background layer.
 At this stage the character is already gone, so unlike a photo editor's generative fill the program never has to invent "anything": it only has to continue the **background**. So it uses a background-only inpainting network trained on scene photos, takes texture only from the remaining background, and spends the remaining computation on the **seam** where the filled area meets the original background (formulas in [4.5](docs/4-2-background.en.md#background-fill-056)). ① **Network estimate**: the picture with the hole blanked and the hole mask are reduced to a long side of 512 (averaging known pixels only), placed on a 512×512 canvas with reflection padding, and fed to the bundled inpainting network <mark>big-lama</mark> (18 Fourier-convolution ResNet blocks, 50.9 M weights, trained on Places scene photos, Apache-2.0). Its Fourier convolutions see the whole picture at once, so distant structure (window frames, floor boards, trees, patterns) is continued across the hole. The output is cropped and upsampled (bicubic) to full resolution: the initial estimate G. The model runs in the browser's ONNX Runtime (WASM, one thread); no internet is needed. ② **Original texture (<mark>PatchMatch</mark>)**: at full resolution (long side ≤ 1024) hole pixels start at G; for every 7×7 patch the most similar known patch is found (propagation and random search, 2 rounds × 3 sweeps) and voted. Final color = w·patch + (1 − w)·G with w = exp(−max(0, D − τ₀)/(2·max(med D, τ₁))) (τ₀ · τ₁ = the distances of an RMS of 0.02 · 0.05 per channel): where a good match exists (fully, when the distance is at noise level) the original texture is used, where none exists (structure absent from the known background) the network estimate stays. An absolute threshold is needed because with the median alone, on flat pictures such as a white background, a distance at JPEG-noise level counts as a bad match and the network's gray noise would remain. ③ **Seam membrane**: on the one-pixel ring of known pixels just outside the hole, the difference between what the fill "predicts" there (patch vote mixed with G by the local weight) and the actual pixels is the boundary value of a harmonic membrane (Laplace = 0 inside the hole, solved by multigrid) added to the fill, the same formulation as <mark>Poisson seamless cloning</mark>. The color and brightness step at the seam becomes zero and spreads smoothly inward; texture and lines are untouched.
 "Patches only" is the method developed first for 0.56 without the network (halving pyramid → diffusion at the coarsest level → coarse-to-fine patch matching → regularity gate → distance-graded blend); it finishes in 1–5 s but cannot reconnect broken structure. The weights are stored as fp16 (102 MB), not 8-bit: per-channel 8-bit quantization flipped the colors of flat backgrounds (a 1% weight perturbation changed the output by up to 0.6–0.8 against fp32) and was unusable, while fp16 differs by at most 0.007–0.03. This is why the app file is about 205 MB (0.55: 80 MB), and because of GitHub's 100 MiB file limit the repository holds it as a split archive (illustracy-0.56.zip.001 · .002, section 1).
 The color difference from the synthetic ground truth re-rendered without the character (MAE, 0–255) is network + patches 2.82 (scene 2.9 · bokeh 9.0 · stripes 0.4 · posed synthetic 1.9), network only 6.08, patches only 3.94 (scene 18.3), left white 84.20, and the MAE in the seam band (8 px from the boundary) is 1.96 · 3.99 · 2.91 (11.17). The naturalness grading of 120 unseen AI-generated pixiv pictures (8 graders × 15, 0–100) is network + patches 59.2 · network only 60.2 · patches only 44.7. None of this knows the meaning of hidden objects, so nothing the character hid is invented.
@@ -2580,7 +2580,7 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.32 | Fewer pictures with no background found | 87.1 | 89.1 | 0.1188 | 8.42 | **1.29** | 1.08–1.55 | 3.05 · 1.70 · 0.96 |
 | 0.33 | Verifying the character layer, background seen between character parts (gaps) | 87.1 | 89.2 | 0.1186 | 8.43 | **1.29** | 1.08–1.55 | 3.05 · 1.70 · 0.96 |
 | 0.34 | Tackling limitations again: narrow gaps on white backgrounds, mirror-agreed faces, returning black hair | 87.8 | 89.2 | 0.1150 | 8.70 | **1.33** | 1.11–1.61 | 3.73 · 1.70 · 0.97 |
-| 0.35 | Layer name "색 트레이스", a tool to rename layers in old PSDs | 87.8 | 89.2 | 0.1150 | 8.70 | **1.33** | 1.11–1.61 | 3.73 · 1.70 · 0.97 |
+| 0.35 | Corrected, spaced Korean "Color trace" layer name, a tool to rename layers in old PSDs | 87.8 | 89.2 | 0.1150 | 8.70 | **1.33** | 1.11–1.61 | 3.73 · 1.70 · 0.97 |
 | 0.36 | Fixing layer names of old PSDs inside the program | 87.8 | 89.2 | 0.1150 | 8.70 | **1.33** | 1.11–1.61 | 3.73 · 1.70 · 0.97 |
 | 0.37 | Tilted pictures, keeping black clothes from leaking into the background | 91.0 | 89.0 | 0.0999 | 10.01 | **1.53** | 1.29–1.84 | 3.46 · 1.70 · 1.18 |
 | 0.38 | Returning lineless clothes · legs that went into the scene background | 94.6 | 88.2 | 0.0862 | 11.60 | **1.78** | 1.50–2.14 | 3.43 · 1.70 · 1.44 |
@@ -2779,7 +2779,7 @@ The graders' notes show the two versions split almost every time. 0.58 traces bo
 ### 11.19 Rough 2 pressure · eye · mouth boxes and blind tests by expert-role graders (0.59 · 0.59e)
 
 0.59 adds a pressure curve · darkness from line importance · overstrokes · stronger stabilization to 0.58's G-pen tracing, and 0.59e adds eye · mouth box tracing on top (2.9). All of them change rough 2 only.
-Six blind rounds were run. The graders are not people but fresh sessions of the same language model (unaware of this development conversation); each round used new graders and new sheets (A · B positions random per picture). From round 2, at the user's request, only the 138 pictures with a character as the main subject and clear line art were used, and 5 real artists' roughs found by a fixed rule on pixiv (tag "ラフ" · 300+ bookmarks · no AI images) were shown to the graders first. From 3-A the graders were given the role of "an expert in the composition of Japanese-style illustration and digital drawing (pen pressure · stabilizer · the rough → line-art process)" (with no instruction to prefer any style). Methods · metrics · decision rules were written down before grading, and rounds with bad results are reported as they are. Only pairs within one round are tests; comparing rates across rounds is for reference only, because the groups of graders differ.
+Six blind rounds were run. The graders are not people but fresh sessions of the same language model (unaware of this development conversation); each round used new graders and new sheets (A · B positions random per picture). From round 2, at the user's request, only the 138 pictures with a character as the main subject and clear line art were used, and 5 real artists' roughs found by a fixed rule on pixiv (the Japanese tag meaning "rough sketch" · 300+ bookmarks · no AI images) were shown to the graders first. From 3-A the graders were given the role of "an expert in the composition of Japanese-style illustration and digital drawing (pen pressure · stabilizer · the rough → line-art process)" (with no instruction to prefer any style). Methods · metrics · decision rules were written down before grading, and rounds with bad results are reported as they are. Only pairs within one round are tests; comparing rates across rounds is for reference only, because the groups of graders differ.
 
 | Round | Pictures | Graders | Versions | More like a rough drawn by a person (new : base : tie) | 𝑝 (sign test) | Judged on its own as a rough drawn by a person (base → new, pairs) | Badly lost meaning (base → new) |
 |---|---|---|---|---|---|---|---|
@@ -2947,7 +2947,7 @@ Newest versions are at the top.
 
 - Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version, 11)
 - Rough skill: 247% of version 0.1 (95% CI 156–419% · rough same as the previous version, 11.20)
-- **Sample image**: at the user's request, **Sample image** (`예제 그림`) now opens one of 10 pictures bundled in the app at random instead of the picture drawn in code (never the same one twice in a row).
+- **Sample image**: at the user's request, **Sample image** now opens one of 10 pictures bundled in the app at random instead of the picture drawn in code (never the same one twice in a row).
   The pictures are embedded as base64 without changing the original files (about 22 MB; the app grows from about 196 MB to 223 MB) and are split like any loaded picture at the default processing size (long side 2048 px). The picture drawn in code is no longer used and was removed.
   Checked in Chromium: all 10 decode, 30 clicks never repeat the previous picture (9 of the 10 appeared in 30 clicks), and one of them (144221130, processed at 1170×2048) splits completely into 49 layers (composite PSNR 57.8 dB).
 - Sample image sources: 10 AI-generated pixiv pictures chosen by the user — [150730595](https://www.pixiv.net/artworks/150730595) · [150847462](https://www.pixiv.net/artworks/150847462) · [150881490](https://www.pixiv.net/artworks/150881490) · [150988710](https://www.pixiv.net/artworks/150988710) · [150999564](https://www.pixiv.net/artworks/150999564) · [151001952](https://www.pixiv.net/artworks/151001952) · [144221130](https://www.pixiv.net/artworks/144221130) · [149272285](https://www.pixiv.net/artworks/149272285) · [150456139](https://www.pixiv.net/artworks/150456139) · [150706121](https://www.pixiv.net/artworks/150706121).
@@ -2972,8 +2972,8 @@ Resolving power · blind test · rough skill are computed as in the 0.59h entry'
 
 - Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version, 11)
 - Rough skill: 247% of version 0.1 (95% CI 156–419% · rough same as the previous version, 11.20)
-- **Help outside the app file**: the help that was bundled inside the app file is taken out, and the **도움말** (help) button in the header opens `illustracy-help.html` from the app's folder in a new window.
-  If that file is missing, the app shows "도움말 파일이 존재하지 않는다. 확인 바란다." ("The help file does not exist. Please check.") and opens nothing. An app opened from the computer checks by loading the file as a script (its content is not run); an app opened from the web asks for the file directly.
+- **Help outside the app file**: the help that was bundled inside the app file is taken out, and the **Help** button in the header opens `illustracy-help.html` from the app's folder in a new window.
+  If that file is missing, the app shows "The help file does not exist. Please check." and opens nothing. An app opened from the computer checks by loading the file as a script (its content is not run); an app opened from the web asks for the file directly.
   The version label that was only in the help now also sits in the app header. The split archive still contains both the app and the help, so extract them into the same folder. Opening · the message · clicking again were checked in Chromium with and without the help file, both from local files (file:) and from a web server (http).
 - The core (separation · rough code) and the 10 neural-network blocks are byte-identical to 0.59e (hash check), so background maps · roughs · resolving power · blind test · rough skill are those of 0.59e.
 - **Rough skill by version (11.20)**: the 12 panels where the rough changed, from 0.1 to 0.59e, were graded blind on the fixed 60 pictures in 300 sheets and written with 0.1 = 100%. The highest version is 0.56 (367%); 0.59e is below it (head to head 22 : 34 (4 ties)). The method is fixed in CLAUDE.md.
@@ -3072,7 +3072,7 @@ Resolving power is given with version 0.1 as 100%; its intervals come from a pai
 
 - Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version, 11)
 - Result: the 'Background' (kind bg) layer is unchanged, and the background maps of the 185 ground-truth pictures and the 60 blind-test pictures, re-run with the same app code, are byte-identical to 0.55, so the resolving power and the blind test keep 0.55's values (table below).
-- Change: instead of leaving the character's area transparent, a 'Background fill' layer (`배경 메꿈`) estimated for it is placed directly above the 'Background' layer inside the 'Background' group (below glows and background FX) (3.5; formulas in docs 4-2). The hole is dilated by 1/160 of the long side (3–12 px) to drop the outline and blended edge → reduced to a long side of 512 and fed to the bundled inpainting network big-lama (Fourier convolutions, 50.9 M weights in fp16, trained on scene photos, Apache-2.0), which continues broken structure (window frames, floors, trees, patterns) → 7×7 patch matching at full resolution for the original texture (patches where a good match exists, the network estimate elsewhere) → seam membrane (a harmonic membrane with the difference between the fill's prediction and the actual pixels on the ring around the hole as boundary values, the formulation of Poisson seamless cloning). At this stage the character is already gone, so only the background has to be continued; hence a background-only model, patches only from the remaining background, and the spare computation spent on the seam. Setting "Fill the background behind the character": network + patches (default) · patches only (no network, 1–5 s, the pyramid patch method developed first for 0.56) · off (same as 0.55). In the PSD the layer is '배경 메꿈' (ASCII name Background fill).
+- Change: instead of leaving the character's area transparent, a 'Background fill' layer estimated for it is placed directly above the 'Background' layer inside the 'Background' group (below glows and background FX) (3.5; formulas in docs 4-2). The hole is dilated by 1/160 of the long side (3–12 px) to drop the outline and blended edge → reduced to a long side of 512 and fed to the bundled inpainting network big-lama (Fourier convolutions, 50.9 M weights in fp16, trained on scene photos, Apache-2.0), which continues broken structure (window frames, floors, trees, patterns) → 7×7 patch matching at full resolution for the original texture (patches where a good match exists, the network estimate elsewhere) → seam membrane (a harmonic membrane with the difference between the fill's prediction and the actual pixels on the ring around the hole as boundary values, the formulation of Poisson seamless cloning). At this stage the character is already gone, so only the background has to be continued; hence a background-only model, patches only from the remaining background, and the spare computation spent on the seam. Setting "Fill the background behind the character": network + patches (default) · patches only (no network, 1–5 s, the pyramid patch method developed first for 0.56) · off (same as 0.55). In the PSD, the layer has the Korean name meaning 'Background fill' and the ASCII name 'Background fill'.
 - Fill quality (11.17): on the 177 synthetic pictures with the background re-rendered as ground truth, the color difference inside the hole (MAE, 0–255) is white 84.20 → patches only 3.94 → network only 6.08 → network + patches 2.82 (flat 0.0 · gradient 1.1 · stripes 0.4 · bokeh 9.0 · scene 2.9 · posed synthetic 1.9; patches only 0.0 · 0.4 · 2.0 · 9.2 · 18.3 · 3.7). Seam band (8 px) MAE 1.96 · 3.99 · 2.91, seam-step excess 0.41 · 0.90 · 1.20.
 - Naturalness grading (11.17): the three candidates were run on 120 unseen AI-generated pixiv pictures (the fixed 60 + 60 new) and eight graders, 15 pictures each, scored "natural, like a background that never had the character" from 0 to 100: network + patches 59.2 (95% 56.1–62.3) · network only 60.2 (57.4–63.1) · patches only 44.7 (40.3–49.3); same-picture pairs network + patches − patches only +14.5 (wins 82 : 31, sign test p = 1.7e-06) · − network only -1.0 (39 : 52, p = 0.21).
 - The weights are stored as fp16 (102 MB; at most 0.007–0.03 from fp32) because 8-bit quantization flipped the colors of flat backgrounds (up to 0.6–0.8 error from a 1% weight perturbation). From 0.56 the published files (app · help) are the source as it is, not obfuscated.
@@ -3305,7 +3305,7 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
     Notes on 0.45 were, in every round, "feels copied over a faint layer of the original" and "lumps of paint · smudges"; notes on the new rough 2 were "blocks in the structure first with a head circle · cross lines" and "overlapping pencil strokes", along with "sleeves split like a grid" and "a net of short pieces".
 - Processing time: the rough step went from 0.63 + 0.64 s (0.46) to 0.74 + 0.90 s (rough 1 + rough 2), median of 12 pictures.
   Both versions were measured on the same computer after one warm-up run per picture, so the numbers differ from those of the 0.46 entry (0.95 + 0.82 s, without a warm-up run).
-- **Help**: a help page was made that covers usage · fixing wrong parts · the layers made · settings · principles · formulas · validation · limitations with a table of contents and search. It is contained in the app file, opens in a new window from the **도움말** (help) button at the top right (your result stays as it is), and its **Illustracy로 돌아가기** (back to Illustracy) button returns to the app.
+- **Help**: a help page was made that covers usage · fixing wrong parts · the layers made · settings · principles · formulas · validation · limitations with a table of contents and search. It is contained in the app file, opens in a new window from the **Help** button at the top right (your result stays as it is), and its **Back to Illustracy** button returns to the app.
   The app header now has the same theme switch as the help (follow system · light · dark). The app, which had only a dark screen, gained a light screen (dark keeps the same colors as before),
   and the choice is shared by the app and the help, so changing it in one updates the other if it is open. Layer splitting results and PSDs do not depend on the theme.
   The app (`illustracy.html`) and the help (`illustracy-help.html`) were put back into the repository.
@@ -3646,18 +3646,18 @@ Resolving power is relative to version 0.1 (= 100%); its intervals come from a <
 ### 0.36 (2026-09-30) Fixing layer names of old PSDs inside the program
 
 - Resolving power: 1.33× version 0.1 (95% CI 1.11–1.61×; background results identical to the previous version, 11)
-- Putting PSDs saved up to 0.34 into the program like pictures (drag and drop · choose, several at once) immediately saves PSDs with the `색트레스` layer renamed to `색 트레이스` (1, 4.15).
+- Putting PSDs saved up to 0.34 into the program like pictures (drag and drop · choose, several at once) immediately saves PSDs with the 'Color trace' layer renamed from its old compact Korean spelling to its corrected, spaced Korean spelling (1, 4.15).
   The separate layer renaming tool was removed. Split results and PSDs for pictures are byte-identical to 0.35.
 - Verification: on 28 test PSDs saved with 0.33, 6 PSBs, 3 files with layer info in `Lr16` · `Lr32`, and 1 file with Pascal names written in EUC-KR,
   results were byte-identical to 0.35's layer renaming tool (whose results were confirmed in 0.35 with psd-tools · ag-psd to differ only in names).
   Choosing one file · several files (fixed files · already fixed files · broken files mixed) · drag and drop · putting pictures and PSDs in together were checked on screen,
   with no errors · external requests.
 
-### 0.35 (2026-09-30) Layer name "색 트레이스", a tool to rename layers in old PSDs
+### 0.35 (2026-09-30) Corrected, spaced Korean "Color trace" layer name, a tool to rename layers in old PSDs
 
 - Resolving power: 1.33× version 0.1 (95% CI 1.11–1.61×; background results identical to the previous version, 11)
-- The line color layer and setting name changed from `색트레스` to `색 트레이스` (PSD layer name, "line art + color trace" in the "Line color" setting). Other split results are the same as 0.34.
-- Added a layer renaming tool. Dropping a PSD saved up to 0.34 gives a file with the `색트레스` layer renamed to `색 트레이스` (1, 4.15).
+- The line color layer and setting name changed from the old compact Korean spelling of 'Color trace' to its corrected, spaced Korean spelling (PSD layer name, "line art + color trace" in the "Line color" setting). Other split results are the same as 0.34.
+- Added a layer renaming tool. Dropping a PSD saved up to 0.34 gives a file with the 'Color trace' layer renamed from its old compact Korean spelling to its corrected, spaced Korean spelling (1, 4.15).
 - Verification: 35 layers were renamed in 28 test PSDs saved with 0.33 (1–2 per file), and in both psd-tools · ag-psd only the names differed,
   with the merged image · per-layer pixels · blend modes · opacity · clipping · hidden flags identical to the original. Putting a renamed file in again says there is no layer to rename.
   6 files converted to PSB, 3 files with layer info in `Lr16` · `Lr32`, and 1 file with Pascal names in EUC-KR also differed only in names in psd-tools.
@@ -4137,3 +4137,4 @@ These are the works cited by number under **References** in the formula notes. "
 - <a id="r93"></a>**[R93]** Microsoft, "ONNX Runtime Web" 1.29.0, MIT License.
 - <a id="r96"></a>**[R96]** R. A. Bradley, M. E. Terry, "Rank Analysis of Incomplete Block Designs: I. The Method of Paired Comparisons," <i>Biometrika</i> 39(3/4), 324–345, 1952.
 - <a id="r97"></a>**[R97]** R. R. Davidson, "On Extending the Bradley-Terry Model to Accommodate Ties in Paired Comparison Experiments," <i>Journal of the American Statistical Association</i> 65(329), 317–328, 1970.
+
