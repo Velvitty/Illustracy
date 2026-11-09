@@ -12,9 +12,10 @@ A program that takes a single finished illustration and **splits it back into ma
 - No installation, no internet connection, no cost.
 - Your image never leaves your computer.
 - Test pictures: in this document, "AI-generated pictures" (AI-generated pixiv pictures) are pictures the user collected from pixiv; they were generated from AI prompts, not drawn by people. "Synthetic pictures" are drawn in code so that the ground truth is known. There are no results measured on human-drawn pictures alone.
-- Resolving power: **17.52× version 0.1** (0.59i, 95% CI 11.87–29.98×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 AI-generated pictures alone it is 4.06× version 0.1. 140 of the 185 differ from 0.54 (14.80×, re-measured with the released app as it is — see the 0.55 correction in 12): improved 68 · worsened 72. 0.56 · 0.57 · 0.58 · 0.59e · 0.59h · 0.59i leave the 'Background' layer unchanged, so the background maps of the 185 pictures are byte-identical to 0.55 and the value is the same, 11).
-- Rough skill: **247% of version 0.1** (0.59i = 0.59e, 95% CI 156–419%; on the fixed 60 AI-generated pixiv pictures, AI graders ranked versions side by side by "which looks more like a rough an illustrator drew by hand", and the value is the odds of being picked over version 0.1, as a multiple. The highest version is 0.56 (367%); it went down with the G-pen tracing of 0.57 · 0.58 and back up at 0.59e. All versions in [11.20](#1120-rough-skill-by-version))
-- Cutout model (0.51, on by default): an anime-character segmentation network (ISNet, skytnt/anime-seg, Apache-2.0) reduced to 8 bits and built into the app file. It picks out the whole character and puts the rest on the background layer (3.5). From 0.52 the character probability it gives is added to the decision of the previous method (background detection + neural-network assist), from 0.53 pictures where the model finds almost no character use the previous method's decision as it is, and from 0.54 a copy of the same network fine-tuned on synthetic · AI-generated pixiv pictures is run as well, a weighted average of the two probabilities is used as the model probability and the threshold is raised slightly; 0.55 uses a copy further trained to count effects (glow · particles · light rays) as background and averages the two probabilities with equal weights.
+- Resolving power: **17.52× version 0.1** (0.60b = 0.59i, 95% CI 11.87–29.98×; measured by the rate of wrongly separated character · background on 185 pictures with ground truth. 177 of the 185 are synthetic; on the 8 AI-generated pictures alone it is 4.06× version 0.1. 140 of the 185 differ from 0.54 (14.80×, re-measured with the released app as it is — see the 0.55 correction in 12): improved 68 · worsened 72. 0.56 · 0.57 · 0.58 · 0.59e · 0.59h · 0.59i · 0.60b leave the 'Background' layer unchanged, so the background maps of the 185 pictures are byte-identical to 0.55 and the value is the same (0.60b confirmed on the 177 pictures that could be regenerated), 11).
+- Rough skill: **471% of version 0.1** (0.60b, 95% CI 288–837%; on the fixed 60 AI-generated pixiv pictures, AI graders ranked versions side by side by "which looks more like a rough an illustrator drew by hand", and the value is the odds of being picked over version 0.1, as a multiple. Every panel was re-graded together for the 0.60b release, so this new scale is not compared directly with the values in earlier entries (on the same scale 0.59i = 0.59e is 552%, and the highest version is 0.56 at 631%). 0.57 · 0.58 could not be re-graded because their review apps no longer exist. All versions' values are in [11.20](#1120-rough-skill-by-version))
+- Base colors (0.60b;1_4[43]): a material-recognition network (skin · hair · clothes) keeps different materials from sharing one base color and merges same-material shade pieces into the base color. In a blind A/B on the fixed 60 + 60 unseen pictures it beat 0.59i 54 : 28 (38 ties, $`p = 0.0054`$); patchwork and shade-color base colors remain weaknesses ([11.21](#1121-material-recognition-network-and-the-base-color-blind-ab-060b)). The app is published as plain HTML with side js files instead of split archives.
+- Cutout model (0.51, on by default): an anime-character segmentation network (ISNet, skytnt/anime-seg, Apache-2.0) reduced to 8 bits and built into the app file (from 0.60b, in js files next to the app). It picks out the whole character and puts the rest on the background layer (3.5). From 0.52 the character probability it gives is added to the decision of the previous method (background detection + neural-network assist), from 0.53 pictures where the model finds almost no character use the previous method's decision as it is, and from 0.54 a copy of the same network fine-tuned on synthetic · AI-generated pixiv pictures is run as well, a weighted average of the two probabilities is used as the model probability and the threshold is raised slightly; 0.55 uses a copy further trained to count effects (glow · particles · light rays) as background and averages the two probabilities with equal weights.
 - Background fill (0.56, default "network + patches"): a 'Background fill' layer that estimates the background behind the character with the bundled inpainting network big-lama (reconnects broken structure), patch matching (original texture) and a seam membrane, placed directly above the 'Background' layer (3.5). The difference from the synthetic ground truth (MAE) is scene 2.9 · bokeh 9.0 · stripes 0.4 (patches only 18.3 · 9.2 · 2.0; left white 66.0 · 167.7 · 29.2), and the naturalness grading of 120 unseen AI-generated pixiv pictures (8 graders, 0–100) is 59.2 (patches only 44.7). The meaning of hidden objects cannot be invented (10.2 · 11.17). The fp16 weights (102 MB) are embedded, so the app file is about 205 MB, and because of GitHub's 100 MiB file limit the repository holds it as a split archive (section 1).
 - Rough 2 traced with a G-pen, with pen pressure (0.57–0.59e): rough 2 picks only the parts of the line art clearly darker than their surroundings (leaving out areas that are broadly dark from fill · shading · texture) and traces each once with a G-pen matched to the picture's own pen width (0.57 · 0.58). From 0.59 each stroke gets a pressure curve that varies its width · darkness, important lines are drawn darker and weak lines lighter, and part of long strokes is drawn over once more. 0.59e draws the eyes · mouth inside a face area straight from the line art as single strokes. Rough 1 is drawn with pencil grain. 15 AI graders given the role of experts compared the same 138 pictures blind: "more like a rough drawn by a person" 0.59e 100 · 0.56 33 · tie 5 ($`p = 5.0 \times 10^{-9}`$), and judged on its own as a rough drawn by a person 54 → 83 (11.19). 0.58 alone lost to 0.56 (65 : 153 on 240 pictures, 11.18). From 0.59e versions are named like `0.59e;4_5[20]` (12).
 - Sample image (0.59i;0_1[20]): **Sample image** opens one of 10 pictures bundled in the app (AI-generated pixiv pictures; sources in [the 0.59i entry of section 12](#059i0_120-2026-10-20-sample-image-one-of-10-bundled-pictures-at-random)) at random, never the same one twice in a row.
@@ -80,7 +81,7 @@ If the program finds a face in the picture (also in PNGs with a transparent back
 
 ### How to use it
 
-1. Download [`illustracy-0.59i.zip.001`](illustracy-0.59i.zip.001) and [`illustracy-0.59i.zip.002`](illustracy-0.59i.zip.002) into the same folder and extract them: open `.001` in 7-Zip (it shows `illustracy-0.59i.zip` inside; extract that), or join the parts first (Windows command prompt `copy /b illustracy-0.59i.zip.001 + illustracy-0.59i.zip.002 illustracy-0.59i.zip`, macOS · Linux `cat illustracy-0.59i.zip.* > illustracy-0.59i.zip`) and unzip. You get `illustracy.html` (the app, about 223 MB) and `illustracy-help.html` (the help); keep both in the same folder and open `illustracy.html` in a browser. It is split because of GitHub's 100 MiB file limit.
+1. Download [`illustracy.html`](illustracy.html) (the app, about 29 MiB) · [`illustracy-help.html`](illustracy-help.html) (the help) and the network files [`illustracy-ort.js`](illustracy-ort.js) · [`illustracy-cut-1.js`](illustracy-cut-1.js) · [`illustracy-cut-2.js`](illustracy-cut-2.js) · [`illustracy-fill-1.js`](illustracy-fill-1.js) · [`illustracy-fill-2.js`](illustracy-fill-2.js) · [`illustracy-fill-3.js`](illustracy-fill-3.js) · [`illustracy-mat.js`](illustracy-mat.js) (about 210 MiB in all) into one folder. You can also take the whole repository with **Code → Download ZIP** on the repository's front page and extract it. Open `illustracy.html` in that folder in a browser (it works over file:// without an internet connection). Without the network files the app still opens, but the cutout falls back to the 0.50 method, base colors to color only and background fill to the patch method, each with a notice. Up to 0.59i the app was published as a split archive (zip.001 · .002) because of GitHub's 100 MiB file limit; from 0.60b the networks are split into files under 50 MiB and published as they are.
 2. Drag an image onto the window, click the box at the top left to choose one, or paste a copied image with `Ctrl+V`.
    To try it first, click **Sample image**. It opens one of 10 pictures bundled in the app at random (never the same one twice in a row).
 3. Wait a few seconds and the layer list appears on the right.
@@ -604,7 +605,7 @@ The program contains the following.
 |---|---|
 | Screen | settings on the left, preview in the middle, layer list on the right |
 | `IllustracyCore()` | the whole splitting algorithm. Closed in one function, so it moves to a worker as is via `toString()` |
-| Cutout-model worker (0.51) | unpacks the 8-bit cutout model and ONNX Runtime Web (WASM), stored in the app as base64, on first use and runs them in a separate worker; makes a character map per picture and hands it to the core, reusing it for the same picture |
+| Cutout · material model worker (0.51 · 0.60b) | unpacks the 8-bit cutout model, the material-recognition network and ONNX Runtime Web (WASM) on first use and runs them in a separate worker (from base64 blocks inside the HTML if present, otherwise from the side js files next to the app); makes a character map and material labels per picture and hands them to the core, reusing them for the same picture |
 | Worker connection | runs the core in a Blob URL worker and receives the result layers' buffers without copying (transferable). If it fails, runs on the page |
 | `PSD.write()` | PSD file writer |
 | `PSD.rename()` | fixing layer names of PSDs saved by older versions (4.15) |
@@ -612,6 +613,7 @@ The program contains the following.
 | Correction tools | send to background, return to character, loop, undo stack |
 | Sample picture | one of 10 pictures bundled in the app (AI-generated pixiv pictures; sources in the 0.59i entry of section 12), chosen at random (never the same one twice in a row). Up to 0.59h, a cel-shaded picture drawn directly on a canvas |
 | Help | a page on usage · principles · formulas · validation (`illustracy-help.html`). From 0.59h it is no longer inside the app file but sits next to it; the help button in the header checks that the file exists and opens it in a new window (if not, it says so and stops); the help's own button closes that window and returns to the app (a help page opened on its own opens `illustracy.html`) |
+| Side js files (0.60b) | `illustracy-ort.js` (ONNX Runtime Web 1.29.0, MIT) · `illustracy-cut-1.js` · `-2.js` (cutout model skytnt/anime-seg ISNet, Apache-2.0, and its fine-tuned delta) · `illustracy-fill-1~3.js` (background fill big-lama, Apache-2.0) · `illustracy-mat.js` (material-recognition network, trained here). Each holds base64 data in `window.__illCut` · `__illFill` · `__illMat`; the app loads them with script tags when the HTML has no embedded blocks (works over file:// too). Without them the previous methods take over, with a notice |
 
 ### 6.2 Data flow
 
@@ -908,6 +910,12 @@ Problems that came up while verifying with AI-generated pictures during developm
 | (0.54 preparation, after seeing results) Optimizing the weights · threshold that mix the statistics and the two models: $`w\,p_1 + (1 - w)\,p_0 + \alpha\,(c - 0.5) \ge \tau`$ with w · α ∈ 0–1 (step 0.1) and τ ∈ 0.30–0.70 (step 0.05), 1,089 combinations (missed-character rule unchanged). Rule written down first: lowest set B, subject to the pairs not worse than the plain mean and improved ≥ worsened, confirmed by ΔW on the 176 | 175 combinations passed the pair gate. The lowest set B, w 0.4 · α 0 · τ 0.35 (0.0189), drops the statistics and lowers the threshold, so background follows the character on AI-generated pictures (ΔW -0.20 on the 176) and it failed. Going down the set B order, the first combination with ΔW ≥ 0 and improved ≥ worsened on the 176, w 0.4 · α 0.4 · τ 0.55, was adopted (0.54; the four in between had ΔW < 0 or more worsened than improved on the 176, and some further down, such as w 0.5 · α 0.4 · τ 0.60 (set B 0.0202, ΔW +0.17), also beat the plain mean on all three sets): pairs 0.0497 → 0.0456 (improved 6 · worsened 3, kept 99.2% · found 91.7%), set B 0.0285 → 0.0200 (improved 119 · worsened 63), ΔW +0.12 on the 176 (improved 112 · worsened 48). The statistics weight α stayed best at 0.4. Because the choice was made on the 14 pairs · set B, their 0.54 values are not out of sample, and the 176 are training data, reference only |
 | (0.55 preparation) Training the cutout model further to count effects (glow · particles · light rays) as background, to return to a single model (four gates and the selection rule registered before looking at results: synthetic set B 199 ≤ 0.54's 0.0200 with improved ≥ worsened, the 14 cutouts posted with the pictures ≤ 0.0456 with improved ≥ worsened, a new effect-composite set rceB of 100 < 0.0383, ΔW ≥ 0 with improved ≥ worsened on the 176 AI-generated pixiv development pictures with region ground truth; selection = lowest set B among those passing the pairs · rceB; candidates = epochs and epoch averages): from the 0.54 copy, on synthetic set A 290 + 300 effect composites (generated on the fly during training, effect pixels as background ground truth) + 292 AI-generated pixiv development pictures; plan A 12 epochs (lr 2e-5) · plan B 6 epochs (lr 5e-6) | Plan A, S2 (mean of epochs 4 · 6 · 8 · 9 · 10 · 11): in 8 bits set B 0.0132 (63:34) · pairs 0.0381 (6:4) · rceB 0.0283 passed, ΔW on the 176 -0.549 (60:105) failed (the character missed entirely on two pictures — 0.54 falls back to the previous method when both models miss, which a single model never triggers). Plan B, S1b (uniform mean of epochs 0–5): set B 0.0118 (52:35) · pairs 0.0388 (6:2) · rceB 0.0182 passed, ΔW -0.131 (57:108) failed — character regions +0.001 (no loss), background regions -0.133 (bowls · props taken as character): a single model loses the "veto" the original model holds over background objects in the 0.54 mix. The single-model rule is shelved (training with background-object negatives is needed) |
 | (0.55 preparation, after seeing results) Replacing only the fine-tuned copy in the 0.54 mix with plan B's copy (S1b) and looking at w ∈ {0.4, 0.5, 0.6} (α 0.4 · τ 0.55 · fallback as in 0.54; the same four gates) | w 0.4 fails the pairs (0.0455, 2:4); w 0.5 set B 0.0184 (37:20) · pairs 0.0440 (3:3) · rceB 0.0271 · ΔW +0.034 (88:73); w 0.6 set B 0.0181 (39:25) · pairs 0.0370 (4:2) · rceB 0.0257 · ΔW +0.049 (82:80). Re-scored with the 8 bits the app actually ships (original scales + difference), the rule's pick w 0.6 gives ΔW +0.047 (78:83), flipping the picture-count condition (the two quantizations differ on 0.023% of pixels), so it was stopped as written down. After seeing results, w 0.5 was registered: all four gates pass under both quantizations (set B 0.0184 (36:21) · pairs 0.0440 (3:3) · rceB 0.0269 · ΔW +0.033 (83:77)) → 0.55. A value inside the grid with the gates unchanged, but the choice is post hoc |
+| (0.60 prep) Four rounds of rule-only base-color candidates (pre-registered: ranking on 40 development pictures → A/B on 80 with 𝑝 < 0.10 + synthetic filter): S_PF (adjusted shadow-face merging conditions in part cleanup) · S_K (small-piece absorption picks the large part closest in color, ΔE < 12) · S_A3 (skin · hair anchors from a grid in the face area plus a white class, never tying skin · hair · white together) · S_A3_DE (+ lit-side area 35 → 15% · merging wholly shaded pieces) | All beat the baseline S in the 40-picture ranking (S_A3 11 : 2, S_A3_DE 19 : 9) but all failed the 80-picture A/B with 𝑝 0.41 · 0.74 · 0.33 · 0.126. Differences between candidates were within grader noise (±10), read as the limit of "deciding materials by color alone", so a material-recognition network followed (11.21) |
+| (0.60 prep) 0.60a (10-25, not released): A (brightness condition on the shadow relation) · D (lit-side area 15%) · E (wholly shaded pieces merged into the nearest same material) | Base-color good rate on synthetic ground truth rose a lot, 16.0 → 44.9% (1,440 development pictures, improved 423 · worsened 8) · 18.3 → 46.1% (1,440 held-out), but on 60 real AI-generated pictures the A/B was a tie with 0.59i, 17 : 16 (27 ties, 𝑝 = 1). A also changed background maps (39 of 248). By the user's decision it was not released and work continued "until real pictures improve" |
+| (0.60 prep) Material-recognition round 1, S_M1: blocking merges in material tying · cleanup with every teacher class (skin · hair · eyes · eyebrows · mouth · clothes · accessory) | 21 : 8 in the 40-picture ranking (𝑝 0.024) but 29 : 20 in the 80-picture A/B (25 ties, 𝑝 0.253), failed. The accessory label covered 23–56% of a character (dark coats · white dresses) and blocked merges within one garment, and almost every blocked merge involved a boundary strip under 1%, so patchwork 62 → 68 · shade colors 40 → 48 rose → round 2 used skin · hair · clothes only, with a class only for regions of at least 0.3% |
+| (0.60 prep) S_M2 (same-class shadow-face merging with enclosure 40 → 10% and the area · darkness guards all lifted) · S_M3 (+ the "lit side" rule on achromatic base colors too) | 20 : 15 · 19 : 17 against S in the 40-picture ranking, below S_M1 (21 : 8); S_M3 lost to S_M2 head to head 1 : 7. Round 2's M2y lifts only the darkness guard |
+| (0.60 prep) Larger student models: DeepLabV3-MobileNetV3 · FPN-ResNet18 (same 573 pictures · same settings) | Validation IoU 0.48 · 0.48 · 0.50 and 0.47 · 0.49 · 0.48, below the first LRASPP (0.54 · 0.52 · 0.53). Training loss kept falling while validation IoU stalled near 0.5, so the limit is data size and teacher-label consistency rather than model size. By the user's decision the first student was judged by its effect on base colors (11.21) |
+| (0.60 prep) Adding the 2,880 synthetic ground-truth pictures to the student's training data | The teacher's labels on synthetic pictures (flat mannequin-like) disagree badly with the truth (skin IoU 0.25 · clothes 0.30 · hair 0.56) and would hinder the student from following the teacher on real pictures, so they were dropped before training (637 real pictures only). For the same reason the synthetic filter carried almost no information for this approach (base colors changed on 37 of 2,880) |
 
 **Note** — **Why**: Methods not adopted must be measured by the same standard to show why the current method stayed. The 𝑝 values in the table are sign-test or exact-test values from paired gradings (formulas in 11.1). **How it works**: The line-detection window $`\max(1, \mathrm{round}(4s))`$ was an attempt to make the 4px window at a 1000px long side proportional to the size ratio 𝑠 without the floor of 3. On small pictures the window shrank to 2px, fewer lines were found and results got worse. **References**: [R85 Dixon · Mood 1946](#r85) · a rule set by this program
 
@@ -1081,6 +1089,8 @@ Problems that came up while verifying with AI-generated pictures during developm
   and skin with white clothes · pale hair of similar color easily share one base color (27). This remains in 0.39 (11).
 - Materials painted with more shade than lit area take the shade color as their base color (hair and shoes with wide shadows, buttons in shade, back hair showing above the shoulders).
   In the synthetic pictures, adding wide shadows drops the base-color good rate from 38.2% to 5.3% (11).
+- 0.60b reduces different materials sharing one base color with the material-recognition network (skin · hair · clothes; grader tag material lumping 85 → 73), but patchwork — one material split into lit · shaded pieces (95 → 103) — and shade-color base colors on white clothes · dark pictures (47 → 53) remain.
+  Regions the network leaves without a class (majority under 60% · strips under 0.3% of the valid pixels) and eyes · mouth · accessories are still handled by color alone (11.21).
 
 ### 10.5 Size · tilt · stability
 
@@ -1197,12 +1207,13 @@ In this section:
 - [11.12 Returning islands in the scene background (0.38)](#1112-returning-islands-in-the-scene-background-038)
 - [11.13 Five-target classification by case (0.39)](#1113-five-target-classification-by-case-039)
 - [11.14 Resolving power by version](#1114-resolving-power-by-version)
-- [11.15 Blind test (0.1 · 0.59e · 0.59h · 0.59i)](#1115-blind-test-01--059e--059h--059i)
+- [11.15 Blind test (0.1 · 0.59h · 0.59i · 0.60b)](#1115-blind-test-01--059h--059i--060b)
 - [11.16 14 cutouts posted with the pictures (0.51)](#1116-14-cutouts-posted-with-the-pictures-051)
 - [11.17 Background fill (0.56)](#1117-background-fill-056)
 - [11.18 Rough 2 traced with a G-pen (0.57 · 0.58)](#1118-rough-2-traced-with-a-g-pen-057--058)
 - [11.19 Rough 2 pressure · eye · mouth boxes and blind tests by expert-role graders (0.59 · 0.59e)](#1119-rough-2-pressure--eye--mouth-boxes-and-blind-tests-by-expert-role-graders-059--059e)
 - [11.20 Rough skill by version](#1120-rough-skill-by-version)
+- [11.21 Material-recognition network and the base-color blind A/B (0.60b)](#1121-material-recognition-network-and-the-base-color-blind-ab-060b)
 
 ### 11.1 Formulas used for evaluation
 
@@ -2607,13 +2618,14 @@ The posed synthetic pictures are the most numerous and weigh the most, so the mu
 | 0.59e | Rough 2 gets a pressure curve · darkness from line importance · overstrokes, and traces eye · mouth boxes (background layer unchanged, so all 185 are byte-identical to 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 | 0.59h | The help is taken out of the app file and the help button opens the help file in the same folder (core · models byte-identical to 0.59e, so all 185 equal 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 | 0.59i | The sample button opens one of 10 pictures bundled in the app at random (core · models byte-identical to 0.59h, so all 185 equal 0.55) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
+| 0.60b | Base-color tying corrected with the classes of a material-recognition network (character pass only, background layer untouched — all 177 regenerated pictures byte-identical to 0.59i; the 8 AI-generated ground-truth pictures could not be re-run because their originals no longer exist) | 99.5 | 98.7 | 0.0088 | 114.28 | **17.52** | 11.87–29.98 | 55.71 · 4.06 · 33.24 |
 
 ```mermaid
 xychart-beta
     title "Resolving power by version (0.1 = 100%)"
-    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51", "0.52", "0.53", "0.54", "0.55", "0.56", "0.57", "0.58", "0.59e", "0.59h", "0.59i"]
+    x-axis ["0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "0.10", "0.11", "0.12", "0.13", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19", "0.20", "0.21", "0.22", "0.23", "0.24", "0.25", "0.26", "0.27", "0.28", "0.29", "0.30", "0.31", "0.32", "0.33", "0.34", "0.35", "0.36", "0.37", "0.38", "0.39", "0.40", "0.41", "0.42", "0.43", "0.44", "0.45", "0.46", "0.47", "0.48", "0.49", "0.50", "0.51", "0.52", "0.53", "0.54", "0.55", "0.56", "0.57", "0.58", "0.59e", "0.59h", "0.59i", "0.60b"]
     y-axis "Resolving power (%)" 0 --> 1800
-    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051, 1133, 1337, 1480, 1752, 1752, 1752, 1752, 1752, 1752, 1752]
+    line [100, 100, 104, 90, 90, 89, 95, 95, 95, 102, 102, 101, 101, 101, 101, 101, 101, 100, 125, 125, 128, 128, 128, 128, 128, 128, 131, 131, 132, 132, 129, 129, 129, 133, 133, 133, 153, 178, 178, 214, 214, 225, 591, 591, 591, 591, 591, 591, 614, 640, 1051, 1133, 1337, 1480, 1752, 1752, 1752, 1752, 1752, 1752, 1752, 1752]
 ```
 
 From 0.4, finding scene backgrounds let the AI-generated pictures' backgrounds be found (background found 0 → 46%) but also took characters in the synthetic and posed pictures (character kept 96.8 → 83.7% · 94.1 → 78.7%), so versions 0.4 through 0.18 were close to or below 0.1.
@@ -2637,8 +2649,9 @@ the 177 synthetic · posed pictures have background maps byte-identical to 0.48 
 0.55 swaps the fine-tuned copy for the effect-trained copy and averages the two probabilities with equal weights, so 140 of the 185 differ from 0.54 (BER improved 68 · worsened 72; the changed pictures are synthetic 37 · AI-generated 8 · posed synthetic 95). Mean BER 0.0104 → 0.0088, 14.80 → 17.52× version 0.1, higher than 0.54. On the 8 AI-generated pictures, character kept 97.0 → 96.4% · background found 77.3 → 78.9% (3.88 → 4.06×); synthetic group 24.77 → 55.71×, posed synthetic group 29.04 → 33.24×. The picture that changed most is lineless_scene (BER 0.1175 → 0.0165). The 185 were not used to train the 0.55 model or to choose it.
 0.56 leaves the 'Background' layer unchanged and adds a 'Background fill' layer above it, so the background maps of all 185 are byte-identical to 0.55 (confirmed by re-running the same app code; 17.52× unchanged).
 0.57 · 0.58 · 0.59e change only the roughs, so the background maps of all 185 are byte-identical to 0.55 (confirmed by re-running 245 pictures with the 0.59e app code, and 122 of them with the 0.58 app code · 45 with the 0.57 app code too; 17.52× unchanged).
+0.60b changes only material tying · base colors (the character pass), so its background maps must be the same. The 177 of the 185 that can be regenerated (57 synthetic · 120 posed synthetic) were run with the 0.59i and 0.60b app code at the default screen settings, and all 177 are byte-identical (comparing today's 0.59i maps with the October 0.60a measurement maps, 157 of the 177 are identical; of the 20 that differ, 15 are pictures where 0.59i and 0.60a already differed in October (expected), and the remaining 5 (prone-pose synthetic pictures) were regenerated slightly differently because the rendering environment changed although the generator code is the same (maps differ by 0.07–0.81%). So 172 of the 177 match the October inputs and 5 differ slightly; 0.59i and 0.60b were both run on today's inputs, so the comparison is unaffected). The 8 AI-generated pictures with ground truth could not be re-run because their original files no longer exist (copyrighted material was never committed, and the working folder was lost); the value is recorded as equal to 0.59i.
 
-### 11.15 Blind test (0.1 · 0.59e · 0.59h · 0.59i)
+### 11.15 Blind test (0.1 · 0.59h · 0.59i · 0.60b)
 
 To compare versions on AI-generated pictures without ground truth too, 60 pictures were drawn from the 642 AI-generated pixiv pictures with characters, 30 from each of the consistent set (300) and the mixed set (342) (seed 20261002), and version 0.1 and the latest versions were run on them.
 For each picture, only the distinct results were collected (versions with identical results share one panel), given random letters, mixed across the versions and placed next to the original without knowing which version made which; each panel was graded (perfect separation · character intact · small pieces lost · major loss · no background found), then the key was opened.
@@ -2647,11 +2660,11 @@ For each picture, only the distinct results were collected (versions with identi
 | Version | No major loss | Character without loss | Major loss | No background found | 300 · 342 (no major loss) |
 |---|---|---|---|---|---|
 | 0.1 | **31.7%** (19/60, 21.3–44.2) | 26.7% | 6.7% | 61.7% | 10/30 · 9/30 |
-| 0.59e | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
 | 0.59h | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
-| **0.59i** | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| 0.59i | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
+| **0.60b** | **86.7%** (52/60, 75.8–93.1) | 76.7% | 8.3% | 5.0% | 25/30 · 27/30 |
 
-0.56 · 0.57 · 0.58 · 0.59e · 0.59h · 0.59i leave the 'Background' layer unchanged, so the background maps of the 60 pictures are byte-identical to 0.55 (confirmed by re-running the 0.56 · 0.59e app code; 0.57 · 0.58 share all code outside the rough function with 0.59e, and 0.59h's and 0.59i's cores are byte-identical to 0.59e); they share a panel, and the grades given at 0.55 are reused (as for 0.39 = 0.38; the background fill layer and the roughs are not part of the background map). For 0.55 the earlier grades were not reused: the four versions 0.1 · 0.53 · 0.54 · 0.55 were graded again from scratch, together (0.53: 86.7 → 81.7%). Each version was run with its own app code and default settings (cutout model on); 0.54 was re-run with the released app's weighted average (0.6 · 0.4) (the blind test at the 0.54 release used a measurement bench that mixed the two probabilities with equal weights; 0.55 correction in 12). Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.55 differs from 0.54 on 58 pictures (panel counts: 2 panels 2 · 3 panels 1 · 4 panels 57 pictures).
+0.56 · 0.57 · 0.58 · 0.59e · 0.59h · 0.59i · 0.60b leave the 'Background' layer unchanged, so the background maps of the 60 pictures are byte-identical to 0.55 (confirmed by re-running the 0.56 · 0.59e app code; 0.57 · 0.58 share all code outside the rough function with 0.59e, 0.59h's and 0.59i's cores are byte-identical to 0.59e, and 0.60b changes only the character pass and was confirmed by re-running the 60 with its app code); they share a panel, and the grades given at 0.55 are reused (as for 0.39 = 0.38; the background fill layer and the roughs are not part of the background map). For 0.55 the earlier grades were not reused: the four versions 0.1 · 0.53 · 0.54 · 0.55 were graded again from scratch, together (0.53: 86.7 → 81.7%). Each version was run with its own app code and default settings (cutout model on); 0.54 was re-run with the released app's weighted average (0.6 · 0.4) (the blind test at the 0.54 release used a measurement bench that mixed the two probabilities with equal weights; 0.55 correction in 12). Four graders each took 15 pictures and graded without knowing the versions (all panels of a picture were graded by one grader). 0.55 differs from 0.54 on 58 pictures (panel counts: 2 panels 2 · 3 panels 1 · 4 panels 57 pictures).
 As same-picture pairs, 0.54 → 0.55 gained 1 · lost 0 in "no major loss" ($`p = 1.00`$), grade up 2 · down 6. 0.53 → 0.55 gained 3 · lost 0 ($`p = 0.25`$), 0.1 → 0.55 gained 35 · lost 2 ($`p = 1.0 \times 10^{-8}`$), and 0.53 → 0.54 gained 3 · lost 1 ($`p = 0.62`$).
 The rates differ from the grading done together at 0.54 (0.1 26.7% · 0.52 83.3% · 0.53 86.7% · 0.54 86.7%) because the graders changed and because the 0.54 maps changed. Graders differ slightly in what they count as characters (held objects · animals · figures in the background), so the size of the rates moves with the graders.
 Read this as the difference between versions graded together by the same standard rather than as the size of the rates.
@@ -2660,12 +2673,12 @@ For panels that lost character (small pieces lost · major loss), graders also p
 
 | Version | Colored like background | Edge | Effect | Non-human | Tilted | Occluded | Other |
 |---|---|---|---|---|---|---|---|
-| 0.59e | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
 | 0.59h | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
 | 0.59i | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
+| 0.60b | 10 | 2 | 2 | 3 | 1 | 0 | 1 |
 
 "Colored like background" is where character and background have similar colors, "Edge" a part cut off at the picture edge, "Effect" light · aura over the character, "Non-human" a body · wings · tail that is not human-shaped, "Tilted" a lying or tilted pose, and "Occluded" a character hidden by props. The 0.57 · 0.58 · 0.59e rows are the same grading as 0.55 (the 0.54 row is in the 0.55 entry of 12, the 0.56 row in the 0.58 entry).
-The table at the end of the 0.59i entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
+The table at the end of the 0.60b entry in section 12 gives the resolving power as a percentage of version 0.1's and this "no major loss" rate, each with its 95% and 80% intervals, for the four versions side by side.
 
 ---
 
@@ -2819,18 +2832,21 @@ The pairs are (yes only for base : yes only for new), and 𝑝 is <mark>McNemar'
 ### 11.20 Rough skill by version
 
 At the user's request, how much the rough improved from version to version is measured like the resolving power (11.14), with version 0.1 as 100%. A rough has no ground truth, so wrong pixels cannot be counted; instead graders compare versions blind on "which looks more like a rough an illustrator drew by hand". The method was fixed in CLAUDE.md as "do not change" before grading.
+It was first measured for 0.59h (2026-10-20). The 0.60a trial (10-25) showed that chaining a new version onto the previous panels' fixed values carries the grader group's scale difference straight into the new value (fixed 307% vs all four panels fitted 244%), so the rule was revised and **every panel was re-graded together for the 0.60b release.** The values below are that new scale (2026-11-08) and are not compared directly with the 10-20 scale printed in the tables up to the 0.59i entry.
 
 - **What**: the rough layer if there is one (up to 0.45), or rough 2 (refine) if there are two (from 0.46). 0.46 compared rough 2 with 0.45's rough, so the same slot continues.
-  Each version's own app code with its default screen settings (the same as for the resolving power) plus the rough switched on, drawn on the same fixed 60 pictures as the blind test (11.15). 0.50–0.55 · 0.59e are the app files published in the repository (including the obfuscated ones); 0.57 · 0.58 are review apps that put that version's rough into the published 0.56 app.
-  For 0.50–0.56 the same code path was confirmed by the background maps matching those measured before. Roughs are shown like in the app, blue lines at 45% on white (one color for all, so the color does not give the version away).
-- **Panels**: versions with the same rough-drawing function (makeRough) form a generation: nine generations (0.1–0.8 · 0.9–0.43 · 0.44 · 0.45 · 0.46 · 0.47–0.56 · 0.57 · 0.58 · 0.59e). The first and last version of each, 12 panels in all, were graded.
-  The other versions in a generation have the same rough code and differ only in line art · background decisions, so their roughs differ a little; they were not graded (the table below gives the generation's first · last values and how many pictures share the previous version's rough).
-- **Sheets**: 5 per picture. Every sheet has 0.1 and 0.59e plus one window of the 10 middle panels taken 3 at a time with one overlap ([0.8 · 0.9 · 0.43] · [0.43 · 0.44 · 0.45] · [0.45 · 0.46 · 0.47] · [0.47 · 0.56 · 0.57] · [0.57 · 0.58]), 300 sheets in all.
+  Each version's own app code with its default screen settings (the same as for the resolving power) plus the rough switched on, drawn on the same fixed 60 pictures as the blind test (11.15). 0.1–0.47 are the version apps in the development repository, 0.56 · 0.59e the app files published in this repository for those versions, and 0.60b the released app (single-file build).
+  Roughs are shown like in the app, blue lines at 45% on white (one color for all, so the color does not give the version away). The 10-20 rendering tool was lost with the working folder and was rewritten; re-drawing 0.60a (measured 10-25) with the new tool reproduced the October rough hashes and background maps byte for byte on 20 of the 60 pictures.
+  **0.57 · 0.58 could not be graded this time**: their review apps (the published 0.56 app with that version's rough) survive nowhere — not in the development repository, the public repository's history or the working folder — so their roughs could not be re-drawn. The table keeps their 10-20 values only as a footnote.
+- **Panels**: versions with the same rough-drawing function (makeRough) form a generation: nine generations up to 0.60b (0.1–0.8 · 0.9–0.43 · 0.44 · 0.45 · 0.46 · 0.47–0.56 · 0.57 · 0.58 · 0.59e–0.60b). The first and last version of each that could be drawn, 11 panels (0.1 · 0.8 · 0.9 · 0.43 · 0.44 · 0.45 · 0.46 · 0.47 · 0.56 · 0.59e · 0.60b), were graded.
+  0.60b has the same rough code as 0.59e, but its base-color · part input changed, so 32 of the 60 roughs differ byte-wise; it is therefore not "= previous version" and was graded on its own. The other versions in a generation were not graded (the table below gives the generation's first · last values and how many pictures share the previous version's rough).
+- **Sheets**: 4 per picture. Every sheet has 0.1 and 0.60b plus one window of the 9 middle panels taken 3 at a time with one overlap ([0.8 · 0.9 · 0.43] · [0.43 · 0.44 · 0.45] · [0.45 · 0.46 · 0.47] · [0.47 · 0.56 · 0.59e]), 240 sheets in all (10-20 had two more windows with 0.57 · 0.58, 300 sheets).
   Roughs that are byte-identical on a picture were shown as one letter (same rank, no pair made between them). Letters and order are random per sheet; the original and each rough come as one file (whole | enlarged face area).
-- **Grading**: 31 expert-role AI graders as in 0.59's 3-B–3-D (fresh sessions of the same language model, not people, shown 5 reference roughs first), 8–10 sheets each, ranked the letters on that question (ties allowed). Each sheet was graded once by one grader.
-  A pilot of 8 pictures (40 sheets) came first with the stopping rule "if version 0.1 never wins or ties, the ratio scale breaks, so switch to 0–10 scores"; it did not trigger, so the pilot grades are included.
+- **Grading**: 24 expert-role AI graders as in 0.59's 3-B–3-D (fresh sessions of the same language model, not people), 10 sheets each, ranked the letters on that question (ties allowed). Each sheet was graded once by one grader.
+  Graders first look at 5 reference roughs. The 10-20 references were lost with the working folder, so 5 character roughs drawn by people were chosen again on pixiv ([151707444](https://www.pixiv.net/artworks/151707444) · [151695768](https://www.pixiv.net/artworks/151695768) · [151719306](https://www.pixiv.net/artworks/151719306) · [151461671](https://www.pixiv.net/artworks/151461671) · [151558349](https://www.pixiv.net/artworks/151558349); every panel sees the same references, so comparisons between panels are unaffected).
+  The 10-20 pilot stopping rule ("if version 0.1 never wins or ties, switch to 0–10 scores") did not trigger then, so it was not set this time.
 
-Every pair within a sheet becomes a win · tie · loss (2760 pairs), and a strength per version is fitted with the <mark>Davidson model</mark> (the <mark>Bradley–Terry model</mark> with ties).
+Every pair within a sheet becomes a win · tie · loss (2,372 pairs), and a strength per version is fitted with the <mark>Davidson model</mark> (the <mark>Bradley–Terry model</mark> with ties).
 
 ```math
 P(i \succ j)=\frac{\pi_i}{\pi_i+\pi_j+\nu\sqrt{\pi_i\pi_j}},\qquad P(i = j)=\frac{\nu\sqrt{\pi_i\pi_j}}{\pi_i+\pi_j+\nu\sqrt{\pi_i\pi_j}},\qquad \pi_v=e^{\beta_v},\ \beta_{0.1}=0,\qquad \text{rough skill}_v = 100\cdot\frac{\pi_v}{\pi_{0.1}}\ \%
@@ -2841,99 +2857,131 @@ P(i \succ j)=\frac{\pi_i}{\pi_i+\pi_j+\nu\sqrt{\pi_i\pi_j}},\qquad P(i = j)=\fra
 ```mermaid
 xychart-beta
     title "Rough skill (version 0.1 = 100%)"
-    x-axis ["0.1", "0.8", "0.9", "0.43", "0.44", "0.45", "0.46", "0.47", "0.56", "0.57", "0.58", "0.59e"]
-    y-axis "% of version 0.1" 0 --> 400
-    bar [100, 153, 98, 72, 81, 204, 110, 239, 367, 174, 157, 247]
+    x-axis ["0.1", "0.8", "0.9", "0.43", "0.44", "0.45", "0.46", "0.47", "0.56", "0.59e", "0.60b"]
+    y-axis "% of version 0.1" 0 --> 700
+    bar [100, 158, 152, 112, 181, 262, 210, 378, 631, 552, 471]
 ```
 
 | Version | Rough skill (vs 0.1) | 95% CI | 80% CI | Against 0.1 (win : tie : loss) | Looks drawn by a person on its own | Meaning largely lost |
 |---|---|---|---|---|---|---|
-| 0.1 | **100%** | — | — | — | 30% (91/300, 25–36) | 19% (57/300) |
-| 0.8 | **153%** | 114–215% | 127–190% | 16 : 38 : 6 | 38% (23/60, 27–51) | 13% (8/60) |
-| 0.9 | **98%** | 63–154% | 72–131% | 24 : 0 : 36 | 30% (18/60, 20–43) | 22% (13/60) |
-| 0.43 | **72%** | 46–110% | 53–96% | 51 : 2 : 67 | 25% (30/120, 18–33) | 22% (26/120) |
-| 0.44 | **81%** | 48–136% | 58–114% | 30 : 0 : 30 | 18% (11/60, 11–30) | 27% (16/60) |
-| 0.45 | **204%** | 128–329% | 150–282% | 74 : 1 : 45 | 41% (49/120, 32–50) | 20% (24/120) |
-| 0.46 | **110%** | 65–188% | 78–156% | 40 : 0 : 20 | 25% (15/60, 16–37) | 32% (19/60) |
-| 0.47 | **239%** | 143–423% | 172–346% | 82 : 2 : 36 | 44% (53/120, 36–53) | 25% (30/120) |
-| 0.56 | **367%** | 200–701% | 247–574% | 42 : 0 : 18 | 55% (33/60, 42–67) | 23% (14/60) |
-| 0.57 | **174%** | 111–285% | 129–242% | 80 : 0 : 40 | 29% (35/120, 22–38) | 21% (25/120) |
-| 0.58 | **157%** | 97–265% | 113–222% | 40 : 0 : 20 | 28% (17/60, 19–41) | 25% (15/60) |
-| 0.59e | **247%** | 156–419% | 184–351% | 202 : 0 : 98 | 52% (157/300, 47–58) | 20% (61/300) |
+| 0.1 | **100%** | — | — | — | 23% (56/240, 18–29) | 18% (43/240) |
+| 0.8 | **158%** | 121–210% | 132–188% | 24 : 25 : 11 | 35% (21/60, 24–48) | 15% (9/60) |
+| 0.9 | **152%** | 95–245% | 112–203% | 34 : 0 : 26 | 30% (18/60, 20–43) | 13% (8/60) |
+| 0.43 | **112%** | 75–170% | 86–144% | 64 : 2 : 54 | 26% (31/120, 19–34) | 13% (16/120) |
+| 0.44 | **181%** | 108–311% | 129–255% | 39 : 0 : 21 | 37% (22/60, 26–49) | 13% (8/60) |
+| 0.45 | **262%** | 169–412% | 199–357% | 87 : 0 : 33 | 47% (56/120, 38–56) | 13% (16/120) |
+| 0.46 | **210%** | 126–374% | 151–299% | 43 : 0 : 17 | 37% (22/60, 26–49) | 12% (7/60) |
+| 0.47 | **378%** | 249–627% | 288–520% | 96 : 0 : 24 | 57% (68/120, 48–65) | 14% (17/120) |
+| 0.56 | **631%** | 367–1232% | 444–982% | 50 : 0 : 10 | 63% (38/60, 51–74) | 15% (9/60) |
+| 0.57 | — | — | — | — | — | could not be re-graded (review app lost) — 10-20 scale 174% (111–285%) |
+| 0.58 | — | — | — | — | — | could not be re-graded (review app lost) — 10-20 scale 157% (97–265%) |
+| 0.59e | **552%** | 324–1039% | 393–821% | 48 : 0 : 12 | 52% (31/60, 39–64) | 15% (9/60) |
+| 0.60b | **471%** | 288–837% | 348–693% | 189 : 0 : 51 | 61% (147/240, 55–67) | 11% (27/240) |
 
-The tie weight is 𝜈 = 0.18. "Looks drawn by a person" is counted over the sheets the panel was on (Wilson 95% interval), so the number of sheets differs (0.1 · 0.59e on every sheet, panels in two windows on 120, the rest on 60).
+The tie weight is 𝜈 = 0.12. "Looks drawn by a person" is counted over the sheets the panel was on (Wilson 95% interval), so the number of sheets differs by panel (0.1 · 0.60b on all 240 sheets, panels in two windows on 120, the rest on 60).
 
-- **Course**: 0.8 (153%) has the same rough code as 0.1, only line art · layer splitting changed, and went up. After the rewrite as an "unbroken rough" at 0.9 (98%), up to 0.43 (72%) the rough code stayed the same while line art · background decisions changed, and it went down (0.43 vs 0.9 head to head 4 : 19 (37 ties)). It jumped at 0.45 (204%), dropped at 0.46 (110%) which split it into two roughs, and rose again with the tracing of 0.47 (239%).
-  The highest, 0.56 (367%), has the same rough code as 0.47, so the 0.47 → 0.56 difference is what changed in the background · character decisions in between, such as the cutout model (0.56 vs 0.47 head to head 28 : 9 (23 ties); graders' notes often penalize stray lines traced from the background). It went down with the G-pen line-art tracing of 0.57 (174%) · 0.58 (157%) and back up at 0.59e (247%) with pressure · line importance · eye and mouth boxes.
-- **0.59e is lower than 0.56.** Head to head on the same sheets, 0.59e : 0.56 = 22 : 34 (4 ties). In 0.59's 3-B (11.19) 0.59e beat 0.56 100 : 33, but the two tests differ in pictures and layout.
-  3-B compared only A · B on 138 pictures chosen at the user's instruction to have a main character and clear line art; these 60 are the blind-test list as it is and include dark, busy or small-figure pictures (graders' notes: on dark backgrounds · crowds · veils · grass every version breaks down badly). Here up to five versions sit on one sheet.
-  So 0.59e's G-pen tracing beats 0.56 on character pictures with clear line art, but with such pictures included it is rated below 0.56's looser strokes. It is above the previous version 0.58 (head to head 33 : 17 (10 ties)).
-- **Position bias**: the share ranked first by letter is A 68/300 · B 66/300 · C 71/300 · D 89/300 · E 57/240 (E only exists on sheets with five panels).
-- **Limitations**: the graders are fresh sessions of the same language model, not people. With 60 pictures and 60–300 sheets per version the intervals are wide (0.56's 95% CI is 200–701%). Versions inside a generation were not graded. The values are multiples of the odds against 0.1, so the ratio of two versions' % is their head-to-head odds (e.g. 0.59e / 0.1 = 2.47).
+- **Course**: 0.8 (158%) has the same rough code as 0.1, only line art · layer splitting changed, and went up (head to head against 0.1: 24 : 11, 25 ties). After the rewrite as an "unbroken rough" in 0.9 (152%), the rough code stayed the same up to 0.43 (112%) while only line-art · background decisions changed, and it went down (0.43 vs 0.9 head to head 13 : 21, 26 ties).
+  It rose at 0.44 (181%) · 0.45 (262%); 0.46 (210%), which split the rough into two layers, is level with 0.45 (29 : 31); and it rose again at 0.47 (378%; 0.47 vs 0.46 43 : 14, 3 ties).
+  The highest, 0.56 (631%), has the same rough code as 0.47, so the 0.47 → 0.56 difference is what changed in the background · character decisions in between, such as the cutout model (0.56 vs 0.47 head to head 36 : 10, 14 ties). 0.59e (552%) cannot be told from 0.56 head to head (28 : 29, 3 ties).
+- **0.60b (471%) came out below 0.59e · 0.56, but head to head on the same sheets they cannot be told apart.** 0.60b vs 0.59e is 0 : 1 (31 ties; the 28 sheets where the roughs were byte-identical and shared one letter are excluded), and 0.60b vs 0.56 is 28 : 29 (3 ties).
+  The gap in the values comes from 0.60b being on every sheet (240), where it was also compared with 0.8–0.47 and won less often (189 : 51 against 0.1, 82 : 38 against 0.45, 88 : 32 against 0.43) than the values of 0.56 · 0.59e would imply. Grading is a relative comparison within a sheet and is not fully transitive; 0.60b's value rests on many more comparisons than 0.56 · 0.59e, which sat on 60 sheets only.
+  Its rough code is the same as 0.59e's; only the base-color · part input changed, so 32 of the 60 roughs differ slightly. The pre-registered stopping rule (report before release if 0.59e wins significantly, 𝑝 < 0.05) did not trigger (𝑝 = 1).
+- **Difference from the 10-20 scale**: the new scale is higher overall (0.56 367 → 631%, 0.59e 247 → 552%, 0.47 239 → 378%). The grader group and the reference roughs differ and the 0.57 · 0.58 panels are gone, so the comparison structure changed; the order of versions (0.56 ≥ 0.59e > 0.47 > 0.45 > 0.46 > 0.44 > 0.8 ≈ 0.9 > 0.43 > 0.1) is almost the same as on 10-20 (there, 0.9 < 0.44). Do not compare values across the two scales.
+- **Position bias**: the share ranked first by letter is A 34/240 · B 55/240 · C 49/240 · D 72/240 · E 54/212 (E only exists on sheets with five panels). D is twice A, a larger bias than on 10-20 (A 68 · B 66 · C 71 · D 89 · E 57, /300). Letters are random per sheet, so no version is favored, but it adds noise.
+- **Limitations**: the graders are fresh sessions of the same language model, not people. With 60 pictures and 60–240 sheets per version the intervals are wide (0.56: 95% CI 367–1232%). Other versions within a generation were not graded, and 0.57 · 0.58 could not be graded because their review apps no longer exist. Grading was interrupted twice by usage limits; the interrupted graders continued in the same session. The value is the odds against 0.1 as a multiple, so the ratio of two versions' percentages can be read as the odds of one over the other, but as shown above transitivity is not perfect.
 
 | Version | Rough-code generation | Rough skill (vs 0.1) | 95% CI | 80% CI | Note |
 |---|---|---|---|---|---|
 | **0.1** | 0.1–0.8 | **100%** | — | — | graded |
-| 0.2 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 153%); same rough as the previous version on 1/60 pictures |
-| 0.3 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 153%); same rough as the previous version on 0/60 pictures |
-| 0.4 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 153%); same rough as the previous version on 0/60 pictures |
-| 0.5 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 153%); same rough as the previous version on 35/60 pictures |
-| 0.6 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 153%); same rough as the previous version on 49/60 pictures |
-| 0.7 | 0.1–0.8 | 153% | 114–215% | 127–190% | = 0.8 (all 60 roughs byte-identical) |
-| **0.8** | 0.1–0.8 | **153%** | 114–215% | 127–190% | graded |
-| **0.9** | 0.9–0.43 | **98%** | 63–154% | 72–131% | graded |
-| 0.10 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 34/60 pictures |
-| 0.11 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 52/60 pictures |
-| 0.12 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 26/60 pictures |
-| 0.13 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 48/60 pictures |
-| 0.14 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.15 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.16 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.17 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 12/60 pictures |
-| 0.18 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 55/60 pictures |
-| 0.19 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 55/60 pictures |
-| 0.20 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 58/60 pictures |
-| 0.21 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 3/60 pictures |
-| 0.22 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.23 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.24 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.25 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.26 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.27 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 46/60 pictures |
-| 0.28 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.29 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 50/60 pictures |
-| 0.30 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.31 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 3/60 pictures |
-| 0.32 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 59/60 pictures |
-| 0.33 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 45/60 pictures |
-| 0.34 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 42/60 pictures |
-| 0.35 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.36 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.37 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 39/60 pictures |
-| 0.38 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 35/60 pictures |
-| 0.39 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.40 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 60/60 pictures |
-| 0.41 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 49/60 pictures |
-| 0.42 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 98% · 0.43 72%); same rough as the previous version on 25/60 pictures |
-| **0.43** | 0.9–0.43 | **72%** | 46–110% | 53–96% | graded |
-| **0.44** | 0.44 | **81%** | 48–136% | 58–114% | graded |
-| **0.45** | 0.45 | **204%** | 128–329% | 150–282% | graded |
-| **0.46** | 0.46 | **110%** | 65–188% | 78–156% | graded |
-| **0.47** | 0.47–0.56 | **239%** | 143–423% | 172–346% | graded |
-| 0.48 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 239% · 0.56 367%); same rough as the previous version on 31/60 pictures |
-| 0.49 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 239% · 0.56 367%); same rough as the previous version on 44/60 pictures |
-| 0.50 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 239% · 0.56 367%); same rough as the previous version on 23/60 pictures |
-| 0.51 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 239% · 0.56 367%); same rough as the previous version on 0/60 pictures |
-| 0.52 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 239% · 0.56 367%); same rough as the previous version on 3/60 pictures |
-| 0.53 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 239% · 0.56 367%); same rough as the previous version on 56/60 pictures |
-| 0.54 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 239% · 0.56 367%); same rough as the previous version on 2/60 pictures |
-| 0.55 | 0.47–0.56 | 367% | 200–701% | 247–574% | = 0.56 (all 60 roughs byte-identical) |
-| **0.56** | 0.47–0.56 | **367%** | 200–701% | 247–574% | graded |
-| **0.57** | 0.57 | **174%** | 111–285% | 129–242% | graded |
-| **0.58** | 0.58 | **157%** | 97–265% | 113–222% | graded |
-| **0.59e** | 0.59e | **247%** | 156–419% | 184–351% | graded |
-| 0.59h | 0.59e | **247%** | 156–419% | 184–351% | = 0.59e (core · models byte-identical, so the roughs are too) |
-| **0.59i** | 0.59e | **247%** | 156–419% | 184–351% | = 0.59h (core · models byte-identical, so the roughs are too) |
+| 0.2 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 158%); same rough as the previous version on 1/60 pictures |
+| 0.3 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 158%); same rough as the previous version on 0/60 pictures |
+| 0.4 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 158%); same rough as the previous version on 0/60 pictures |
+| 0.5 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 158%); same rough as the previous version on 35/60 pictures |
+| 0.6 | 0.1–0.8 | — | — | — | not graded — same rough code (generation 0.1–0.8: 0.1 100% · 0.8 158%); same rough as the previous version on 49/60 pictures |
+| 0.7 | 0.1–0.8 | 158% | 121–210% | 132–188% | = 0.8 (all 60 roughs byte-identical) |
+| **0.8** | 0.1–0.8 | **158%** | 121–210% | 132–188% | graded |
+| **0.9** | 0.9–0.43 | **152%** | 95–245% | 112–203% | graded |
+| 0.10 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 34/60 pictures |
+| 0.11 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 52/60 pictures |
+| 0.12 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 26/60 pictures |
+| 0.13 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 48/60 pictures |
+| 0.14 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.15 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.16 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.17 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 12/60 pictures |
+| 0.18 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 55/60 pictures |
+| 0.19 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 55/60 pictures |
+| 0.20 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 58/60 pictures |
+| 0.21 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 3/60 pictures |
+| 0.22 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.23 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.24 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.25 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.26 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.27 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 46/60 pictures |
+| 0.28 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.29 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 50/60 pictures |
+| 0.30 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.31 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 3/60 pictures |
+| 0.32 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 59/60 pictures |
+| 0.33 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 45/60 pictures |
+| 0.34 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 42/60 pictures |
+| 0.35 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.36 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.37 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 39/60 pictures |
+| 0.38 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 35/60 pictures |
+| 0.39 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.40 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 60/60 pictures |
+| 0.41 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 49/60 pictures |
+| 0.42 | 0.9–0.43 | — | — | — | not graded — same rough code (generation 0.9–0.43: 0.9 152% · 0.43 112%); same rough as the previous version on 25/60 pictures |
+| **0.43** | 0.9–0.43 | **112%** | 75–170% | 86–144% | graded |
+| **0.44** | 0.44 | **181%** | 108–311% | 129–255% | graded |
+| **0.45** | 0.45 | **262%** | 169–412% | 199–357% | graded |
+| **0.46** | 0.46 | **210%** | 126–374% | 151–299% | graded |
+| **0.47** | 0.47–0.56 | **378%** | 249–627% | 288–520% | graded |
+| 0.48 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 378% · 0.56 631%); same rough as the previous version on 31/60 pictures |
+| 0.49 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 378% · 0.56 631%); same rough as the previous version on 44/60 pictures |
+| 0.50 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 378% · 0.56 631%); same rough as the previous version on 23/60 pictures |
+| 0.51 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 378% · 0.56 631%); same rough as the previous version on 0/60 pictures |
+| 0.52 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 378% · 0.56 631%); same rough as the previous version on 3/60 pictures |
+| 0.53 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 378% · 0.56 631%); same rough as the previous version on 56/60 pictures |
+| 0.54 | 0.47–0.56 | — | — | — | not graded — same rough code (generation 0.47–0.56: 0.47 378% · 0.56 631%); same rough as the previous version on 2/60 pictures |
+| 0.55 | 0.47–0.56 | 631% | 367–1232% | 444–982% | = 0.56 (all 60 roughs byte-identical) |
+| **0.56** | 0.47–0.56 | **631%** | 367–1232% | 444–982% | graded |
+| 0.57 | 0.57 | — | — | — | could not be re-graded — the review app (published 0.56 app + that version's rough) no longer exists; 10-20 scale 174% (95% CI 111–285%) |
+| 0.58 | 0.58 | — | — | — | could not be re-graded — the review app (published 0.56 app + that version's rough) no longer exists; 10-20 scale 157% (95% CI 97–265%) |
+| **0.59e** | 0.59e–0.60b | **552%** | 324–1039% | 393–821% | graded |
+| 0.59h | 0.59e–0.60b | 552% | 324–1039% | 393–821% | = 0.59e (core · models byte-identical, so the roughs are too) |
+| 0.59i | 0.59e–0.60b | 552% | 324–1039% | 393–821% | = 0.59e (core · models byte-identical, so the roughs are too) |
+| **0.60b** | 0.59e–0.60b | **471%** | 288–837% | 348–693% | graded (same rough code as 0.59e, but base-color · part input changed: 32 of 60 roughs differ) |
+
+### 11.21 Material-recognition network and the base-color blind A/B (0.60b)
+
+Up to 0.60a (10-25, not released), four rounds of candidates that only adjusted the base-color rules were all indistinguishable from 0.59i in A/B on real AI-generated pictures (𝑝 0.41 · 0.74 · 0.33 · 0.13). Lumping (light hair ↔ skin ↔ white clothes), patchwork (one material split into lit · shaded pieces) and shade colors on white clothes all come from "deciding what a material is by color alone": one color threshold cannot separate light hair from skin while joining bright hair with shaded hair. So a new approach that adds a learned material classifier was pre-registered and carried out (`PREREG3.md`, fixed before grading).
+
+- **Hypothesis**: with a model that gives each pixel a material (skin · hair · clothes), (a) merges across materials can be blocked and (b) lit · shaded pieces of one material can share one base color, so base colors on real AI-generated pictures improve in graders' eyes.
+- **Pictures**: development AI-generated pixiv pictures — 40 (Dd40, ranking sheets) · 80 (Da80, A/B) · 60 unseen (F60) · the fixed 60 of the blind test (11.15). F60 and the fixed 60 were not used in any grading before the final gate.
+- **Graders**: expert-role AI graders as in 0.59's 3-B–3-D (fresh sessions of the same language model, not people). Ranking sheets show one picture's candidate base-color layers under shuffled letters and ask for a ranking; A/B sheets show two versions under shuffled letters and ask which base colors are better (ties allowed); graders also pick weakness tags (material lumping · patchwork · shade-color base · other). One sheet is graded once by one grader, no grader more than 10 sheets.
+- **Selection rule** (fixed in advance): on Dd40 rankings, among candidates with more wins than losses against the baseline (S), the largest wins − losses → Da80 A/B with a two-sided sign test on non-ties, 𝑝 < 0.10 to advance → Da80 again with the shipped student model (gate A, 𝑝 < 0.10) → final gate B: 0.59i vs candidate on fixed 60 + F60 (120 pictures), 𝑝 < 0.05, and on F60 alone the candidate wins at least as often as 0.59i (no reversal). At most three teacher-stage rounds.
+- **Teacher and student**: measurements used labels from the teacher model AnimeSeg (suzukimain, Mask2Former swin-base v3, 12 classes, 768 × 768). It has no stated license, so it is not in the app; for release a small student, LRASPP-MobileNetV3-Large (torchvision, BSD), was trained on 637 AI-generated pixiv pictures collected by the user (573 train · 64 validation, no human-drawn pictures) with the teacher's labels (skin = skin · face · nose, hair, clothes).
+  On synthetic ground-truth pictures the teacher's labels disagreed badly with the truth (skin IoU 0.25 · hair 0.56 · clothes 0.30; flat mannequin-like pictures are outside what it learned), so synthetic pictures were dropped from the student's training data, and the synthetic filter (dev0 · dev3) carried almost no information for this approach (base colors changed on only 37 of 2,880 pictures; dev0 improved 7 · worsened 8, dev3 15 · 7; recorded as "uninformative" by the user's decision).
+  The student's validation IoU against the teacher — skin 0.539 · hair 0.515 · clothes 0.530 — missed the pre-set bar (0.6 each, raised to 0.625 by the user), and two larger models (DeepLabV3-MobileNetV3 0.48 · 0.48 · 0.50, FPN-ResNet18 0.47 · 0.49 · 0.48) also stalled near 0.5, pointing to the data size and the teacher's own inconsistency (dark coats · white dresses flipping between clothes and accessory) as the limit.
+  By the user's decision the student was therefore judged by its **effect on base colors** (gates A · B) rather than pixel agreement. Its region classes agree with the teacher's at 0.84 on Dd40 and 0.88 on Da80 (weighted by pixels of regions that got a class), with no skin ↔ hair confusion.
+
+| Stage | Pictures | Candidate | Win : loss (ties) | 𝑝 | Verdict |
+|---|---|---|---|---|---|
+| Round 1 Dd40 ranking | 40 | S vs S_M1 (blocking on all classes) | 21 : 8 (8) | 0.024 | S_M1 chosen (wins − losses +13; S_M2 20 : 15 · S_M3 19 : 17) |
+| Round 1 Da80 A/B | 80 | S vs S_M1 | 29 : 20 (25) | 0.253 | **failed** (not 𝑝 < 0.10) |
+| Round 2 Dd40 ranking | 40 | S vs S_N2 (skin · hair · clothes only · area threshold · same-class shadow merging) | 10 : 4 (10) | — | S_N2 chosen (tied with S_N1, head-to-head 1 : 0) |
+| Round 2 Da80 A/B | 80 | S vs S_N2 (teacher labels) | 22 : 5 (17) | 0.0015 | **passed** |
+| Gate A Da80 A/B | 80 | S vs S_N2 (student labels) | 26 : 5 (13) | 0.00019 | **passed** |
+| **Gate B** (final) A/B | 120 | 0.59i vs 0.60b (student labels) | **54 : 28 (38)** | **0.0054** | **passed** (F60 29 : 13 (18), 𝑝 0.020 — no reversal; fixed 60 25 : 15 (20), 𝑝 0.15) |
+
+𝑝 is a two-sided exact sign test on non-ties. S is the baseline with stable clustering only. The round-1 diagnosis showed the accessory label taking 23–56% of a character (dark coats · white dresses) and blocking merges within one garment, and almost every blocked merge involved a boundary strip under 1% of the valid pixels, which raised patchwork and shade colors; the round-2 candidate (classes skin · hair · clothes only, a class only for regions of at least 0.3% of the area, and the shadow-merge guard lifted for same-class pairs) followed from that.
+
+- **Tags** (0.59i → 0.60b, weakness counts chosen by graders on the 120 gate-B pictures): material lumping 85 → 73, patchwork 95 → 103, shade-color base 47 → 53, other 24 → 29. Wins came mostly where skin separated from white clothes · light hair; losses where hair was tied to skin · clothes colors or white clothes took a shade color. Patchwork and shade colors remain weaknesses (10.4).
+- **Background · rough**: in every render the background map (background-layer alpha ≥ 128) was byte-identical to 0.59i (Dd40 · Da80 · the 120 gate-B pictures · 2,880 synthetic pictures). The rough-drawing code is unchanged but its base-color · part input changed, so roughs were re-graded in 11.20.
+- **Limits**: the graders are not people. The test used 120 development pictures and 60 unseen ones; on the fixed 60 alone 𝑝 = 0.15, not significant (same direction). The student follows the teacher's labels only about half the time (IoU around 0.5), and the teacher itself wavers (dark coats · props as accessory). The training data is AI-generated pictures only, so results on human-drawn pictures were not measured.
 
 ---
 
@@ -2942,6 +2990,43 @@ The tie weight is 𝜈 = 0.18. "Looks drawn by a person" is counted over the she
 Newest versions are at the top.
 
 **Note** — **Why**: The formulas behind each version's resolving-power multiple, intervals and 𝑝 values are not repeated per version. **How it works**: The resolving-power multiple and its interval use the BER formula of 11.14 and a paired bootstrap (10,000 draws), blind-test intervals are Wilson intervals, and 𝑝 for paired gradings is McNemar's exact test or the sign test (11.1). **References**: [R56 Wilson 1927](#r56) · [R72 McNemar 1947](#r72) · [R85 Dixon · Mood 1946](#r85) · [R80 Efron 1979](#r80)
+
+### 0.60b;1_4[43] (2026-11-08) Material-recognition network for better base colors; app published as plain HTML + js
+
+- Resolving power: 17.52× version 0.1 (95% CI 11.87–29.98× · background result same as the previous version — confirmed on the 177 regenerated pictures of the 185 with ground truth, 11)
+- Rough skill: 471% of version 0.1 (95% CI 288–837% · every panel re-graded together on a new scale; the previous version 0.59i is 552% on the same scale, 11.20)
+- **Better base colors** (user's instruction: fix the base-color weaknesses — shade colors becoming the base color, materials lumped together, patchwork — and release only once real AI-generated pictures improve): the base color (3.8) is the widest color within a group of regions tied as one material, and the biggest weakness was material tying (3.7) lumping different materials of similar color — skin with white clothes or light hair, bangs with skin — so their base colors mixed.
+  This version adds a small neural network that labels each pixel as skin · hair · clothes, keeps regions of different classes from being tied together, and merges shade pieces inside the same class into the base color more readily. The candidate was chosen by measurement only (below), and the background layer is untouched.
+  - **Material-recognition network** (added): LRASPP-MobileNetV3-Large (torchvision, BSD; ImageNet-pretrained backbone) that shrinks the character picture to 512 × 512 and outputs four classes per pixel — none · skin · hair · clothes (ONNX 12.9 MB → `illustracy-mat.js`, 15.2 MiB).
+    Training data: 637 AI-generated pixiv pictures collected by the user (573 train · 64 validation; no human-drawn pictures). Labels came from the teacher model AnimeSeg (suzukimain, Mask2Former swin-base v3, 12 classes), folded into skin (skin · face · nose) · hair · clothes.
+    The teacher has no stated license, so it is not shipped in the app and was used only to make labels during development. On the 64 validation pictures the student's IoU against the teacher was skin 0.539 · hair 0.515 · clothes 0.530, below the pre-set bar (0.6 each, raised to 0.625 by the user; two larger models also stalled near 0.5), so by the user's decision the student was judged by its **effect on base colors** instead of pixel agreement, and it passed gates A · B below (11.21).
+    The network runs in the same worker as the cutout model (ONNX Runtime Web, one thread) and adds about 0.4 s per picture. Labels are used per region only: a region gets a class when at least 60% of its valid pixels share it and the region covers at least 0.3% of the valid pixels; small boundary strips get no class and are absorbed by neighbors as before.
+  - **Stable clustering** (updated): the color clustering of step 4 (k-means) drew its samples and initial centers with a shared random generator, so a single different character pixel re-rolled every region → part. In the character pass the samples are now drawn by a coordinate hash and the initial centers from Lab grid-cell means, so the same input gives the same output and a small input change no longer shakes the whole result (the background pass keeps the original path, so background maps are byte-identical).
+  - **Class blocking** (updated): material tying in step 6 and the 7-2 cleanup (shadow-piece merging · small-piece absorption · part cap) never merge regions of different classes (skin · hair · clothes). Eye · eyebrow · mouth · accessory labels are not used (in round 1 the accessory label split dark coats and white dresses and did harm).
+  - **Same-class shadow merging** (updated): in 7-2 ①, pairs of the same class drop the guard "0.6× darker and at least 1% of the area means a different material", so shade pieces join the base color (the 40% enclosure · 1.5× area · shadow-relation conditions stay).
+- **Measurement** (pre-registered in `PREREG3.md`, everything fixed before grading · graders are expert-role AI in fresh sessions; details in 11.21): the round-1 candidate (blocking on all classes) failed the 80 development-picture A/B (𝑝 = 0.25) → diagnosis → the round-2 candidate (skin · hair · clothes only · area threshold · same-class shadow merging) passed (22 : 5, 17 ties, 𝑝 = 0.0015).
+  Re-measured with the shipped student model, gate A (80 development pictures): 26 : 5 (13 ties, 𝑝 = 0.00019). **Final gate B** (fixed 60 + 60 unseen pictures, 0.59i vs 0.60b): **54 : 28 (38 ties, 𝑝 = 0.0054)**; the 60 unseen alone 29 : 13 (𝑝 = 0.020), the fixed 60 alone 25 : 15 (𝑝 = 0.15, same direction).
+  By grader tags, material lumping fell from 85 to 73, but patchwork (95 → 103) and shade-color base colors (47 → 53) rose slightly — remaining weaknesses (10.4).
+- **Effect on background · rough**: the background map (background-layer alpha ≥ 128) is byte-identical to 0.59i on the 120 gate-B pictures, the 60 blind-test pictures and the 177 regenerated ground-truth pictures → resolving power and blind test are those of 0.59i.
+  The 8 AI-generated pictures with ground truth could not be re-run: their original files are gone (copyrighted material was never committed, and the working folder was lost). Every changed line acts only in the character pass, so their background maps are taken to be unchanged too. Whether the 177 regenerated pictures match the originals was gauged against the October measurement maps: comparing today's 0.59i maps with the October 0.60a measurement maps, 157 of the 177 are identical; of the 20 that differ, 15 are pictures where 0.59i and 0.60a already differed in October (expected), and the remaining 5 (prone-pose synthetic pictures) were regenerated slightly differently because the rendering environment changed although the generator code is the same (maps differ by 0.07–0.81%). So 172 of the 177 match the October inputs and 5 differ slightly; 0.59i and 0.60b were both run on today's inputs, so the comparison is unaffected.
+  The rough-drawing code (makeRough) is the same as 0.59e, but its base-color · part input changed, so 32 of the fixed 60 roughs differ byte-wise. Rough skill is therefore not "= previous version", and by the rule revised on 10-25 every panel was re-graded together (11.20).
+- **Distribution format** (updated, user's instruction): files are published as they are instead of split archives (zip.001 · .002). Next to the app `illustracy.html` (28.9 MiB), the neural-network blobs are side js files — `illustracy-ort.js` (ONNX Runtime Web 1.29.0, MIT) · `illustracy-cut-1.js` · `-2.js` (cutout model skytnt/anime-seg ISNet, Apache-2.0, and its fine-tuned delta) · `illustracy-fill-1~3.js` (background fill big-lama, Apache-2.0) · `illustracy-mat.js` (material-recognition network).
+  The app uses blocks inside the HTML when present, otherwise the side js files (works over file:// too); without them the cutout falls back to the 0.50 method, base colors to color only, and fill to the patch method, each with a notice. Layer · pixel hashes of the single-file and split builds were confirmed equal. Every file is under 50 MiB.
+- Version name: added 1 (material-recognition network) · updated 4 (stable clustering · class blocking · same-class shadow merging · side blobs) · build 43 = 17 up to 0.60a + S 1 + P · F · PF 3 + S_P · S_F · S_PF 3 + S_PF_L · T · LT 3 + S_K · S_PF_K 2 + S_A2 · S_K_A2 · S_A3 3 + S_D · S_A3_D · S_A3_DE · S_A4 4 + S_M1–M3 3 + S_N1 · S_N3 · S_N2 3 + S_N2s 1 (the 10-25–26 records were lost and rebuilt from memory, so that stretch may be undercounted). The minor letter b is the second candidate of 0.60 (0.60a was not released).
+
+| | Version 0.1 | Version 0.59h | Version 0.59i | Version 0.60b |
+|---|---|---|---|---|
+| Resolving power | 100% | 1752% | 1752% | 1752% |
+| Resolving power 95% CI | — | 1187–2998% | 1187–2998% | 1187–2998% |
+| Resolving power 80% CI | — | 1352–2434% | 1352–2434% | 1352–2434% |
+| Blind test (no major loss) | 31.7% | 86.7% | 86.7% | 86.7% |
+| Blind test 95% CI | 21.3–44.2% | 75.8–93.1% | 75.8–93.1% | 75.8–93.1% |
+| Blind test 80% CI | 24.5–39.8% | 80.1–91.3% | 80.1–91.3% | 80.1–91.3% |
+| Rough skill (new scale) | 100% | 552% | 552% | 471% |
+| Rough skill 95% CI | — | 324–1039% | 324–1039% | 288–837% |
+| Rough skill 80% CI | — | 393–821% | 393–821% | 348–693% |
+
+Resolving power and the blind test follow the table in the 0.59h entry; 0.60b has the same background maps as 0.59i, so both values are the same (the 60 blind-test pictures fall in the same cell, so 0.59i's grades are reused). Rough skill is on the new scale from re-grading every panel this time, so it is not compared directly with the tables of earlier entries (the 10-20 scale).
 
 ### 0.59i;0_1[20] (2026-10-20) Sample image: one of 10 bundled pictures at random
 
