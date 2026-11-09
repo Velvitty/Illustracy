@@ -74,6 +74,15 @@
 - 앱의 "예제 그림"은 사용자가 고른 픽시브 AI 생성 그림 10장(AI 생성 태그, 사용자가 공개를 허락함)을 원본 파일 그대로 앱 안에 넣어 그중 하나를 무작위로 연다(0.59i부터, 바로 앞과 같은 그림은 피함).
   목록 · 출처는 README 12절 0.59i 항목. 그림을 더하거나 바꿀 때는 사용자에게 묻고, 어려 보이는 캐릭터를 선정적으로 그린 그림은 넣지 않는다.
 
+## PWA 시작 화면(사용자가 ChatGPT Codex로 만들어 2026-11-10 main에 올림, bcbc363) — 앞으로의 판에서도 유지 · 갱신(사용자 지시 11-10)
+
+- 파일(저장소 루트): `index.html`(설치 가능한 시작 화면. 앱 UI의 정적 스냅숏을 배경으로 한 로딩 상자 → `illustracy.html`을 iframe `#application`으로 열고 검색 문자열 · 해시를 그대로 넘기며, 앱 문서가 준비되면 시작 화면을 지움) · `sw.js`(서비스 워커. 시작 화면 · 설치 자산 · `offline.html`만 캐시하고 앱 HTML과 옆 js는 캐시하지 않음) · `pwa.js`(서비스 워커 등록, 설치 · 업데이트 메뉴) · `manifest.webmanifest` · `offline.html` · `pwa-ui.html`(앱 UI 스냅숏) · 아이콘 `pwa-icon-192.png` · `pwa-icon-512.png` · `pwa-icon-maskable.png` · `apple-touch-icon.png` · 생성기 `pwa/refresh.py` · `pwa/ui_snapshot.py` · 설명 `PWA.md`. 그 커밋은 앱 · 도움말 · README를 바꾸지 않았다.
+- **지켜야 할 동작(사용자 지시 11-10)**: 로딩 화면(index.html)과 오프라인 화면(offline.html, 시작 화면의 연결 안내)의 테마가 앱의 테마 설정과 연동되어야 한다 — `illustracy-theme`이 `dark` · `light`면 그 테마, `auto`거나 없으면 시스템 설정(prefers-color-scheme)을 따른다. 앱 쪽에서 테마 저장 키 · 값 체계를 바꾸면 `pwa/ui_snapshot.theme_profile`이 읽는 프로필도 함께 바뀌어야 하므로, 바꿀 일이 있으면 refresh.py 결과(index.html · offline.html 안의 `readUITheme({...})` 인자)를 확인한다.
+- 새 판마다(출시 절차): 앱 `illustracy.html`을 바꾼 뒤 저장소 루트에서 `python3 pwa/refresh.py`(표준 라이브러리만. `-I`를 붙이면 pwa/ 안 `ui_snapshot` 모듈을 못 찾는다)를 돌려 `index.html` · `offline.html` · `pwa-ui.html` · `sw.js`(캐시 버전 = 앱 · PWA 파일 해시 16자)를 다시 만들고 앱과 같은 커밋에 넣는다. 한 번 더 돌려 바뀌지 않음(멱등)을 확인한다. 0.60b로 확인(11-10 03:50 KST): 커밋된 네 파일과 바이트로 같음(버전 0daaca9782715caa).
+- 확인(새 판마다): 스크래치패드 `bc60/pwa/check_pwa.cjs`(개발 저장소 rel060/bc60/pwa) — `node check_pwa.cjs <저장소 루트 복사본> [포트] [스크린샷 폴더]`(Playwright 크로미움, http.server). 테마 설정 dark · light · auto · 없음 × 시스템 dark · light 여섯 경우에 (1) 로딩 화면 테마, (2) 시작 화면이 사라진 뒤 iframe의 `illustracy.html?…#…`과 앱 테마, 서비스 워커 active, 페이지 오류 0, (3) 서비스 워커 설치 뒤 연결을 끊고 다시 열었을 때 보이는 오프라인 화면의 테마와 연결 안내를 본다. 0.60b: 6/6 통과(11-10 04:00 KST; 오프라인은 offline.html이 캐시에서 나옴).
+- 앱 쪽에서 지킬 것: (1) 파일 이름(`illustracy.html` · `illustracy-help.html` · 옆 js)을 바꾸지 않는다. 옆 js를 더하면 `illustracy-<이름>.js` 꼴로 하고 `sw.js`의 제외 정규식 `/\/illustracy-(?:ort|cut-\d+|fill-\d+|mat)\.js$/`에 넣는다(큰 파일을 캐시하지 않게). (2) 테마 저장 키 `illustracy-theme`(localStorage; light · dark · auto)와 `<html data-theme>`를 그대로 둔다. (3) 앱은 iframe 안에서도 그대로 돌아가야 한다(`window.top !== window`로 멈추는 코드 금지. 도움말 새 창은 iframe에서도 열린다). (4) 스냅숏은 앱의 script · iframe · object · @font-face를 뺀 정적 HTML · CSS이므로 큰 데이터(예제 그림 · 모델)는 지금처럼 script 태그 안에 둔다.
+- README 12절의 새 판 항목에 "PWA 시작 화면 파일을 다시 만듦(pwa/refresh.py)"을 한 줄 적는다(0.61a부터). PWA 파일은 앱과 함께 main에 직접 커밋한다(앱 파일 커밋 방식과 같음).
+
 ## 버전 이름 규칙(사용자 지시, 0.59부터)
 
 - 형식: `0.<올라간 버전 수><부 버전 알파벳>;<추가된 기능 수>_<업데이트 및 수정된 기능 수>[<빌드 번호>]`. 예: `0.60g;4_2[13]`.
