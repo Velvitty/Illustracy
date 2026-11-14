@@ -210,7 +210,7 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: var
 <style>header .tseg .opt[aria-checked="true"]{background:var(--sel)!important;box-shadow:inset 0 -2px 0 var(--accent)}</style></head>
 <body inert>
 <header>
-  <h1><svg class="logo" viewbox="0 0 26 26" aria-hidden="true"><path d="M3 17.6 13 23l10-5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" opacity=".55"/><path d="M3 13.1 13 18.5l10-5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" opacity=".8"/><path d="M13 3 23 8.4 13 13.8 3 8.4z" fill="var(--accent)"/></svg>Illustracy<span class="ver" title="Illustracy 버전 0.59i;0_1[20]">v0.59i;0_1[20]</span><span>일러스트 → 레이어 분리 PSD</span></h1>
+  <h1><svg class="logo" viewbox="0 0 26 26" aria-hidden="true"><path d="M3 17.6 13 23l10-5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" opacity=".55"/><path d="M3 13.1 13 18.5l10-5.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" opacity=".8"/><path d="M13 3 23 8.4 13 13.8 3 8.4z" fill="var(--accent)"/></svg>Illustracy<span class="ver" title="Illustracy 버전 0.61c;2_3[20]">v0.61c;2_3[20]</span><span>일러스트 → 레이어 분리 PSD</span></h1>
   <div class="spacer"></div>
   <div class="stat" id="stat"></div>
   <a class="helpbtn" id="helpBtn" href="illustracy-help.html" title="도움말: 쓰는 법, 틀린 곳 고치기, 분리 원리"><svg viewbox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4.1"/><path d="M12 17.6h.01"/></svg>도움말</a>
@@ -324,8 +324,9 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: var
         <select id="o_folderMode" style="width:100%">
           <option value="part" selected>파츠별 폴더 (피부 · 머리카락별)</option>
           <option value="stage">단계별 폴더 (밑색 · 그림자별)</option>
+          <option value="mat">재질별 폴더 (피부 · 옷 · 머리카락 · 눈)</option>
         </select>
-        <div class="hint" id="h_folderMode">파츠별: [피부] [머리카락] … 안에 밑색 · 그림자 · 하이라이트. 단계별: [밑색] [1차 그림자] [2차 그림자] [하이라이트] 안에 파츠(클리핑 없이. 불투명한 그림은 합친 결과가 같음)</div>
+        <div class="hint" id="h_folderMode">파츠별: [피부] [머리카락] … 안에 밑색 · 그림자 · 하이라이트(밑색 색마다 한 폴더). 재질별: [피부] [옷] [머리카락] [눈] [그 밖] 다섯 폴더(재질 식별 신경망). 단계별: [밑색] [1차 그림자] [2차 그림자] [하이라이트] 안에 파츠(클리핑 없이. 불투명한 그림은 합친 결과가 같음)</div>
       </div>
       <div class="field"><label class="check"><input type="checkbox" id="o_clip" checked> 그림자·하이라이트를 밑색에 클리핑</label></div>
       <div class="field"><label class="check"><input type="checkbox" id="o_bg" checked> 단색 배경 자동 분리</label></div>

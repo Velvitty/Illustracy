@@ -241,7 +241,7 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: var
 &lt;style&gt;header .tseg .opt[aria-checked=&quot;true&quot;]{background:var(--sel)!important;box-shadow:inset 0 -2px 0 var(--accent)}&lt;/style&gt;&lt;/head&gt;
 &lt;body inert&gt;
 &lt;header&gt;
-  &lt;h1&gt;&lt;svg class=&quot;logo&quot; viewbox=&quot;0 0 26 26&quot; aria-hidden=&quot;true&quot;&gt;&lt;path d=&quot;M3 17.6 13 23l10-5.4&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.7&quot; stroke-linejoin=&quot;round&quot; stroke-linecap=&quot;round&quot; opacity=&quot;.55&quot;/&gt;&lt;path d=&quot;M3 13.1 13 18.5l10-5.4&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.7&quot; stroke-linejoin=&quot;round&quot; stroke-linecap=&quot;round&quot; opacity=&quot;.8&quot;/&gt;&lt;path d=&quot;M13 3 23 8.4 13 13.8 3 8.4z&quot; fill=&quot;var(--accent)&quot;/&gt;&lt;/svg&gt;Illustracy&lt;span class=&quot;ver&quot; title=&quot;Illustracy 버전 0.59i;0_1[20]&quot;&gt;v0.59i;0_1[20]&lt;/span&gt;&lt;span&gt;일러스트 → 레이어 분리 PSD&lt;/span&gt;&lt;/h1&gt;
+  &lt;h1&gt;&lt;svg class=&quot;logo&quot; viewbox=&quot;0 0 26 26&quot; aria-hidden=&quot;true&quot;&gt;&lt;path d=&quot;M3 17.6 13 23l10-5.4&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.7&quot; stroke-linejoin=&quot;round&quot; stroke-linecap=&quot;round&quot; opacity=&quot;.55&quot;/&gt;&lt;path d=&quot;M3 13.1 13 18.5l10-5.4&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.7&quot; stroke-linejoin=&quot;round&quot; stroke-linecap=&quot;round&quot; opacity=&quot;.8&quot;/&gt;&lt;path d=&quot;M13 3 23 8.4 13 13.8 3 8.4z&quot; fill=&quot;var(--accent)&quot;/&gt;&lt;/svg&gt;Illustracy&lt;span class=&quot;ver&quot; title=&quot;Illustracy 버전 0.61c;2_3[20]&quot;&gt;v0.61c;2_3[20]&lt;/span&gt;&lt;span&gt;일러스트 → 레이어 분리 PSD&lt;/span&gt;&lt;/h1&gt;
   &lt;div class=&quot;spacer&quot;&gt;&lt;/div&gt;
   &lt;div class=&quot;stat&quot; id=&quot;stat&quot;&gt;&lt;/div&gt;
   &lt;a class=&quot;helpbtn&quot; id=&quot;helpBtn&quot; href=&quot;illustracy-help.html&quot; title=&quot;도움말: 쓰는 법, 틀린 곳 고치기, 분리 원리&quot;&gt;&lt;svg viewbox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; aria-hidden=&quot;true&quot;&gt;&lt;circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;9.5&quot;/&gt;&lt;path d=&quot;M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4.1&quot;/&gt;&lt;path d=&quot;M12 17.6h.01&quot;/&gt;&lt;/svg&gt;도움말&lt;/a&gt;
@@ -355,8 +355,9 @@ button.tool.on { background: var(--sel); border-color: var(--accent); color: var
         &lt;select id=&quot;o_folderMode&quot; style=&quot;width:100%&quot;&gt;
           &lt;option value=&quot;part&quot; selected&gt;파츠별 폴더 (피부 · 머리카락별)&lt;/option&gt;
           &lt;option value=&quot;stage&quot;&gt;단계별 폴더 (밑색 · 그림자별)&lt;/option&gt;
+          &lt;option value=&quot;mat&quot;&gt;재질별 폴더 (피부 · 옷 · 머리카락 · 눈)&lt;/option&gt;
         &lt;/select&gt;
-        &lt;div class=&quot;hint&quot; id=&quot;h_folderMode&quot;&gt;파츠별: [피부] [머리카락] … 안에 밑색 · 그림자 · 하이라이트. 단계별: [밑색] [1차 그림자] [2차 그림자] [하이라이트] 안에 파츠(클리핑 없이. 불투명한 그림은 합친 결과가 같음)&lt;/div&gt;
+        &lt;div class=&quot;hint&quot; id=&quot;h_folderMode&quot;&gt;파츠별: [피부] [머리카락] … 안에 밑색 · 그림자 · 하이라이트(밑색 색마다 한 폴더). 재질별: [피부] [옷] [머리카락] [눈] [그 밖] 다섯 폴더(재질 식별 신경망). 단계별: [밑색] [1차 그림자] [2차 그림자] [하이라이트] 안에 파츠(클리핑 없이. 불투명한 그림은 합친 결과가 같음)&lt;/div&gt;
       &lt;/div&gt;
       &lt;div class=&quot;field&quot;&gt;&lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;o_clip&quot; checked&gt; 그림자·하이라이트를 밑색에 클리핑&lt;/label&gt;&lt;/div&gt;
       &lt;div class=&quot;field&quot;&gt;&lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;o_bg&quot; checked&gt; 단색 배경 자동 분리&lt;/label&gt;&lt;/div&gt;
