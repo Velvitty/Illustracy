@@ -1,6 +1,6 @@
 /* Project-local PWA cache. Offline launches display a connection notice. */
 'use strict';
-const VERSION = "94efbfce0648b29c";
+const VERSION = "a64708b210babf1a";
 const APP = "Illustracy";
 const CORE = ["./pwa-ui.html", "./manifest.webmanifest", "./pwa.js", "./offline.html", "./pwa-icon-192.png", "./pwa-icon-512.png", "./pwa-icon-maskable.png", "./apple-touch-icon.png"];
 const OPTIONAL = [];
@@ -91,7 +91,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (!url.href.startsWith(SCOPE)) return;
-  if (/\/illustracy-(?:ort|cut-\d+|fill-\d+|mat)\.js$/i.test(url.pathname)) return;
+  if (/\/illustracy-(?:ort|cut-[a-z0-9-]+|fill-[a-z0-9-]+|mat)\.js$/i.test(url.pathname)) return;
   if (/\/(?:api|graphql|auth|login|logout)(?:\/|$)/i.test(url.pathname)) return;
   const keyURL = new URL(url);
   keyURL.hash = '';
